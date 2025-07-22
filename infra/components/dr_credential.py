@@ -259,9 +259,7 @@ def get_credential_runtime_parameter_values(
             )
         credential_runtime_parameter_values.append(rtp)
     # Need to disable LLM gateway inference if using user-provided creds
-    if os.environ["DISABLE_LLM_GATEWAY"] == "True":
-        pass
-    else:
+    if os.environ.get("DISABLE_LLM_GATEWAY", "False") != "True":
         llm_gw_inference_param = datarobot.CustomModelRuntimeParameterValueArgs(
             key="ENABLE_LLM_GATEWAY_INFERENCE",
             type="boolean",
