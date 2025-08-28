@@ -2,7 +2,6 @@ import logging
 
 from domain.reboot_manager import IRebootManager
 
-
 logger = logging.getLogger(__name__)
     
 class RebootUsecase:

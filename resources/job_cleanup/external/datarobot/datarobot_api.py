@@ -1,8 +1,7 @@
-import aiohttp
-import asyncio
 import logging
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
+import aiohttp
 from domain.item_manager import IItemManager
 from domain.reboot_manager import IRebootManager
 

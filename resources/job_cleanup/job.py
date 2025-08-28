@@ -1,10 +1,13 @@
 import asyncio
-import os
 import logging
+import os
+
+from external.datarobot.datarobot_api import (
+    DataRobotItemManager,
+    DataRobotRebootManager,
+)
 from usecase.delete_items import DeleteItemsUsecase
 from usecase.reboot_custom_application import RebootUsecase
-from external.datarobot.datarobot_api import DataRobotItemManager
-from external.datarobot.datarobot_api import DataRobotRebootManager
 
 logging.basicConfig(level=logging.INFO)
 
