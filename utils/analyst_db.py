@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import hashlib
 import json
 import uuid
 from abc import ABC
@@ -24,11 +25,11 @@ from typing import Any, AsyncGenerator, List, Optional, cast
 
 import duckdb
 import langid
-import numpy as np
 import pandas as pd
 import pyarrow as pa
 
 from utils.logging_helper import get_logger
+from utils.persistent_storage import PersistentStorage
 from utils.schema import (
     AnalystChatMessage,
     AnalystDataset,
@@ -84,11 +85,13 @@ class BaseDuckDBHandler(ABC):
         db_version: (
             int | None
         ) = 1,  # should be updated after updating db tables structure
+        use_persistent_storage: bool = False,
     ) -> None:
         """Initialize database path and create tables."""
         self.db_version = db_version
         self.user_id = user_id
         self.db_path = self.get_db_path(user_id=user_id, db_path=db_path, name=name)
+        self._storage = PersistentStorage(user_id) if use_persistent_storage else None
 
     async def _create_db_version_table(
         self,
@@ -110,6 +113,10 @@ class BaseDuckDBHandler(ABC):
 
     async def _initialize_database(self) -> None:
         """Initialize database tables and extensions."""
+        if self._storage and not self.db_path.exists():
+            self._storage.fetch_from_storage(
+                self.db_path.name, str(self.db_path.absolute())
+            )
         async with self._get_connection() as conn:
             # check if db_version table exist
             db_version_result = await self.execute_query(
@@ -152,10 +159,32 @@ class BaseDuckDBHandler(ABC):
         """Async context manager for database connections."""
         loop = asyncio.get_running_loop()
         conn = await loop.run_in_executor(None, duckdb.connect, self.db_path)
-        try:
-            yield conn
-        finally:
-            await loop.run_in_executor(None, conn.close)
+        async with self._save_to_storage():
+            try:
+                yield conn
+            finally:
+                await loop.run_in_executor(None, conn.close)
+
+    @asynccontextmanager
+    async def _save_to_storage(self) -> AsyncGenerator[None, None]:
+        # if we have storage, check DB hashsum before and after connection
+        # and save if file changed
+        if self._storage:
+            before = hashlib.sha256()
+            with self.db_path.open("rb") as db_file:
+                while chunk := db_file.read(8192):
+                    before.update(chunk)
+            yield
+            after = hashlib.sha256()
+            with self.db_path.open("rb") as db_file:
+                while chunk := db_file.read(8192):
+                    after.update(chunk)
+            if before.digest() != after.digest():
+                self._storage.save_to_storage(
+                    self.db_path.name, str(self.db_path.absolute())
+                )
+        else:
+            yield
 
     async def execute_query(
         self,
@@ -916,7 +945,7 @@ class ChatHandler(BaseDuckDBHandler):
             )
 
             if not exists:
-                logger.warning(f"Chat with ID {chat_id} does not exist")
+                logger.error(f"Chat with ID {chat_id} does not exist")
                 return ""
 
             # Insert the new message
@@ -1325,6 +1354,7 @@ class AnalystDB:
         dataset_db_name: str = "dataset",
         chat_db_name: str = "chat",
         db_version: int | None = ANALYST_DATABASE_VERSION,
+        use_persistent_storage: bool = False,
     ) -> "AnalystDB":
         self = cls.__new__(cls)
         self.dataset_handler = DatasetHandler(
@@ -1332,9 +1362,14 @@ class AnalystDB:
             db_path=db_path,
             name=dataset_db_name,
             db_version=db_version,
+            use_persistent_storage=use_persistent_storage,
         )
         self.chat_handler = ChatHandler(
-            user_id=user_id, db_path=db_path, name=chat_db_name, db_version=db_version
+            user_id=user_id,
+            db_path=db_path,
+            name=chat_db_name,
+            db_version=db_version,
+            use_persistent_storage=use_persistent_storage,
         )
         self.user_id = user_id
         self.db_path = db_path
