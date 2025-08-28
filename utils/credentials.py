@@ -66,10 +66,24 @@ class GoogleCredentials(DRCredentials):
         )
     )
     region: Optional[str] = Field(default="us-west1", validation_alias="GOOGLE_REGION")
+
+
+class GoogleCredentialsBQ(DRCredentials):
+    service_account_key: Dict[str, Any] = Field(
+        validation_alias=AliasChoices(
+            "GOOGLE_SERVICE_ACCOUNT_BQ",
+            AliasPath(
+                "MLOPS_RUNTIME_PARAM_GOOGLE_SERVICE_ACCOUNT_BQ", "payload", "gcpKey"
+            ),
+        )
+    )
+    region: Optional[str] = Field(
+        default="us-west1", validation_alias="GOOGLE_REGION_BQ"
+    )
     db_schema: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
-            "GOOGLE_DB_SCHEMA", AliasPath("MLOPS_RUNTIME_PARAM_GOOGLE_DB_SCHEMA")
+            "GOOGLE_DB_SCHEMA_BQ", AliasPath("MLOPS_RUNTIME_PARAM_GOOGLE_DB_SCHEMA_BQ")
         ),
     )
 

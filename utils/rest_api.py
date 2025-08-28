@@ -49,7 +49,7 @@ from utils.analyst_db import AnalystDB, DatasetMetadata, DataSourceType
 from utils.database_helpers import get_external_database
 from utils.logging_helper import get_logger
 
-sys.path.append("..")
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 from utils.api import (
     AnalysisGenerationError,
@@ -86,6 +86,7 @@ async def get_database(user_id: str) -> AnalystDB:
         db_path=Path("/tmp"),
         dataset_db_name="datasets.db",
         chat_db_name="chat.db",
+        use_persistent_storage=bool(os.environ.get("APPLICATION_ID")),
     )
     return analyst_db
 
