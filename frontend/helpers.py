@@ -14,6 +14,7 @@
 
 import json
 import logging
+import os
 import sys
 import traceback
 import uuid
@@ -25,7 +26,7 @@ from typing import (
 
 import streamlit as st
 
-sys.path.append("..")
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from utils.analyst_db import AnalystDB, DataSourceType
 
 logger = logging.getLogger("DataAnalyst")
@@ -97,6 +98,7 @@ async def state_init() -> None:
             db_path=Path("/tmp"),
             dataset_db_name="datasets.db",
             chat_db_name="chat.db",
+            use_persistent_storage=bool(os.environ.get("APPLICATION_ID")),
         )
 
         st.session_state.analyst_db = analyst_db
