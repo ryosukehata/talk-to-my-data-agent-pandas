@@ -22,7 +22,7 @@ import pandas as pd
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-sys.path.append("..")
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from app_settings import (
     apply_custom_css,
     display_page_logo,

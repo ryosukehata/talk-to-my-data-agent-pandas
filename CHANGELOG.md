@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.2.00] - 2025-08-29
+
+### Fixed
+
+- Support separate google creds for vertexAI and BQ
+- New google model name in credentials check
+- Data dictionary generation timeout
+- Data dictionary generation didn't return partial results
+- Analyst dataset incorrectly inferred schema at read time
+- Fix rare DR Catalog ingest issue
+
+### Changed
+
+- 
+
+### Added
+
+- Persistent storage functionality
+
 ## [0.1.13] - 2025-05-06
 
 ### Fixed

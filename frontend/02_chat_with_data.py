@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import os
 import sys
 import time
 import uuid
@@ -28,7 +29,7 @@ from openai.types.chat.chat_completion_user_message_param import (
 )
 from streamlit.delta_generator import DeltaGenerator
 
-sys.path.append("..")
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 # Import FastAPI functions directly
 from app_settings import (
     apply_custom_css,
