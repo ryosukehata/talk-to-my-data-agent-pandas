@@ -448,7 +448,7 @@ if os.environ.get("DISALLOW_MONITORING_RESOURCES", "false").lower() == "true":
 else:
     create_monitoring_resources()
 
-if os.environ.get("CLEANUP_JOB_FOR_APP_DATA", "false").lower() == "true":
-    create_cleanup_job(app)
+if os.environ.get("DISALLOW_APP_CLEANUP_JOB", "false").lower() == "true":
+    pulumi.info("Skipping app cleanup job creation")
 else:
-    pulumi.info("Skipping app data cleanup job creation")
+    create_cleanup_job(app)
