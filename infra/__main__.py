@@ -414,7 +414,7 @@ def create_cleanup_job(app: datarobot.CustomApplication):
 
     # Cleanup schedules before updating/creating custom_job
     cleanup = CustomJobScheduleCleanup(
-        "custom-job-schedule-cleanup", settings_job_infra.job_resource_name
+        "cleanup-job-schedule-cleanup", settings_job_infra.cleanup_job_resource_name
     )
 
     job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters, 
@@ -449,6 +449,6 @@ else:
     create_monitoring_resources()
 
 if os.environ.get("DISALLOW_APP_CLEANUP_JOB", "false").lower() == "true":
-    pulumi.info("Skipping app cleanup job creation")
+    pulumi.info("Skipping app data cleanup job creation")
 else:
     create_cleanup_job(app)
