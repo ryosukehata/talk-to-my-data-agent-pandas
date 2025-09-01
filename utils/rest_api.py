@@ -19,6 +19,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
@@ -40,10 +41,15 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import StreamingResponse
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as XLImage
+from openpyxl.utils.dataframe import dataframe_to_rows
+from starlette.background import BackgroundTask
 
 from utils.analyst_db import AnalystDB, DatasetMetadata, DataSourceType
 from utils.database_helpers import get_external_database
@@ -67,17 +73,21 @@ from utils.schema import (
     ChatRequest,
     ChatResponse,
     ChatUpdate,
-    CleansedDataset,
     DataDictionary,
     DataDictionaryResponse,
     DataRegistryDataset,
+    DatasetCleansedResponse,
     DictionaryCellUpdate,
     FileUploadResponse,
+    GetBusinessAnalysisResult,
     LoadDatabaseRequest,
+    RunAnalysisResult,
+    RunChartsResult,
 )
 
-logger = get_logger("DataAnalystBackend")
-print("logger initialized")
+logger = get_logger()
+
+MAX_EXCEL_ROWS = 50000  # Maximum rows to export to Excel to prevent memory issues
 
 
 async def get_database(user_id: str) -> AnalystDB:
@@ -97,9 +107,11 @@ async def get_initialized_db(request: Request) -> AnalystDB:
         not hasattr(request.state.session, "analyst_db")
         or request.state.session.analyst_db is None
     ):
+        if not request.headers.get("x-user-email"):
+            logger.error("x-user-email is required in order to initialize the database")
         raise HTTPException(
             status_code=400,
-            detail="Database not initialized. Please call /initialize first.",
+            detail="Database not initialized.",
         )
 
     return cast(AnalystDB, request.state.session.analyst_db)
@@ -290,11 +302,14 @@ async def _initialize_session(
 ]:
     """Initialize the session state and return the session ID and user ID."""
     # Create a new session state with default values
+    is_local_dev = os.environ.get("DEV_MODE", False)
     session_state = SessionState()
     empty_session_state: dict[str, Any] = {
         "datarobot_account_info": None,
         "datarobot_endpoint": os.environ.get("DATAROBOT_ENDPOINT"),
-        "datarobot_api_token": None,
+        "datarobot_api_token": os.environ.get("DATAROBOT_API_TOKEN")
+        if is_local_dev
+        else None,
         "datarobot_api_skoped_token": None,
         "analyst_db": None,
     }
@@ -617,51 +632,87 @@ async def get_cleansed_dataset(
     name: str,
     skip: int = 0,
     limit: int = 10000,
+    search: str | None = None,
     analyst_db: AnalystDB = Depends(get_initialized_db),
-) -> CleansedDataset:
+) ->  DatasetCleansedResponse:
     """
-    Get a cleansed dataset by name from the database with pagination support.
+    Get a cleansed dataset by name from the database with pagination and search support.
 
     Args:
         name: The name of the dataset
         skip: Number of records to skip (for pagination)
         limit: Maximum number of records to return (for pagination)
+        search: Optional search term to filter columns by name (raw data view)
 
     Returns:
-        The cleansed dataset with cleaning report, containing a subset of records based on skip and limit
+        A dictionary containing the cleaning report (if available) and the dataset as a list of records.
 
     Raises:
         HTTPException: If the dataset doesn't exist or cannot be retrieved
     """
     try:
-        # Calculate max_rows based on skip + limit
-        max_rows = skip + limit if skip + limit > 0 else None
+        ds_display = await analyst_db.get_dataset(name)
 
-        # Retrieve the dataset with the calculated max_rows
-        cleansed_dataset = await analyst_db.get_cleansed_dataset(
-            name, max_rows=max_rows
+        # Initialize the response structure
+        response = DatasetCleansedResponse(
+            dataset_name=name,
+            cleaning_report=None,
+            dataset=None,
         )
 
-        # Apply skip if needed (max_rows in get_cleansed_dataset only handles the limit)
-        if skip > 0 and cleansed_dataset.dataset.to_df().shape[0] > skip:
-            # Create a new dataset with skipped rows
-            skipped_df = cleansed_dataset.dataset.to_df().iloc[
-                skip : min(limit, max_rows)
-            ]
-            cleansed_dataset.dataset = AnalystDataset(name=name, data=skipped_df)
-        elif skip > 0:
-            # If skip is greater than the number of rows, return an empty dataset
-            cleansed_dataset.dataset = AnalystDataset(
-                name=name,
-                data=cleansed_dataset.dataset.to_df().head(1),
-            )
+        # Attempt to fetch the cleaning report
+        try:
+            ds_display_cleansed = await analyst_db.get_cleansed_dataset(name)
+            response.cleaning_report = ds_display_cleansed.generate_cleaning_report()
 
-        return cleansed_dataset
+        except ValueError:
+            # Cleaning report is not available
+            response.cleaning_report = None
+
+        # Convert the dataset to a DataFrame
+        df_display = ds_display.to_df()
+
+        # Apply search filter if provided - filter columns by name
+        if search and search.strip():
+            search_term = search.strip().lower()
+            original_columns = list(df_display.columns)
+            matching_columns = [
+                col for col in original_columns if search_term in col.lower()
+            ]
+            if matching_columns:
+                # Select only the matching columns
+                try:
+                    df_display = df_display.loc[:, matching_columns]
+                except Exception as e:
+                    logger.error(f"Error selecting columns: {e}")
+                    # Fallback to original dataframe if selection fails
+                    pass
+            else:
+                # No matching columns, create empty dataframe
+                df_display = df_display.iloc[0:0, []]
+
+        # Apply pagination (skip and limit)
+        if skip > 0 or limit > 0:
+            df_display = df_display.iloc[skip : skip+limit]
+
+        # Create an instance of AnalystDataset
+        dataset = AnalystDataset(
+            name=name,
+            columns=df_display.columns,
+            data=df_display.to_dict(orient="records"),  # Convert rows to a list of dictionaries
+        )
+
+        # Add the dataset to the response
+        response.dataset = dataset
+
+        return response
+
     except ValueError as e:
         raise HTTPException(
-            status_code=404, detail=f"Cleansed dataset not found: {str(e)}"
+            status_code=404, detail=f"Dataset '{name}' not found: {str(e)}"
         )
     except Exception as e:
+        logger.error(f"Error retrieving cleansed dataset '{name}': {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Error retrieving cleansed dataset: {str(e)}"
         )
@@ -683,7 +734,9 @@ async def delete_dictionary(
 
 @router.get("/dictionaries/{name}/download")
 async def download_dictionary(
-    name: str, analyst_db: AnalystDB = Depends(get_initialized_db)
+    name: str,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+    bom: bool = False,
 ) -> Response:
     """
     Download a dictionary as a CSV file.
@@ -709,11 +762,13 @@ async def download_dictionary(
     logger.info(f"CSV conversion complete for {name}")
 
     # Create response with CSV attachment
-    response = Response(content=csv_content.getvalue())
-    response.headers["Content-Disposition"] = (
-        f"attachment; filename={name}_dictionary.csv"
-    )
-    response.headers["Content-Type"] = "text/csv"
+    csv_text = csv_content.getvalue()
+    if bom:
+        csv_text = (
+            "\ufeff" + csv_text
+        )  # Prefix UTF-8 BOM for Excel compatibility with international characters
+    response = Response(content=csv_text)
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
 
     return response
 
@@ -868,6 +923,35 @@ async def delete_chat_message(
         return cast(list[AnalystChatMessage], [])
 
 
+@router.get("/chats/{chat_id}/messages/{message_id}")
+async def get_chat_message(
+    chat_id: str,
+    message_id: str,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+) -> AnalystChatMessage:
+    """Get a specific message by ID from a specific chat"""
+    try:
+        message = await analyst_db.get_chat_message(message_id=message_id)
+        if not message:
+            raise HTTPException(
+                status_code=404, detail=f"Message with ID {message_id} not found"
+            )
+
+        # Verify the message belongs to the specified chat
+        if message.chat_id != chat_id:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Message with ID {message_id} not found in chat {chat_id}",
+            )
+
+        return message
+    except Exception as e:
+        logger.error(f"Error getting message: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error retrieving message: {str(e)}"
+        )
+
+
 @router.post("/chats/messages")
 async def create_new_chat_message(
     request: Request,
@@ -879,7 +963,7 @@ async def create_new_chat_message(
 
     # Create a new chat
     chat_id = await analyst_db.create_chat(
-        chat_name="New Chat",
+        chat_name=payload.chatName,
         data_source=payload.data_source,
     )
 
@@ -960,7 +1044,7 @@ async def create_chat_message(
 
         # Create valid messages for the chat request
         valid_messages: list[ChatCompletionMessageParam] = [
-            user_message.to_openai_message_param()
+            msg.to_openai_message_param() for msg in messages if msg.content.strip()
         ]
 
         # Add the current message
@@ -995,6 +1079,231 @@ async def create_chat_message(
     }
 
     return chat
+
+
+@router.get("/chats/{chat_id}/messages/download/")
+async def save_chat_messages(
+    request: Request,
+    chat_id: str,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+    message_id: str | None = None,
+) -> StreamingResponse:
+    """
+    This API controller saves a chat ID to an excel spreadsheet which
+    saves key information, then is streamed back to the user.
+    """
+    temp_files: list[str] = []
+
+    chat_messages: List[AnalystChatMessage] = await analyst_db.get_chat_messages(
+        chat_id=chat_id
+    )
+
+    # If a specific message_id is provided, filter messages to include
+    # only that user message and its following assistant response.
+    if message_id:
+        idx = next((i for i, m in enumerate(chat_messages) if m.id == message_id), None)
+        if idx is None or chat_messages[idx].role != "user":
+            raise HTTPException(detail="User message not found", status_code=404)
+        # Ensure there is a following assistant message
+        if idx == len(chat_messages) - 1 or chat_messages[idx + 1].role != "assistant":
+            filtered_messages = [chat_messages[idx]]
+        else:
+            filtered_messages = [chat_messages[idx], chat_messages[idx + 1]]
+        chat_messages = filtered_messages
+    if not chat_messages:
+        # Create an empty workbook with basic structure for empty chats
+        analysis_workbook = Workbook()
+        # Remove the default sheet
+        analysis_workbook.remove(analysis_workbook.active)
+
+        # Create a single sheet indicating the chat is empty
+        empty_sheet = analysis_workbook.create_sheet("Empty Chat")
+        empty_sheet["A1"] = "Chat Export"
+        empty_sheet["A3"] = "This chat contains no messages to export yet."
+
+        output = io.BytesIO()
+        analysis_workbook.save(output)
+        output.seek(0)
+
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    if any(msg.in_progress for msg in chat_messages):
+        raise HTTPException(
+            detail="Cannot download while a chat is in progress.", status_code=425
+        )
+    analysis_workbook = Workbook()
+    data_sheets_count = 0
+    charts_sheets_count = 0
+    report_sheets_count = 0
+
+    # Remove the initial default sheet created by Workbook()
+    analysis_workbook.remove(analysis_workbook.active)
+
+    for i, chat_message in enumerate(chat_messages):
+        if chat_message.role == "assistant":
+            # Handle Analysis Report sheet
+            report_sheets_count += 1
+            report_sheet_name = (
+                "Sheet" if report_sheets_count == 1 else f"Sheet {report_sheets_count}"
+            )
+            report_sheet = analysis_workbook.create_sheet(report_sheet_name)
+
+            report_sheet["A1"] = "Analysis Report"
+
+            # Since messages alternate user/assistant, the previous message is always the user question
+            user_question = (
+                chat_messages[i - 1].content
+                if i > 0 and chat_messages[i - 1].role == "user"
+                else "No question found"
+            )
+
+            report_sheet["A3"] = "Question"
+            report_sheet["A4"] = user_question
+            report_sheet["A6"] = "Answer"
+            report_sheet["A7"] = chat_message.content
+
+            business_components: list[GetBusinessAnalysisResult] = [
+                component
+                for component in chat_message.components
+                if isinstance(component, GetBusinessAnalysisResult)
+            ]
+            for index, business_component in enumerate(business_components):
+                cell_index = index + 1  # Excel uses 1 indexing
+                report_sheet.cell(9, cell_index).value = "Bottom Line"
+                report_sheet.cell(10, cell_index).value = business_component.bottom_line
+
+                report_sheet.cell(12, cell_index).value = "Additional Insights"
+                report_sheet.cell(
+                    13, cell_index
+                ).value = business_component.additional_insights
+
+                report_sheet.cell(15, cell_index).value = "Follow-up Questions:"
+                for q_index, followup_question in enumerate(
+                    business_component.follow_up_questions
+                ):
+                    report_sheet.cell(
+                        16 + q_index, cell_index
+                    ).value = followup_question
+
+            # Handle Data sheets
+            run_analysis_components: List[RunAnalysisResult] = [
+                component
+                for component in chat_message.components
+                if isinstance(component, RunAnalysisResult)
+            ]
+            for run_analysis_component in run_analysis_components:
+                if not run_analysis_component.dataset:
+                    continue
+                data_sheets_count += 1
+                data_sheet_name = (
+                    "Data" if data_sheets_count == 1 else f"Data {data_sheets_count}"
+                )
+                data_sheet = analysis_workbook.create_sheet(data_sheet_name)
+
+                try:
+                    dataset: pd.DataFrame = (
+                        run_analysis_component.dataset.data.df
+                    )
+
+                    # Convert to pandas with error handling for large datasets
+                    pandas_df = dataset
+
+                    # Add size check to prevent memory issues and Excel limits
+                    original_rows = pandas_df.shape[0]
+                    if original_rows > MAX_EXCEL_ROWS:
+                        logger.warning(
+                            f"Dataset too large ({original_rows} rows), truncating to {MAX_EXCEL_ROWS} rows"
+                        )
+                        pandas_df = pandas_df.head(MAX_EXCEL_ROWS)
+                        # Add a notice row at the top of the sheet
+                        data_sheet.append(
+                            [
+                                f"NOTICE: Dataset truncated from {original_rows:,} to {MAX_EXCEL_ROWS:,} rows due to Excel limitations"
+                            ]
+                        )
+                        data_sheet.append([])
+
+                    for r in dataframe_to_rows(pandas_df, index=False, header=True):
+                        data_sheet.append(r)
+
+                except Exception as e:
+                    logger.error(f"Failed to process dataset: {e}")
+                    # Create error sheet instead of crashing
+                    data_sheet["A1"] = "Dataset Processing Error"
+                    data_sheet["A2"] = f"Error: {str(e)}"
+
+            # Handle Charts sheets
+            run_charts_components: List[RunChartsResult] = [
+                component
+                for component in chat_message.components
+                if isinstance(component, RunChartsResult)
+            ]
+            for run_chart_component in run_charts_components:
+                for f, js in [
+                    (run_chart_component.fig1, run_chart_component.fig1_json),
+                    (run_chart_component.fig2, run_chart_component.fig2_json),
+                ]:
+                    if not js or not f:
+                        continue
+                    charts_sheets_count += 1
+                    charts_sheet_name = f"Chart {charts_sheets_count}"
+                    charts_sheet = analysis_workbook.create_sheet(charts_sheet_name)
+
+                    # Save the chart data by removing the some keys from this field
+                    # We don't know what exactly is going to be graphed, so this is an easy way of covering
+                    # ourselves
+                    try:
+                        parsed_json = json.loads(js)
+                        data_list = parsed_json.get("data", [])
+                        if data_list and len(data_list) > 0:
+                            fig_json = data_list[
+                                0
+                            ].copy()  # Create copy to avoid modifying original
+                            [fig_json.pop(k, None) for k in ["marker", "name", "type"]]
+                            df = pd.DataFrame(fig_json)
+                            for r in dataframe_to_rows(df, index=False, header=True):
+                                charts_sheet.append(r)
+
+                        with tempfile.NamedTemporaryFile(
+                            suffix=".png", delete=False
+                        ) as tmpfile:
+                            f.write_image(tmpfile.name)
+                            img = XLImage(tmpfile.name)
+                            charts_sheet.add_image(img, "F3")
+                            temp_files.append(tmpfile.name)
+                    except (
+                        json.JSONDecodeError,
+                        KeyError,
+                        IndexError,
+                        ValueError,
+                    ) as e:
+                        logger.warning(f"Failed to process chart data: {e}")
+                        # Create error sheet instead of crashing
+                        charts_sheet["A1"] = "Chart Processing Error"
+                        charts_sheet["A2"] = f"Error: {str(e)}"
+                    except Exception as e:
+                        logger.error(f"Unexpected error processing chart: {e}")
+                        continue  # Skip this chart but continue processing
+    output = io.BytesIO()
+    analysis_workbook.save(output)
+    output.seek(0)
+
+    # Create background task to cleanup temporary files
+    def cleanup_files(file_paths: List[str]) -> None:
+        for fp in file_paths:
+            if os.path.exists(fp):
+                os.remove(fp)
+
+    background_task = BackgroundTask(cleanup_files, temp_files) if temp_files else None
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        background=background_task,
+    )
 
 
 async def run_complete_analysis_task(

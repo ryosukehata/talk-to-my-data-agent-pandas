@@ -29,12 +29,13 @@ from utils.i18n import LanguageCode, LocaleSettings
 from .settings_main import PROJECT_ROOT
 
 FRONTEND_PATHS = {
-    "react": Path("frontend_react") / "deploy",
+    "react": Path("app_backend"),
     "streamlit": Path("frontend"),
 }
 
+
 def get_frontend_path() -> Path:
-    frontend_type = os.environ.get("FRONTEND_TYPE", "streamlit")
+    frontend_type = os.environ.get("FRONTEND_TYPE", "react")
     return FRONTEND_PATHS[frontend_type]
 
 
