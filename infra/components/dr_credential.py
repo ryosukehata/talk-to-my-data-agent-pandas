@@ -14,8 +14,8 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
+import logging
 import textwrap
 from typing import Any
 
@@ -30,6 +30,7 @@ from utils.credentials import (
     AzureOpenAICredentials,
     DRCredentials,
     GoogleCredentials,
+    GoogleCredentialsBQ,
     NoDatabaseCredentials,
     SAPDatasphereCredentials,
     SnowflakeCredentials,
@@ -90,10 +91,27 @@ def get_credential_runtime_parameter_values(
             rtps.append(
                 {"key": "GOOGLE_REGION", "type": "string", "value": credentials.region}
             )
+        credential_rtp_dicts = [rtp for rtp in rtps if rtp["value"] is not None]
+    elif isinstance(credentials, GoogleCredentialsBQ):
+        rtps = [
+            {
+                "key": "GOOGLE_SERVICE_ACCOUNT_BQ",
+                "type": "google_credential",
+                "value": {"gcpKey": json.dumps(credentials.service_account_key)},
+            }
+        ]
+        if credentials.region:
+            rtps.append(
+                {
+                    "key": "GOOGLE_REGION_BQ",
+                    "type": "string",
+                    "value": credentials.region,
+                }
+            )
         if credential_type == "db":
             rtps.append(
                 {
-                    "key": "GOOGLE_DB_SCHEMA",
+                    "key": "GOOGLE_DB_SCHEMA_BQ",
                     "type": "string",
                     "value": credentials.db_schema,
                 }
@@ -387,9 +405,9 @@ def get_llm_credentials(
             credentials = GoogleCredentials()
             if test_credentials:
                 lookup = {
-                    LLMs.GOOGLE_1_5_PRO.name: "gemini-1.5-pro-001",
+                    LLMs.GOOGLE_1_5_PRO.name: "gemini-1.5-pro-002",
                     LLMs.GOOGLE_BISON.name: "chat-bison@002",
-                    LLMs.GOOGLE_GEMINI_1_5_FLASH.name: "gemini-1.5-flash-001",
+                    LLMs.GOOGLE_GEMINI_1_5_FLASH.name: "gemini-1.5-flash-002",
                 }
                 try:
                     import openai
@@ -444,13 +462,13 @@ def get_database_credentials(
     test_credentials: bool = True,
 ) -> (
     SnowflakeCredentials
-    | GoogleCredentials
+    | GoogleCredentialsBQ
     | SAPDatasphereCredentials
     | NoDatabaseCredentials
 ):
     credentials: (
         SnowflakeCredentials
-        | GoogleCredentials
+        | GoogleCredentialsBQ
         | SAPDatasphereCredentials
         | NoDatabaseCredentials
     )
@@ -523,7 +541,7 @@ def get_database_credentials(
             return credentials
 
         elif database == "bigquery":
-            credentials = GoogleCredentials()
+            credentials = GoogleCredentialsBQ()
             if test_credentials:
                 import google.cloud.bigquery
                 from google.oauth2 import service_account

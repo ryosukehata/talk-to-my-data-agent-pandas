@@ -15,7 +15,7 @@ import asyncio
 import os
 import sys
 import warnings
-from collections import defaultdict
+
 from typing import cast
 
 import pandas as pd
@@ -44,7 +44,6 @@ from utils.i18n import gettext
 from utils.logging_helper import get_logger
 from utils.schema import (
     AnalystDataset,
-    CleansedColumnReport,
     DataDictionary,
     DataRegistryDataset,
 )
@@ -372,30 +371,22 @@ async def main() -> None:
             with tab1:
                 ds_display = await analyst_db.get_dataset(ds_display_name)
                 st.subheader(f"{ds_display.name}")
-                cleaning_report: list[CleansedColumnReport] | None = None
+                
                 try:
                     ds_display_cleansed = await analyst_db.get_cleansed_dataset(
                         ds_display_name
                     )
-                    cleaning_report = ds_display_cleansed.cleaning_report
+                    cleaning_report = ds_display_cleansed.generate_cleaning_report()
 
                     # Display cleaning report in expander
                     with st.expander(gettext("View Cleaning Report")):
-                        # Group reports by conversion type
-                        conversions: defaultdict[str, list[CleansedColumnReport]] = (
-                            defaultdict(list)
-                        )
-
-                        for col_report in cleaning_report:
-                            if col_report.conversion_type:
-                                conversions[col_report.conversion_type].append(
-                                    col_report
-                                )
-
                         # Display summary of changes
-                        if conversions:
+                        if cleaning_report.conversions:
                             st.write(gettext("### Summary of Changes"))
-                            for conv_type, reports in conversions.items():
+                            for (
+                                conv_type,
+                                reports,
+                            ) in cleaning_report.conversions.items():
                                 columns_count = len(reports)
                                 st.write(
                                     f"**{conv_type}** ({columns_count} {'column' if columns_count == 1 else 'columns'})"
@@ -436,13 +427,13 @@ async def main() -> None:
                             st.info(gettext("No columns were modified during cleaning"))
 
                         # Show unchanged columns
-                        unchanged = [
-                            r for r in cleaning_report if not r.conversion_type
-                        ]
-                        if unchanged:
+                        if cleaning_report.unchanged_columns:
                             st.write(gettext("### Unchanged Columns"))
                             st.write(
-                                ", ".join(f"`{r.new_column_name}`" for r in unchanged)
+                                ", ".join(
+                                    f"`{col}`"
+                                    for col in cleaning_report.unchanged_columns
+                                )
                             )
 
                 except ValueError:
