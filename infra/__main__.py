@@ -279,7 +279,8 @@ def create_monitoring_resources():
         "custom-job-schedule-cleanup", settings_job_infra.job_resource_name
     )
 
-    job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters)
+    job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters, 
+                                                                 settings_job_infra.job_path)
     # Add content hash to description to force update on file change
     job_description = (
         f"DataRobot Custom Job for telemetry export. Content Hash: {job_files_hash}"
@@ -383,9 +384,71 @@ def create_monitoring_resources():
         settings_dashboard_infra.dashboard_resource_name, dashboard.application_url
     )
 
+def create_cleanup_job(app: datarobot.CustomApplication):
+    job_runtime_parameters = [
+        datarobot.ApplicationSourceRuntimeParameterValueArgs(
+            key=key,
+            type="string",
+            value=value,
+        )
+        for key, value in {
+            "DATAROBOT_APPLICATION_ID": app.id,
+        }.items()
+    ]
+    class CustomJobScheduleCleanup(pulumi.ComponentResource):
+        def __init__(self, name, custom_job_name, opts=None):
+            super().__init__("custom:resource:CustomJobScheduleCleanup", name, {}, opts)
+            self.cleanup_done = pulumi.Output.from_input(custom_job_name).apply(
+                self._delete_schedules_if_exists
+            )
+            self.register_outputs({"cleanup_done": self.cleanup_done})
+
+        def _delete_schedules_if_exists(self, job_name):
+            job = get_custom_job_by_name(job_name)
+            if job is None:
+                # Job does not exist, skip deletion
+                return True
+            job_id = job["id"]
+            delete_all_custom_job_schedule(job_id)
+            return True
+
+    # Cleanup schedules before updating/creating custom_job
+    cleanup = CustomJobScheduleCleanup(
+        "cleanup-job-schedule-cleanup", settings_job_infra.cleanup_job_resource_name
+    )
+
+    job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters, 
+                                                                 settings_job_infra.cleanup_job_path)
+
+    # Add content hash to description to force update on file change
+    job_description = (
+        f"DataRobot Cleanup Custom Job Content Hash: {job_files_hash}"
+    )
+
+    cleanup_custom_job = datarobot.CustomJob(
+        resource_name=settings_job_infra.cleanup_job_resource_name,
+        name=settings_job_infra.cleanup_job_resource_name,
+        description=job_description,
+        environment_id=settings_job_infra.base_environment_id,
+        files=job_files,
+        runtime_parameter_values=job_runtime_parameters,
+        resource_bundle_id=settings_job_infra.resource_bundle_id,
+        job_type="default",
+        opts=pulumi.ResourceOptions(
+            depends_on=[cleanup],
+        ),
+    )
+    pulumi.export(settings_job_infra.cleanup_job_resource_name, cleanup_custom_job.id)
+    pulumi.export("CLEANUP_CUSTOM_JOB_ID", cleanup_custom_job.id)
+
 
 # Only stop monitoring resources if DISALLOW_MONITORING_RESOURCES is set to true
 if os.environ.get("DISALLOW_MONITORING_RESOURCES", "false").lower() == "true":
     pulumi.info("Disallowing monitoring resources")
 else:
     create_monitoring_resources()
+
+if os.environ.get("DISALLOW_APP_CLEANUP_JOB", "false").lower() == "true":
+    pulumi.info("Skipping app data cleanup job creation")
+else:
+    create_cleanup_job(app)

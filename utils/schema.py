@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Generator, Literal, Optional, Union
@@ -177,11 +178,52 @@ class CleansedDataset(BaseModel):
     def to_df(self) -> pd.DataFrame:
         return self.dataset.to_df()
 
+    def generate_cleaning_report(self) -> CleaningReport:
+        """
+        Generate a detailed cleaning report for the dataset.
+
+        Returns:
+            CleaningReport: A dictionary containing:
+                - `conversions`: A mapping of conversion types to lists of column reports.
+                - `unchanged_columns`: A list of column names that were not modified.
+        """
+        if not self.cleaning_report:
+            return CleaningReport(
+                conversions={},
+                unchanged_columns=[],
+            )
+
+        # Group reports by conversion type
+        conversions: dict[str, list[CleansedColumnReport]] = defaultdict(list)
+        unchanged_columns: list[str] = []
+
+        for col_report in self.cleaning_report:
+            if col_report.conversion_type:
+                conversions[col_report.conversion_type].append(col_report)
+            else:
+                unchanged_columns.append(col_report.new_column_name)
+
+        return CleaningReport(
+            conversions=conversions,
+            unchanged_columns=unchanged_columns,
+        )
+
 
 class DataDictionaryColumn(BaseModel):
     data_type: str
     column: str
     description: str
+
+
+class CleaningReport(BaseModel):
+    conversions: dict[str, list[CleansedColumnReport]]
+    unchanged_columns: list[str]
+
+
+class DatasetCleansedResponse(BaseModel):
+    dataset_name: str
+    cleaning_report: Optional[CleaningReport]
+    dataset: Optional[AnalystDataset]
 
 
 class DataDictionary(BaseModel):
@@ -534,6 +576,7 @@ class AnalystChatMessage(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     chat_id: str | None = None
+    error: str | None = None
 
     def to_openai_message_param(self) -> ChatCompletionMessageParam:
         if self.role == "user":
@@ -626,6 +669,7 @@ class ChatMessagePayload(BaseModel):
     enable_chart_generation: bool = True
     enable_business_insights: bool = True
     data_source: str = "file"
+    chatName: Optional[str] = "New Chat"
 
 
 class DownloadedRegistryDataset(BaseModel):

@@ -67,6 +67,9 @@ dataset_access_log_path = str(
 )
 job_path = PROJECT_ROOT / "resources" / "job_telemetry_exporter"
 
+cleanup_job_path = PROJECT_ROOT / "resources" / "job_cleanup"
+
+
 # set the source bundle
 resource_bundle_id = "cpu.medium"
 
@@ -74,6 +77,7 @@ resource_bundle_id = "cpu.medium"
 dataset_trace_name = f"Dataset Trace [{PROJECT_NAME}]"
 dataset_access_log_name = f"Dataset Access Log [{PROJECT_NAME}]"
 job_resource_name: str = f"Usage Export Job [{PROJECT_NAME}]"
+cleanup_job_resource_name: str = f"Cleanup Job [{PROJECT_NAME}]"
 
 
 def _prep_metadata_yaml(
@@ -81,6 +85,7 @@ def _prep_metadata_yaml(
         datarobot.ApplicationSourceRuntimeParameterValueArgs
         | datarobot.CustomModelRuntimeParameterValueArgs
     ],
+    job_path: Path,
 ) -> None:
     from jinja2 import BaseLoader, Environment
 
@@ -109,8 +114,10 @@ def get_job_files(
         datarobot.ApplicationSourceRuntimeParameterValueArgs
         | datarobot.CustomModelRuntimeParameterValueArgs,
     ],
+    job_path: Path,
 ) -> Tuple[list[tuple[str, str]], str]:
-    _prep_metadata_yaml(runtime_parameter_values)
+    _prep_metadata_yaml(runtime_parameter_values, 
+                        job_path=job_path)
     # Get all files from job path, excluding specific patterns
     files_to_include: list[Path] = []
     for f in job_path.glob("**/*"):
