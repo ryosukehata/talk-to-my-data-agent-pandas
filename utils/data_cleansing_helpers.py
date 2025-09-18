@@ -253,9 +253,35 @@ def try_datetime_conversion(
                 ts_series = pd.to_datetime(series, format=format_2, errors='coerce', dayfirst=True)
         
         return True, ts_series, warnings
-    
     return False, series, warnings
 
+def try_string_trim(
+        series: pd.Series, 
+        sample_series: pd.Series, 
+        original_nulls: pd.Series
+) -> tuple[bool, pd.Series, list[str]]:
+    """
+    Trim leading and trailing whitespace from string values.
+    Only applies if whitespace trimming actually changes the data.
+    """
+    warnings = []
+    
+    # pandasでは、str.strip() を使用して前後の空白を削除します。
+    # NoneはNaNとして扱われ、そのまま残ります。
+    original_values = sample_series.astype(str)
+    sample_cleaned = original_values.str.strip()
+    
+    # 処理後の値と元の値が異なるかどうかをチェックします。
+    # isna() でNaNを考慮し、空白が削除された行を特定します。
+    has_whitespace = (original_values != sample_cleaned).any()
+    
+    if has_whitespace:
+        # シリーズ全体に適用します。
+        cleaned_series = series.str.strip()
+        warnings.append("Removed leading and trailing whitespace from string values")
+        return True, cleaned_series, warnings
+    
+    return False, series, warnings
 
 def add_summary_statistics(
     df: pd.DataFrame, report: list[CleansedColumnReport]
@@ -311,6 +337,7 @@ def process_column(
             ("simple_clean", try_simple_numeric_conversion),
             ("unit_conversion", try_unit_conversion),
             ("datetime", try_datetime_conversion),
+            ("string_trim", try_string_trim),
         ]
 
         # それぞれの変換方法を試す
