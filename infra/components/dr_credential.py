@@ -330,6 +330,11 @@ def get_llm_credentials(
                         messages=[{"role": "user", "content": "Hello"}],
                     )
                 except Exception as e:
+
+
+                    # デバッグ情報を追加
+                    logger.error(f"Azure OpenAI connection test failed: {type(e).__name__}: {str(e)}")
+                    logger.error(f"Exception details: {repr(e)}")
                     raise ValueError(
                         textwrap.dedent(
                             f"""\
