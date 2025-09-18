@@ -291,10 +291,10 @@ def get_llm_credentials(
         if llm.credential_type == "azure":
             credentials = AzureOpenAICredentials()
             if test_credentials:
-                #try:
-                import openai
+                try:
+                    import openai
 
-                lookup = {
+                    lookup = {
                         LLMs.AZURE_OPENAI_GPT_3_5_TURBO.name: "gpt-35-turbo",
                         LLMs.AZURE_OPENAI_GPT_3_5_TURBO_16K.name: "gpt-35-turbo-16k",
                         LLMs.AZURE_OPENAI_GPT_4.name: "gpt-4",
@@ -303,12 +303,12 @@ def get_llm_credentials(
                         LLMs.AZURE_OPENAI_GPT_4_TURBO.name: "gpt-4-turbo",
                         LLMs.AZURE_OPENAI_GPT_4_O_MINI.name: "gpt-4o-mini",
                     }
-                if (
+                    if (
                         credentials.azure_deployment is not None
                         and credentials.azure_deployment != lookup[llm.name]
                     ):
-                    pulumi.warn(
-                        textwrap.dedent(
+                        pulumi.warn(
+                            textwrap.dedent(
                                 f"""\
                                 Environment variable OPENAI_API_DEPLOYMENT_ID doesn't match the LLM Blueprint specified in settings_generative.py.
 
@@ -318,34 +318,29 @@ def get_llm_credentials(
                                 """
                             )
                         )
-                openai_client = openai.AzureOpenAI(
+                    openai_client = openai.AzureOpenAI(
                         azure_endpoint=credentials.azure_endpoint,
                         azure_deployment=credentials.azure_deployment
                         or lookup[llm.name],
                         api_key=credentials.api_key,
                         api_version=credentials.api_version or "2023-05-15",
                     )
-                openai_client.chat.completions.create(
+                    openai_client.chat.completions.create(
                         model=llm.name,
                         messages=[{"role": "user", "content": "Hello"}],
                     )
-                #except Exception as e:
-
-
-                    # デバッグ情報を追加
-                 #   logger.error(f"Azure OpenAI connection test failed: {type(e).__name__}: {str(e)}")
-                 #   logger.error(f"Exception details: {repr(e)}")
-                 #   raise ValueError(
-                 #       textwrap.dedent(
-                 #           f"""\
-                 #           Unable to run a successful test completion against deployment '{credentials.azure_deployment or lookup[llm.name]}'
-                 #           on '{credentials.azure_endpoint}' with API version '{credentials.api_version or "2023-05-15"}'
-                 #           with provided Azure OpenAI credentials. Please validate your credentials.
-                 #           
-                 #           Please validate your credentials or check {__file__} for details.
-                 #           """
-                 #       )
-                 #   ) from e
+                except Exception as e:
+                    raise ValueError(
+                        textwrap.dedent(
+                            f"""\
+                            Unable to run a successful test completion against deployment '{credentials.azure_deployment or lookup[llm.name]}'
+                            on '{credentials.azure_endpoint}' with API version '{credentials.api_version or "2023-05-15"}'
+                            with provided Azure OpenAI credentials. Please validate your credentials.
+                            
+                            Please validate your credentials or check {__file__} for details.
+                            """
+                        )
+                    ) from e
 
         elif llm.credential_type == "aws":
             credentials = AWSBedrockCredentials()
