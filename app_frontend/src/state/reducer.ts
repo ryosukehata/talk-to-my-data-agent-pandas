@@ -13,6 +13,8 @@ export const createInitialState = (): AppStateData => {
     enableBusinessInsights: getStorageItem(STORAGE_KEYS.ENABLE_BUSINESS_INSIGHTS) !== 'false', // Enable by default
     includeCsvBom: getStorageItem(STORAGE_KEYS.INCLUDE_CSV_BOM) === 'true',
     dataSource: getStorageItem(STORAGE_KEYS.DATA_SOURCE) || DATA_SOURCES.FILE, // Default to FILE
+    expandGraphsInsightsDefaultOpen: getStorageItem(STORAGE_KEYS.EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN) === 'true',
+    theme: (getStorageItem(STORAGE_KEYS.THEME) as 'light' | 'dark') || 'light', // Default to light theme
   };
 };
 
@@ -57,6 +59,18 @@ export const reducer = (state: AppStateData, action: Action): AppStateData => {
         ...state,
         dataSource: action.payload,
       };
+    case ACTION_TYPES.SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN:
+      setStorageItem(STORAGE_KEYS.EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN, action.payload ? 'true' : 'false');
+      return {
+        ...state,
+        expandGraphsInsightsDefaultOpen: action.payload,
+      };
+    case ACTION_TYPES.SET_THEME:
+      setStorageItem(STORAGE_KEYS.THEME, action.payload);
+      return {
+        ...state,
+        theme: action.payload,
+      };
     default:
       return state;
   }
@@ -85,5 +99,13 @@ export const actions = {
   setDataSource: (source: string): Action => ({
     type: ACTION_TYPES.SET_DATA_SOURCE,
     payload: source,
+  }),
+  setExpandGraphsInsightsDefaultOpen: (isOpen: boolean): Action => ({
+    type: ACTION_TYPES.SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN,
+    payload: isOpen,
+  }),
+  setTheme: (theme: 'light' | 'dark'): Action => ({
+    type: ACTION_TYPES.SET_THEME,
+    payload: theme,
   }),
 };

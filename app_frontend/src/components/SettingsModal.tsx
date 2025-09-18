@@ -34,6 +34,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
     setEnableBusinessInsights,
     includeCsvBom,
     setIncludeCsvBom,
+    theme,
+    setTheme,
   } = useAppState();
 
   const {
@@ -55,12 +57,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
   const [localEnableBusinessInsights, setLocalEnableBusinessInsights] =
     useState(enableBusinessInsights);
   const [localIncludeCsvBom, setLocalIncludeCsvBom] = useState(includeCsvBom);
+  const [localTheme, setLocalTheme] = useState(theme);
+
 
   const handleSaveSettings = () => {
     setCollapsiblePanelDefaultOpen(localCollapsiblePanelDefaultOpen);
     setEnableChartGeneration(localEnableChartGeneration);
     setEnableBusinessInsights(localEnableBusinessInsights);
     setIncludeCsvBom(localIncludeCsvBom);
+    setTheme(localTheme);
     onOpenChange(false);
   };
 
@@ -74,6 +79,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
           </DialogDescription>
         </DialogHeader>
         <div>
+          <div className="flex items-center justify-between gap-4 py-2">
+            <Label htmlFor="theme-toggle" className="cursor-pointer">
+              Dark theme
+            </Label>
+            <Switch
+              id="theme-toggle"
+              checked={localTheme === 'dark'}
+              onCheckedChange={(checked) => setLocalTheme(checked ? 'dark' : 'light')}
+            />
+          </div>
           <div className="flex items-center justify-between gap-4 py-2">
             <Label htmlFor="collapsible-default-open" className="cursor-pointer">
               {t('Expand data panels by default')}
