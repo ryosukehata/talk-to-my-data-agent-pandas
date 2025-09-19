@@ -44,6 +44,7 @@ from utils.api import (
     run_complete_analysis,
 )
 from utils.database_helpers import load_app_infra
+from utils.i18n import gettext
 from utils.logging_helper import get_logger
 from utils.schema import (
     AnalysisError,
@@ -55,8 +56,6 @@ from utils.schema import (
     RunChartsResult,
     RunDatabaseAnalysisResult,
 )
-
-from utils.i18n import gettext
 
 warnings.filterwarnings("ignore")
 logger = get_logger("DataAnalystFrontend")

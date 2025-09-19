@@ -728,7 +728,7 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                         pandas_df = pd.DataFrame(data=data, columns=columns, dtype=str)
 
                         logger.info(
-                            f"Successfully loaded table {table}: {len(df)} rows, {len(df.columns)} columns"
+                            f"Successfully loaded table {table}: {len(pandas_df)} rows, {len(pandas_df.columns)} columns"
                         )
                         dataframes.append(AnalystDataset(name=table, data=pandas_df))
 

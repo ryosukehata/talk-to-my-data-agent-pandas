@@ -50,7 +50,7 @@ from utils.custom_job_helper import (
 from utils.i18n import LocaleSettings
 from utils.resources import (
     app_env_name,
-    dashboard_env_name, 
+    dashboard_env_name,
     llm_deployment_env_name,
 )
 from utils.schema import AppInfra

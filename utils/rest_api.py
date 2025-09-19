@@ -89,6 +89,41 @@ logger = get_logger()
 
 MAX_EXCEL_ROWS = 50000  # Maximum rows to export to Excel to prevent memory issues
 
+def list_container_fonts_fallback():
+    """
+    fc-listが使えない環境で、フォントファイルを直接スキャンしてフォント名をリストアップする。
+    """
+    # 一般的なフォントディレクトリ
+    font_dirs = [
+        '/usr/share/fonts/',
+        '/usr/local/share/fonts/',
+        '/usr/X11R6/lib/X11/fonts/',
+        '/opt/X11/share/fonts/',
+        os.path.expanduser('~/.fonts')
+    ]
+    
+    fonts = set()
+    
+    for font_dir in font_dirs:
+        if os.path.isdir(font_dir):
+            for root, _, files in os.walk(font_dir):
+                for file in files:
+                    # 一般的なフォントファイルの拡張子をチェック
+                    if file.lower().endswith(('.ttf', '.otf', '.ttc', '.pcf', '.bdf')):
+                        # ファイル名から拡張子を除去し、フォント名として追加
+                        font_name = os.path.splitext(file)[0]
+                        # ハイフンやアンダースコアをスペースに変換して、より読みやすい名前にする
+                        font_name = font_name.replace('-', ' ').replace('_', ' ')
+                        fonts.add(font_name)
+    
+    if fonts:
+        print("コンテナ内で利用可能なフォント (ファイル名から推測):")
+        for font in sorted(list(fonts)):
+            print(font)
+    else:
+        print("フォントファイルが見つかりませんでした。")
+        print("コンテナにフォントがインストールされているか確認してください。")
+
 
 async def get_database(user_id: str) -> AnalystDB:
     analyst_db = await AnalystDB.create(
@@ -951,7 +986,6 @@ async def get_chat_message(
             status_code=500, detail=f"Error retrieving message: {str(e)}"
         )
 
-
 @router.post("/chats/messages")
 async def create_new_chat_message(
     request: Request,
@@ -1092,6 +1126,7 @@ async def save_chat_messages(
     This API controller saves a chat ID to an excel spreadsheet which
     saves key information, then is streamed back to the user.
     """
+    list_container_fonts_fallback()
     temp_files: list[str] = []
 
     chat_messages: List[AnalystChatMessage] = await analyst_db.get_chat_messages(
