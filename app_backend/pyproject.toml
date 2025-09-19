@@ -49,6 +49,7 @@ dependencies = [
     "types-aiofiles==24.1.0.20241221",
     "typing-extensions>=4.12.2,<5.0",
     "uvicorn==0.34.0,<1",
+    "langid==1.1.6",
 ]
 
 [project.optional-dependencies]

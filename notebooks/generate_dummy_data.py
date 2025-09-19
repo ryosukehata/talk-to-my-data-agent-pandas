@@ -86,10 +86,10 @@ for i in range(NUM_USERS):
         email = "yifu.gu@datarobot.com" if i == 0 else "yifu.gu+demo@datarobot.com"
         user_type = "creator" if i == 0 else "guest"
     else:
-        email = f"{fake.user_name()}_{random.randint(1,99)}@{domain}"
+        email = f"{fake.user_name()}_{random.randint(1, 99)}@{domain}"
         # Ensure yifu users are unique if generated randomly
         while email.startswith("yifu.gu"):
-            email = f"{fake.user_name()}_{random.randint(1,99)}@{domain}"
+            email = f"{fake.user_name()}_{random.randint(1, 99)}@{domain}"
 
     users.append(
         {

@@ -523,8 +523,7 @@ async def _get_dictionary_batch(
 
 @log_api_call
 async def get_dictionary(
-    dataset: AnalystDataset, 
-    telemetry_json: dict[str, Any] | None = None
+    dataset: AnalystDataset, telemetry_json: dict[str, Any] | None = None
 ) -> DataDictionary:
     """Process a single dataset with parallel column batch processing"""
 

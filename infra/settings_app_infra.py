@@ -128,10 +128,16 @@ def get_app_files(
     if application_locale != LanguageCode.EN:
         source_files.append(
             (
-                str( PROJECT_ROOT / "utils" / "locale" / application_locale / "LC_MESSAGES" / "base.mo"),
+                str(
+                    PROJECT_ROOT
+                    / "utils"
+                    / "locale"
+                    / application_locale
+                    / "LC_MESSAGES"
+                    / "base.mo"
+                ),
                 f"utils/locale/{application_locale}/LC_MESSAGES/base.mo",
             )
         )
-
 
     return source_files

@@ -26,7 +26,7 @@ def display_page_logo() -> None:
     # logo placeholder used for initial load
     logo = '<svg width="133" height="20" xmlns="http://www.w3.org/2000/svg" id="datarobot-logo"></svg>'
     logo = "./DataRobot_black.svg"
-    
+
     with st.container(key="datarobot-logo"):
         st.image(logo, width=200)
 

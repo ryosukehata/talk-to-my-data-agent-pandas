@@ -15,7 +15,6 @@ import asyncio
 import os
 import sys
 import warnings
-
 from typing import cast
 
 import pandas as pd
@@ -371,7 +370,7 @@ async def main() -> None:
             with tab1:
                 ds_display = await analyst_db.get_dataset(ds_display_name)
                 st.subheader(f"{ds_display.name}")
-                
+
                 try:
                     ds_display_cleansed = await analyst_db.get_cleansed_dataset(
                         ds_display_name

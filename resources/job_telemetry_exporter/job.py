@@ -23,9 +23,17 @@ def main():
 
     logger.info("Starting export trace data")
     path_trace = run_trace_update_workflow()
+    if path_trace is None:
+        logger.error("Trace update workflow failed. Exiting.")
+        return
+
     logger.info("Updated trace dataset.")
     logger.info("Starting update usage data")
     path_usage = run_usage_update_flow()
+    if path_usage is None:
+        logger.error("Usage update workflow failed. Exiting.")
+        return
+
     logger.info("Updated usage dataset.")
 
     logger.info("Finished job")

@@ -19,9 +19,10 @@ from contextlib import contextmanager
 from typing import Generator, cast
 
 import pandas as pd
+
+from utils.i18n import gettext
 from utils.logging_helper import get_logger
 from utils.schema import CleansedColumnReport
-from utils.i18n import gettext
 
 logger = get_logger("DataCleansingHelper")
 
@@ -50,17 +51,21 @@ def try_simple_numeric_conversion(
     original_nulls: pd.Series,
 ) -> tuple[bool, pd.Series, list[str]]:
     # 文字列の前後の空白を削除し、特殊文字（引用符や空白）を削除
-    simple_cleaned = sample_series.astype(str).str.strip().str.replace(r"['\s]+", "", regex=True)
+    simple_cleaned = (
+        sample_series.astype(str).str.strip().str.replace(r"['\s]+", "", regex=True)
+    )
 
     # 数値に変換
-    numeric_simple = pd.to_numeric(simple_cleaned, errors='coerce')
+    numeric_simple = pd.to_numeric(simple_cleaned, errors="coerce")
 
     # 新しいnull値の数をカウント
     new_nulls = numeric_simple.isna()
     original_nulls_count = original_nulls.sum()
 
     # 成功率の計算
-    simple_success_rate = 1 - (new_nulls.sum() - original_nulls_count) / len(sample_series)
+    simple_success_rate = 1 - (new_nulls.sum() - original_nulls_count) / len(
+        sample_series
+    )
 
     warnings = []
 
@@ -68,11 +73,13 @@ def try_simple_numeric_conversion(
         warnings.append(
             gettext(
                 "Converted to numeric after removing spaces/quotes. Success rate: {simple_success_rate:.1%}"
-                    ).format(simple_success_rate=simple_success_rate)
+            ).format(simple_success_rate=simple_success_rate)
         )
         # 実際のシリーズにも同じ処理を適用
-        clean_series = series.astype(str).str.strip().str.replace(r"['\s]+", "", regex=True)
-        result_series = pd.to_numeric(clean_series, errors='coerce')
+        clean_series = (
+            series.astype(str).str.strip().str.replace(r"['\s]+", "", regex=True)
+        )
+        result_series = pd.to_numeric(clean_series, errors="coerce")
         return True, result_series, warnings
     else:
         # 変換が部分的に成功した場合は警告
@@ -80,7 +87,7 @@ def try_simple_numeric_conversion(
             warnings.append(
                 gettext(
                     "Simple numeric conversion partially successful ({simple_success_rate:.1%}) but below threshold"
-                    ).format(simple_success_rate=simple_success_rate)
+                ).format(simple_success_rate=simple_success_rate)
             )
     return False, series, warnings
 
@@ -99,10 +106,22 @@ def _convert_units(
     if patterns is None:
         # パターンを検出
         patterns = {
-            "has_currency": cast(float, series.astype(str).str.contains(r"[$€£¥]", regex=True).mean()) > 0.7,
-            "has_commas": cast(float, series.astype(str).str.contains(r",", regex=True).mean()) > 0.7,
-            "has_percent": cast(float, series.astype(str).str.contains(r"%", regex=True).mean()) > 0.7,
-            "has_magnitude": cast(float, series.astype(str).str.contains(r"(?i)[KMB]$", regex=True).mean()) > 0.7,
+            "has_currency": cast(
+                float, series.astype(str).str.contains(r"[$€£¥]", regex=True).mean()
+            )
+            > 0.7,
+            "has_commas": cast(
+                float, series.astype(str).str.contains(r",", regex=True).mean()
+            )
+            > 0.7,
+            "has_percent": cast(
+                float, series.astype(str).str.contains(r"%", regex=True).mean()
+            )
+            > 0.7,
+            "has_magnitude": cast(
+                float, series.astype(str).str.contains(r"(?i)[KMB]$", regex=True).mean()
+            )
+            > 0.7,
         }
 
     # コピーを作成
@@ -122,11 +141,11 @@ def _convert_units(
 
         # K/M/B を削除
         result = result.astype(str).str.replace(r"(?i)[KMB]$", "", regex=True)
-        numeric_result = pd.to_numeric(result, errors='coerce')
+        numeric_result = pd.to_numeric(result, errors="coerce")
 
         # 有効な数値にのみ乗数を適用
         valid_mask = ~numeric_result.isna()
-        
+
         # 各乗数に基づいて調整
         if valid_mask.any() and k_mask.any():
             numeric_result.loc[valid_mask & k_mask] *= 1000
@@ -134,14 +153,14 @@ def _convert_units(
             numeric_result.loc[valid_mask & m_mask] *= 1000000
         if valid_mask.any() and b_mask.any():
             numeric_result.loc[valid_mask & b_mask] *= 1000000000
-            
+
         result = numeric_result
 
     if patterns["has_percent"]:
         result = result.astype(str).str.replace("%", "", regex=True)
-        result = pd.to_numeric(result, errors='coerce') / 100
+        result = pd.to_numeric(result, errors="coerce") / 100
     else:
-        result = pd.to_numeric(result, errors='coerce')
+        result = pd.to_numeric(result, errors="coerce")
 
     return result, patterns
 
@@ -158,9 +177,15 @@ def try_unit_conversion(
     warnings: list[str] = []
 
     # 数値データを含む可能性があるかチェック
-    if not cast(
-        float, sample_series.astype(str).str.contains(r"[$€£¥%KMB,\d.]", regex=True).mean()
-    ) > 0.5:
+    if (
+        not cast(
+            float,
+            sample_series.astype(str)
+            .str.contains(r"[$€£¥%KMB,\d.]", regex=True)
+            .mean(),
+        )
+        > 0.5
+    ):
         return False, series, warnings
 
     # サンプルでまず変換を試みてパターンを検出
@@ -177,21 +202,21 @@ def try_unit_conversion(
     detected = [pattern_names[k] for k, v in patterns.items() if v]
     if detected:
         warnings.append(
-            gettext(
-                "Detected patterns in data: {}"
-                    ).format(', '.join(detected))
-            )
+            gettext("Detected patterns in data: {}").format(", ".join(detected))
+        )
 
     # 変換成功率の計算
     new_nulls = sample_result.isna()
-    conversion_success_rate = 1 - (new_nulls.sum() - original_nulls.sum()) / len(sample_result)
+    conversion_success_rate = 1 - (new_nulls.sum() - original_nulls.sum()) / len(
+        sample_result
+    )
 
     if conversion_success_rate > 0.8:
         # サンプル変換が成功した場合、検出されたパターンを使用して完全なデータセットを変換
         warnings.append(
             gettext(
                 "Converted to numeric with pattern handling. Success rate: {conversion_success_rate:.1%}"
-                ).format(conversion_success_rate=conversion_success_rate)
+            ).format(conversion_success_rate=conversion_success_rate)
         )
         result, _ = _convert_units(series, patterns)  # サンプルから得たパターンを再利用
         return True, result, warnings
@@ -220,14 +245,14 @@ def try_datetime_conversion(
         )
 
         format_1 = _guess_datetime_format_for_array(sample_series.values)
-        format_2 = _guess_datetime_format_for_array(
-            sample_series.values, dayfirst=True
-        )
-        
+        format_2 = _guess_datetime_format_for_array(sample_series.values, dayfirst=True)
+
     # 2つの形式で日付時刻への変換を試す
     with suppress_datetime_warnings():
-        candidate_1 = pd.to_datetime(sample_series, format=format_1, errors='coerce')
-        candidate_2 = pd.to_datetime(sample_series, format=format_2, errors='coerce', dayfirst=True)
+        candidate_1 = pd.to_datetime(sample_series, format=format_1, errors="coerce")
+        candidate_2 = pd.to_datetime(
+            sample_series, format=format_2, errors="coerce", dayfirst=True
+        )
 
     candidate_1_success_rate = cast(float, (~candidate_1.isna()).mean())
     candidate_2_success_rate = cast(float, (~candidate_2.isna()).mean())
@@ -238,50 +263,52 @@ def try_datetime_conversion(
             candidate_2_success_rate,
         )
         warnings.append(
-            gettext(
-                "Converted to datetime. Success rate: {success_rate:.1%}"
-                ).format(success_rate=success_rate)
+            gettext("Converted to datetime. Success rate: {success_rate:.1%}").format(
+                success_rate=success_rate
             )
+        )
         # Japanse localization for date parsing
         if candidate_1_success_rate >= candidate_2_success_rate:
             warnings.append(gettext("Used month-first date parsing"))
             with suppress_datetime_warnings():
-                ts_series = pd.to_datetime(series, format=format_1, errors='coerce')
+                ts_series = pd.to_datetime(series, format=format_1, errors="coerce")
         else:
             warnings.append(gettext("Used day-first date parsing"))
             with suppress_datetime_warnings():
-                ts_series = pd.to_datetime(series, format=format_2, errors='coerce', dayfirst=True)
-        
+                ts_series = pd.to_datetime(
+                    series, format=format_2, errors="coerce", dayfirst=True
+                )
+
         return True, ts_series, warnings
     return False, series, warnings
 
+
 def try_string_trim(
-        series: pd.Series, 
-        sample_series: pd.Series, 
-        original_nulls: pd.Series
+    series: pd.Series, sample_series: pd.Series, original_nulls: pd.Series
 ) -> tuple[bool, pd.Series, list[str]]:
     """
     Trim leading and trailing whitespace from string values.
     Only applies if whitespace trimming actually changes the data.
     """
     warnings = []
-    
+
     # pandasでは、str.strip() を使用して前後の空白を削除します。
     # NoneはNaNとして扱われ、そのまま残ります。
     original_values = sample_series.astype(str)
     sample_cleaned = original_values.str.strip()
-    
+
     # 処理後の値と元の値が異なるかどうかをチェックします。
     # isna() でNaNを考慮し、空白が削除された行を特定します。
     has_whitespace = (original_values != sample_cleaned).any()
-    
+
     if has_whitespace:
         # シリーズ全体に適用します。
         cleaned_series = series.str.strip()
         warnings.append("Removed leading and trailing whitespace from string values")
         return True, cleaned_series, warnings
-    
+
     return False, series, warnings
+
 
 def add_summary_statistics(
     df: pd.DataFrame, report: list[CleansedColumnReport]
@@ -296,20 +323,20 @@ def add_summary_statistics(
                 column_report.warnings.append(
                     gettext(
                         "Contains {null_val} null values ({percentage:.1%} of data)"
-                        ).format(null_val=null_count, 
-                                 percentage=null_count / total_count)
+                    ).format(null_val=null_count, percentage=null_count / total_count)
                 )
 
             if column_report.new_dtype == "float64":
                 unique_count = df[col].nunique()
                 if unique_count == 1:
-                    column_report.warnings.append(gettext(
-                        "Contains only one unique value"
-                        )
-                        )
+                    column_report.warnings.append(
+                        gettext("Contains only one unique value")
+                    )
                 elif unique_count == 2:
                     column_report.warnings.append(
-                        gettext("Contains only two unique values - consider boolean conversion")
+                        gettext(
+                            "Contains only two unique values - consider boolean conversion"
+                        )
                     )
 
 
@@ -326,9 +353,9 @@ def process_column(
     if cleaned_column_name != column_name:
         column_report.original_column_name = column_name
         column_report.warnings.append(
-            gettext(
-                "Column renamed from '{old_name}' to '{new_name}'"
-                ).format(old_name=column_name, new_name=cleaned_column_name)
+            gettext("Column renamed from '{old_name}' to '{new_name}'").format(
+                old_name=column_name, new_name=cleaned_column_name
+            )
         )
 
     if pd.api.types.is_string_dtype(df[column_name]):

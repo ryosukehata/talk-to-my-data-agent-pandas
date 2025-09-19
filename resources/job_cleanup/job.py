@@ -11,6 +11,7 @@ from usecase.reboot_custom_application import RebootUsecase
 
 logging.basicConfig(level=logging.INFO)
 
+
 def main():
     app_id = os.environ.get("DATAROBOT_APPLICATION_ID")
     endpoint = os.environ["DATAROBOT_ENDPOINT"]
@@ -23,6 +24,7 @@ def main():
     datarobot_reboot_api = DataRobotRebootManager(endpoint, token)
     reboot_usecase = RebootUsecase(datarobot_reboot_api)
     asyncio.run(reboot_usecase.run(app_id))
+
 
 if __name__ == "__main__":
     main()

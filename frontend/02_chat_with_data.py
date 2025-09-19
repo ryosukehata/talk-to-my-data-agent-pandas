@@ -44,6 +44,7 @@ from utils.api import (
     run_complete_analysis,
 )
 from utils.database_helpers import load_app_infra
+from utils.i18n import gettext
 from utils.logging_helper import get_logger
 from utils.schema import (
     AnalysisError,
@@ -55,8 +56,6 @@ from utils.schema import (
     RunChartsResult,
     RunDatabaseAnalysisResult,
 )
-
-from utils.i18n import gettext
 
 warnings.filterwarnings("ignore")
 logger = get_logger("DataAnalystFrontend")
@@ -261,7 +260,9 @@ class UnifiedRenderer:
             with self.containers.bottom_line:
                 if result.metadata is not None and result.metadata.exception_str:
                     st.error(
-                        gettext("Error running business analysis\n{result_metadata_exception_str}").format(
+                        gettext(
+                            "Error running business analysis\n{result_metadata_exception_str}"
+                        ).format(
                             result_metadata_exception_str=result.metadata.exception_str
                         )
                     )
@@ -388,7 +389,9 @@ async def main() -> None:
     if "analyst_db" not in st.session_state:
         st.session_state.retries += 1
         if st.session_state.retries >= 5:
-            st.warning(gettext("Could not identify user, please provide your API token"))
+            st.warning(
+                gettext("Could not identify user, please provide your API token")
+            )
             return
         st.error(gettext("Failed to initialize the database connection."))
         time.sleep(1)
@@ -571,7 +574,9 @@ async def main() -> None:
     )
     if not st.session_state.datasets_names and not st.session_state.chat_messages:
         st.info(
-            gettext("Please upload and process data using the sidebar before starting the chat")
+            gettext(
+                "Please upload and process data using the sidebar before starting the chat"
+            )
         )
     else:
         # Render existing chat history

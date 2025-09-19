@@ -3,9 +3,6 @@
 # Get the absolute path to the directory where this script resides
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-# Construct the absolute path to the 'modules' directory
-MODULES_DIR="${SCRIPT_DIR}"
-
 # Prepend the modules directory to PYTHONPATH. Create PYTHONPATH if it doesn't exist.
 # This allows Python to find modules like 'config' directly when imported from other files within 'modules'.
 export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH}"

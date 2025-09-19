@@ -634,7 +634,7 @@ async def get_cleansed_dataset(
     limit: int = 10000,
     search: str | None = None,
     analyst_db: AnalystDB = Depends(get_initialized_db),
-) ->  DatasetCleansedResponse:
+) -> DatasetCleansedResponse:
     """
     Get a cleansed dataset by name from the database with pagination and search support.
 
@@ -693,13 +693,15 @@ async def get_cleansed_dataset(
 
         # Apply pagination (skip and limit)
         if skip > 0 or limit > 0:
-            df_display = df_display.iloc[skip : skip+limit]
+            df_display = df_display.iloc[skip : skip + limit]
 
         # Create an instance of AnalystDataset
         dataset = AnalystDataset(
             name=name,
             columns=df_display.columns,
-            data=df_display.to_dict(orient="records"),  # Convert rows to a list of dictionaries
+            data=df_display.to_dict(
+                orient="records"
+            ),  # Convert rows to a list of dictionaries
         )
 
         # Add the dataset to the response
@@ -1204,9 +1206,7 @@ async def save_chat_messages(
                 data_sheet = analysis_workbook.create_sheet(data_sheet_name)
 
                 try:
-                    dataset: pd.DataFrame = (
-                        run_analysis_component.dataset.data.df
-                    )
+                    dataset: pd.DataFrame = run_analysis_component.dataset.data.df
 
                     # Convert to pandas with error handling for large datasets
                     pandas_df = dataset

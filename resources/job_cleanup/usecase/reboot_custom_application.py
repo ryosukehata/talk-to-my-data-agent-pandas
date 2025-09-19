@@ -3,7 +3,8 @@ import logging
 from domain.reboot_manager import IRebootManager
 
 logger = logging.getLogger(__name__)
-    
+
+
 class RebootUsecase:
     def __init__(self, reboot_manager: IRebootManager):
         self.reboot_manager = reboot_manager

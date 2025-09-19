@@ -6,9 +6,9 @@ from domain.item_manager import IItemManager
 
 logger = logging.getLogger(__name__)
 
+
 class DeleteItemsUsecase:
-    def __init__(self, item_manager: IItemManager, 
-                 max_concurrent: int = 5):
+    def __init__(self, item_manager: IItemManager, max_concurrent: int = 5):
         self.item_manager = item_manager
         self.sem = asyncio.Semaphore(max_concurrent)
 

@@ -1,8 +1,9 @@
+---
 name: runtime-params
 
 runtimeParameterDefinitions:
-- fieldName: DATASET_TRACE_ID
-  type: string
+  - fieldName: DATASET_TRACE_ID
+    type: string
 
-- fieldName: DATASET_ACCESS_LOG_ID
-  type: string
+  - fieldName: DATASET_ACCESS_LOG_ID
+    type: string
