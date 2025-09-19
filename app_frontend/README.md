@@ -40,6 +40,7 @@ npm i
 npm run dev
 ```
 
+
 Open http://localhost:5173 (frontend) not the backend URL.
 The dev server proxies `/api` calls to the backend on port 8080.
 
