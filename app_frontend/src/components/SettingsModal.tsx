@@ -59,7 +59,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
   const [localIncludeCsvBom, setLocalIncludeCsvBom] = useState(includeCsvBom);
   const [localTheme, setLocalTheme] = useState(theme);
 
-
   const handleSaveSettings = () => {
     setCollapsiblePanelDefaultOpen(localCollapsiblePanelDefaultOpen);
     setEnableChartGeneration(localEnableChartGeneration);
@@ -86,7 +85,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
             <Switch
               id="theme-toggle"
               checked={localTheme === 'dark'}
-              onCheckedChange={(checked) => setLocalTheme(checked ? 'dark' : 'light')}
+              onCheckedChange={checked => setLocalTheme(checked ? 'dark' : 'light')}
             />
           </div>
           <div className="flex items-center justify-between gap-4 py-2">
