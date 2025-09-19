@@ -7,7 +7,110 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [0.2.00] - 2025-08-29
+## [0.3.8] - 2025-09-19
+
+### Docs
+- Add missing changelog notes for version 0.3.7  
+
+### Improvements
+- Add frontend install and build commands to the makefile
+
+
+## [0.3.7] - 2025-09-19
+
+### Improvements
+
+- Increased in-progress message polling speed for better user experience.
+- Localized app chat responses to match user's language preference.
+- Frontend assets are now automatically built during `pulumi up`, simplifying the overall deployment process.
+
+### Bug Fixes
+
+- Fixed empty screen issue that could occur during message loading.
+- Fixed the issue with fetching the API token on STS and on-prem.
+
+## [0.3.6] - 2025-09-19
+
+### Features
+
+- Allow adding BOM when exporting and fix dictionary exports containing Japanese characters in name.
+- Performance improvements: Cache DataRobot client and Deployment ID.
+
+### Bug Fixes
+
+- Message deletion fixes.
+
+### Improvements
+
+- Hide welcome modal on close click.
+- Updated README with local React development instructions.
+
+## [0.3.5] - 2025-09-19
+
+### Added
+
+- Export individual chat message (question-answer) functionality. That includes underlying data, charts, summary and insights.
+- Integration of LLM Gateway with Model Deployments
+
+### Changed
+
+- Updated welcome modal
+- Disabled clicking follow-up suggestions while answering is in progress; replaced icon with button
+
+### Fixed
+
+- Improved overall exporting experience
+- Better visual feedback when something fails
+- UX improvements for chat messages: removed excessive auto-scrolling and enhanced the Send button
+
+## [0.3.4] - 2025-09-19
+
+### Added
+
+- Allow use of DataRobot LLM Gateway instead of DataRobot-hosted pre-built LLM (https://docs.datarobot.com/en/docs/gen-ai/genai-code/dr-llm-gateway.html)
+
+## [0.3.3] - 2025-09-19
+
+### Changed
+
+- Fix Snowflake connector issue by upgrading pulumi-datarobot to 0.10.13
+
+## [0.3.2] - 2025-09-19
+
+### Added
+
+- Implemented search control for each dataset dictionary
+
+### Fixed
+
+- Updates translation files after fixing automation
+
+## [0.3.1] - 2025-09-19
+
+### Changed
+
+- Fix prompt column issue by upgrading pulumi-datarobot to 0.10.8
+
+## [0.3.0] - 2025-09-19
+
+### Changed
+
+- Add chat and dataset deletion safeguards
+- Add chat time in name and add confirm modal for deletion
+
+## [0.2.2] - 2025-09-19
+
+### Fixed
+
+- Fix chat conversation context for React frontend apps
+
+## [0.2.1] - 2025-09-19
+
+### Fixed
+
+- Set LLM Gateway Inference runtime parameter to False always for user-provided credentials
+
+## [0.2.00] - 2025-09-19
 
 ### Fixed
 
@@ -20,11 +123,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- 
+- Renamed "Save chat" to "Export chat"
 
 ### Added
 
 - Persistent storage functionality
+
+## [0.1.14] - 2025-09-19
+
+### Fixed
+
+- Data cleansing now automatically removes leading and trailing whitespace from string columns
+- Fixed chat endpoint when DATAROBOT_ENDPOINT has a trailing slash
+- Fixed the raw data preview for SAP (react)
+
+### Added
+
+- Ability to download a specific chat history (including charts) in the React version.
+
+### Changed
+
+- React-based Frontend as the default for the Application
+- Improved error handling when prompting (react)
+- Change react frontend `deploy` app to use AF fastapi template
+- Change react frontend to use AF react template, removes `frontend_react` in favor of `app_frontend`
+
+
 
 ## [0.1.13] - 2025-05-06
 
