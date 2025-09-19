@@ -184,7 +184,7 @@
     --border-blue: 233 83% 76%;
     --shadow-blue: 227 83% 73%;
     
-    --suggested-prompt-bg: 214 15% 13%; /* Dark theme suggested prompt background */
+    --suggested-prompt-bg: 207 12% 15%; /* Dark theme suggested prompt background */
 
     --animation-blink-border-and-shadow: blinkBorderAndShadow 1.5s ease-in-out infinite;
   }
