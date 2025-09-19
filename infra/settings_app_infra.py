@@ -29,12 +29,13 @@ from utils.i18n import LanguageCode, LocaleSettings
 from .settings_main import PROJECT_ROOT
 
 FRONTEND_PATHS = {
-    "react": Path("frontend_react") / "deploy",
+    "react": Path("app_backend"),
     "streamlit": Path("frontend"),
 }
 
+
 def get_frontend_path() -> Path:
-    frontend_type = os.environ.get("FRONTEND_TYPE", "streamlit")
+    frontend_type = os.environ.get("FRONTEND_TYPE", "react")
     return FRONTEND_PATHS[frontend_type]
 
 
@@ -127,10 +128,16 @@ def get_app_files(
     if application_locale != LanguageCode.EN:
         source_files.append(
             (
-                str( PROJECT_ROOT / "utils" / "locale" / application_locale / "LC_MESSAGES" / "base.mo"),
+                str(
+                    PROJECT_ROOT
+                    / "utils"
+                    / "locale"
+                    / application_locale
+                    / "LC_MESSAGES"
+                    / "base.mo"
+                ),
                 f"utils/locale/{application_locale}/LC_MESSAGES/base.mo",
             )
         )
-
 
     return source_files

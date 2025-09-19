@@ -24,7 +24,6 @@ from pathlib import Path
 from typing import Any, Generator, Generic, TypeVar, cast
 
 import pandas as pd
-import polars as pl
 import snowflake.connector
 from google.cloud import bigquery
 from hdbcli import dbapi
@@ -728,13 +727,8 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
                         # Convert to pandas DataFrame
                         pandas_df = pd.DataFrame(data=data, columns=columns, dtype=str)
 
-                        # Convert to polars DataFrame
-                        df = pl.DataFrame(
-                            data=pandas_df, schema={col: pl.String for col in columns}
-                        )
-
                         logger.info(
-                            f"Successfully loaded table {table}: {len(df)} rows, {len(df.columns)} columns"
+                            f"Successfully loaded table {table}: {len(pandas_df)} rows, {len(pandas_df.columns)} columns"
                         )
                         dataframes.append(AnalystDataset(name=table, data=pandas_df))
 
@@ -826,9 +820,7 @@ def load_app_infra() -> AppInfra:
             return app_infra
         except (FileNotFoundError, ValidationError):
             try:
-                with open(
-                    "frontend_react/deploy/app_infra.json", "r"
-                ) as infra_selection:
+                with open("app_backend/app_infra.json", "r") as infra_selection:
                     app_infra = AppInfra(**json.load(infra_selection))
                 return app_infra
             except (FileNotFoundError, ValidationError) as e:

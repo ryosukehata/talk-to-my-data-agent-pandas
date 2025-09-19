@@ -7,13 +7,16 @@ from domain.reboot_manager import IRebootManager
 
 logger = logging.getLogger(__name__)
 
+
 class DataRobotItemManager(IItemManager):
     def __init__(self, endpoint: str, token: str):
         self.endpoint = endpoint
         self.headers = {"Authorization": f"Bearer {token}"}
 
     async def fetch_items(self, app_id: str) -> Optional[List[Dict]]:
-        url = f"{self.endpoint}/keyValues/?entityType=customApplication&entityId={app_id}"
+        url = (
+            f"{self.endpoint}/keyValues/?entityType=customApplication&entityId={app_id}"
+        )
         async with aiohttp.ClientSession(headers=self.headers) as session:
             try:
                 async with session.get(url) as resp:

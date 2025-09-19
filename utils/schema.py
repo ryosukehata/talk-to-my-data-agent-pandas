@@ -456,11 +456,19 @@ class RunChartsResult(BaseModel):
 
     @property
     def fig1(self) -> go.Figure | None:
-        return go.Figure(json.loads(self.fig1_json)) if self.fig1_json else None
+        if self.fig1_json:
+            fig = go.Figure(json.loads(self.fig1_json))
+            fig.update_layout(font=dict(family="font/NotoSansJP-VariableFont_wght.ttf"))
+            return fig
+        return None
 
     @property
     def fig2(self) -> go.Figure | None:
-        return go.Figure(json.loads(self.fig2_json)) if self.fig2_json else None
+        if self.fig2_json:
+            fig = go.Figure(json.loads(self.fig2_json))
+            fig.update_layout(font=dict(family="font/NotoSansJP-VariableFont_wght.ttf"))
+            return fig
+        return None
 
 
 class GetBusinessAnalysisMetadata(BaseModel):

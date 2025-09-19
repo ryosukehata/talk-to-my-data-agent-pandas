@@ -1384,6 +1384,7 @@ class AnalystDB:
         await self.chat_handler._initialize_database()
 
     async def _validate_and_fix_dtypes(self, df, dataset_name: str):
+        # MODIFY POINT
         """Validate and fix dtypes for the given dataframe.
 
         Converts object columns to numeric if possible, otherwise to string.
@@ -1479,7 +1480,7 @@ class AnalystDB:
         df: AnalystDataset | CleansedDataset,
         data_source: DataSourceType,
         file_size: int = 0,
-    ) -> dict[str, object]:
+    ) -> dict[str, object]:  # MODIFY POINT original one returns None
         """
         Register a dataset (standard or cleansed) in the database.
 

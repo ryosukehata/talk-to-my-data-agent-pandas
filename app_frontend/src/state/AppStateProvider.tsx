@@ -1,0 +1,56 @@
+import React, { useReducer } from 'react';
+import { AppState } from './types';
+import { reducer, createInitialState, actions } from './reducer';
+import { AppStateContext } from './AppStateContext';
+
+export const AppStateProvider: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => {
+  const [state, dispatch] = useReducer(reducer, createInitialState());
+
+  const hideWelcomeModal = () => {
+    dispatch(actions.hideWelcomeModal());
+  };
+
+  const setCollapsiblePanelDefaultOpen = (isOpen: boolean) => {
+    dispatch(actions.setCollapsiblePanelDefaultOpen(isOpen));
+  };
+
+  const setEnableChartGeneration = (enabled: boolean) => {
+    dispatch(actions.setEnableChartGeneration(enabled));
+  };
+
+  const setEnableBusinessInsights = (enabled: boolean) => {
+    dispatch(actions.setEnableBusinessInsights(enabled));
+  };
+
+  const setIncludeCsvBom = (enabled: boolean) => {
+    dispatch(actions.setIncludeCsvBom(enabled));
+  };
+
+  const setDataSource = (source: string) => {
+    dispatch(actions.setDataSource(source));
+  };
+
+  const setExpandGraphsInsightsDefaultOpen = (isOpen: boolean) => {
+    dispatch(actions.setExpandGraphsInsightsDefaultOpen(isOpen));
+  };
+
+  const setTheme = (theme: 'light' | 'dark') => {
+    dispatch(actions.setTheme(theme));
+  };
+
+  const contextValue: AppState = {
+    ...state,
+    hideWelcomeModal,
+    setCollapsiblePanelDefaultOpen,
+    setEnableChartGeneration,
+    setEnableBusinessInsights,
+    setIncludeCsvBom,
+    setDataSource,
+    setExpandGraphsInsightsDefaultOpen,
+    setTheme,
+  };
+
+  return <AppStateContext.Provider value={contextValue}>{children}</AppStateContext.Provider>;
+};

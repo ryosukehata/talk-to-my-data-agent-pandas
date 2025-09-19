@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import json
-import os
 import logging
 import textwrap
 from typing import Any
@@ -276,14 +275,6 @@ def get_credential_runtime_parameter_values(
                 value=rtp_dict["value"],
             )
         credential_runtime_parameter_values.append(rtp)
-    # Need to disable LLM gateway inference if using user-provided creds
-    if os.environ.get("DISABLE_LLM_GATEWAY", "False") != "True":
-        llm_gw_inference_param = datarobot.CustomModelRuntimeParameterValueArgs(
-            key="ENABLE_LLM_GATEWAY_INFERENCE",
-            type="boolean",
-            value="False",
-        )
-        credential_runtime_parameter_values.append(llm_gw_inference_param)
 
     return credential_runtime_parameter_values
 

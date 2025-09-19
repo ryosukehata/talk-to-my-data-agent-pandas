@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import tempfile
 
 from modules import application_helper, config

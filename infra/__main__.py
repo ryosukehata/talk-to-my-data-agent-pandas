@@ -35,6 +35,7 @@ from infra import (
     settings_generative,
     settings_job_infra,
 )
+from infra.app_frontend import app_frontend
 from infra.components.dr_credential import (
     get_credential_runtime_parameter_values,
     get_database_credentials,
@@ -47,12 +48,47 @@ from utils.custom_job_helper import (
     get_custom_job_by_name,
 )
 from utils.i18n import LocaleSettings
-from utils.resources import app_env_name, dashboard_env_name, llm_deployment_env_name
+from utils.resources import (
+    app_env_name,
+    dashboard_env_name,
+    llm_deployment_env_name,
+)
 from utils.schema import AppInfra
 
 TEXTGEN_DEPLOYMENT_ID = os.environ.get("TEXTGEN_DEPLOYMENT_ID")
 TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
+USE_DATAROBOT_LLM_GATEWAY = (
+    os.environ.get("USE_DATAROBOT_LLM_GATEWAY", "false").lower() == "true"
+)
 
+
+# Check if OpenAI credentials are available (same logic as in utils/api.py)
+def has_openai_credentials() -> bool:
+    """Check if OpenAI credentials are available in environment variables."""
+    # Check for the essential OpenAI environment variables
+    api_key = os.environ.get("OPENAI_API_KEY")
+    api_base = os.environ.get("OPENAI_API_BASE")
+
+    if api_key and api_base:
+        pulumi.info("OpenAI credentials detected in environment variables")
+        return True
+    return False
+
+
+# 1. If `LLMs.DEPLOYED_LLM` is set, an already deployed DataRobot-hosted LLM deployment i.e.,
+#    NVIDIA NIM, Cohere, Shared LLM Deployment, or other custom model of the text gen type.
+# 2. If `LLMs.DEPLOYED_LLM` is unset and OpenAI Credentials are set, spin up an LLM Blueprint deployed
+#    with OpenAI credentials
+# 3. If `LLMs.DEPLOYED_LLM` is unset and OpenAI Credentials are not set, it check if pay as you go
+#    pricing is enabled and spin up an LLM Blueprint with DataRobot credentials
+HAS_OPENAI_CREDS = has_openai_credentials()
+USE_LLM_GATEWAY = USE_DATAROBOT_LLM_GATEWAY and not HAS_OPENAI_CREDS
+
+if USE_LLM_GATEWAY:
+    pulumi.info("Using LLM Gateway - OpenAI credentials will not be required")
+    check_feature_flags(
+        PROJECT_ROOT / "infra" / "feature_flag_requirements_llm_gateway.yaml"
+    )
 
 if settings_generative.LLM == LLMs.DEPLOYED_LLM:
     pulumi.info(f"{TEXTGEN_DEPLOYMENT_ID=}")
@@ -72,7 +108,7 @@ with open(
     infra_selection.write(
         AppInfra(
             database=DATABASE_CONNECTION_TYPE,
-            llm=settings_generative.LLM.name,
+            llm=settings_generative.LLM.name,  # Always write the actual LLM name
         ).model_dump_json()
     )
 
@@ -94,11 +130,12 @@ prediction_environment = datarobot.PredictionEnvironment(
     platform=dr.enums.PredictionEnvironmentPlatform.DATAROBOT_SERVERLESS,
 )
 
-llm_credential = get_llm_credentials(settings_generative.LLM)
+if not USE_LLM_GATEWAY:
+    llm_credential = get_llm_credentials(settings_generative.LLM)
 
-llm_runtime_parameter_values = get_credential_runtime_parameter_values(
-    llm_credential, "llm"
-)
+    llm_runtime_parameter_values = get_credential_runtime_parameter_values(
+        llm_credential, "llm"
+    )
 
 playground = datarobot.Playground(
     use_case_id=use_case.id,
@@ -144,14 +181,13 @@ elif settings_generative.LLM != LLMs.DEPLOYED_LLM:
         **settings_generative.llm_blueprint_args.model_dump(),
     )
 
-
 llm_custom_model = datarobot.CustomModel(
     **settings_generative.custom_model_args.model_dump(exclude_none=True),
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
     runtime_parameter_values=(
         []
-        if settings_generative.LLM == LLMs.DEPLOYED_LLM
+        if settings_generative.LLM == LLMs.DEPLOYED_LLM or USE_LLM_GATEWAY
         else llm_runtime_parameter_values
     ),
     guard_configurations=settings_job_infra.guardrails,
@@ -165,7 +201,6 @@ llm_deployment = CustomModelDeployment(
     prediction_environment=prediction_environment,
     deployment_args=settings_generative.deployment_args,
 )
-
 
 app_runtime_parameters = [
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
@@ -185,10 +220,22 @@ db_runtime_parameter_values = get_credential_runtime_parameter_values(
     db_credential, "db"
 )
 app_runtime_parameters += db_runtime_parameter_values  # type: ignore[arg-type]
+# Only pass LLM Gateway runtime parameters if we're actually using LLM Gateway
+# This prevents confusion when OpenAI credentials override LLM Gateway settings
+if USE_LLM_GATEWAY:
+    app_runtime_parameters.append(
+        datarobot.ApplicationSourceRuntimeParameterValueArgs(
+            key="USE_DATAROBOT_LLM_GATEWAY",
+            type="string",
+            value="true",
+        )
+    )
 
 app_source = datarobot.ApplicationSource(
-    files=settings_app_infra.get_app_files(
-        runtime_parameter_values=app_runtime_parameters
+    files=app_frontend.stdout.apply(
+        lambda _: settings_app_infra.get_app_files(
+            runtime_parameter_values=app_runtime_parameters
+        )
     ),
     runtime_parameter_values=app_runtime_parameters,
     resources=datarobot.ApplicationSourceResourcesArgs(
@@ -198,7 +245,6 @@ app_source = datarobot.ApplicationSource(
     ),
     **settings_app_infra.app_source_args,
 )
-
 
 app = datarobot.CustomApplication(
     resource_name=settings_app_infra.app_resource_name,
@@ -212,6 +258,10 @@ pulumi.export(llm_deployment_env_name, llm_deployment.id)
 pulumi.export(
     settings_generative.deployment_args.resource_name,
     llm_deployment.id.apply(get_deployment_url),
+)
+# Export LLM Gateway configuration for visibility
+pulumi.export(
+    "USE_DATAROBOT_LLM_GATEWAY", "true" if USE_DATAROBOT_LLM_GATEWAY else "false"
 )
 
 # App output
@@ -279,8 +329,9 @@ def create_monitoring_resources():
         "custom-job-schedule-cleanup", settings_job_infra.job_resource_name
     )
 
-    job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters, 
-                                                                 settings_job_infra.job_path)
+    job_files, job_files_hash = settings_job_infra.get_job_files(
+        job_runtime_parameters, settings_job_infra.job_path
+    )
     # Add content hash to description to force update on file change
     job_description = (
         f"DataRobot Custom Job for telemetry export. Content Hash: {job_files_hash}"
@@ -384,6 +435,7 @@ def create_monitoring_resources():
         settings_dashboard_infra.dashboard_resource_name, dashboard.application_url
     )
 
+
 def create_cleanup_job(app: datarobot.CustomApplication):
     job_runtime_parameters = [
         datarobot.ApplicationSourceRuntimeParameterValueArgs(
@@ -395,6 +447,7 @@ def create_cleanup_job(app: datarobot.CustomApplication):
             "DATAROBOT_APPLICATION_ID": app.id,
         }.items()
     ]
+
     class CustomJobScheduleCleanup(pulumi.ComponentResource):
         def __init__(self, name, custom_job_name, opts=None):
             super().__init__("custom:resource:CustomJobScheduleCleanup", name, {}, opts)
@@ -417,13 +470,12 @@ def create_cleanup_job(app: datarobot.CustomApplication):
         "cleanup-job-schedule-cleanup", settings_job_infra.cleanup_job_resource_name
     )
 
-    job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters, 
-                                                                 settings_job_infra.cleanup_job_path)
+    job_files, job_files_hash = settings_job_infra.get_job_files(
+        job_runtime_parameters, settings_job_infra.cleanup_job_path
+    )
 
     # Add content hash to description to force update on file change
-    job_description = (
-        f"DataRobot Cleanup Custom Job Content Hash: {job_files_hash}"
-    )
+    job_description = f"DataRobot Cleanup Custom Job Content Hash: {job_files_hash}"
 
     cleanup_custom_job = datarobot.CustomJob(
         resource_name=settings_job_infra.cleanup_job_resource_name,
