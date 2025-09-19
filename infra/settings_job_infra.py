@@ -116,8 +116,7 @@ def get_job_files(
     ],
     job_path: Path,
 ) -> Tuple[list[tuple[str, str]], str]:
-    _prep_metadata_yaml(runtime_parameter_values, 
-                        job_path=job_path)
+    _prep_metadata_yaml(runtime_parameter_values, job_path=job_path)
     # Get all files from job path, excluding specific patterns
     files_to_include: list[Path] = []
     for f in job_path.glob("**/*"):

@@ -329,8 +329,9 @@ def create_monitoring_resources():
         "custom-job-schedule-cleanup", settings_job_infra.job_resource_name
     )
 
-    job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters, 
-                                                                 settings_job_infra.job_path)
+    job_files, job_files_hash = settings_job_infra.get_job_files(
+        job_runtime_parameters, settings_job_infra.job_path
+    )
     # Add content hash to description to force update on file change
     job_description = (
         f"DataRobot Custom Job for telemetry export. Content Hash: {job_files_hash}"
@@ -434,6 +435,7 @@ def create_monitoring_resources():
         settings_dashboard_infra.dashboard_resource_name, dashboard.application_url
     )
 
+
 def create_cleanup_job(app: datarobot.CustomApplication):
     job_runtime_parameters = [
         datarobot.ApplicationSourceRuntimeParameterValueArgs(
@@ -445,6 +447,7 @@ def create_cleanup_job(app: datarobot.CustomApplication):
             "DATAROBOT_APPLICATION_ID": app.id,
         }.items()
     ]
+
     class CustomJobScheduleCleanup(pulumi.ComponentResource):
         def __init__(self, name, custom_job_name, opts=None):
             super().__init__("custom:resource:CustomJobScheduleCleanup", name, {}, opts)
@@ -467,13 +470,12 @@ def create_cleanup_job(app: datarobot.CustomApplication):
         "cleanup-job-schedule-cleanup", settings_job_infra.cleanup_job_resource_name
     )
 
-    job_files, job_files_hash = settings_job_infra.get_job_files(job_runtime_parameters, 
-                                                                 settings_job_infra.cleanup_job_path)
+    job_files, job_files_hash = settings_job_infra.get_job_files(
+        job_runtime_parameters, settings_job_infra.cleanup_job_path
+    )
 
     # Add content hash to description to force update on file change
-    job_description = (
-        f"DataRobot Cleanup Custom Job Content Hash: {job_files_hash}"
-    )
+    job_description = f"DataRobot Cleanup Custom Job Content Hash: {job_files_hash}"
 
     cleanup_custom_job = datarobot.CustomJob(
         resource_name=settings_job_infra.cleanup_job_resource_name,

@@ -1480,7 +1480,7 @@ class AnalystDB:
         df: AnalystDataset | CleansedDataset,
         data_source: DataSourceType,
         file_size: int = 0,
-    ) -> dict[str, object]:# MODIFY POINT original one returns None
+    ) -> dict[str, object]:  # MODIFY POINT original one returns None
         """
         Register a dataset (standard or cleansed) in the database.
 
