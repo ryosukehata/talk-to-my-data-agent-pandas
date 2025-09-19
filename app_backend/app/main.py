@@ -74,3 +74,4 @@ app.include_router(base_router)
 if SERVE_STATIC_FRONTEND:
     # Important to be last so that we fall back to the static files if the route is not found
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+

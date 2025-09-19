@@ -10,4 +10,3 @@ if [ "$(echo "$DEV_MODE" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
 fi
 
 python -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --log-level $LOG_LEVEL "${EXTRA_OPTS[@]}"
-
