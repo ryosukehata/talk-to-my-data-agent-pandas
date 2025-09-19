@@ -1,3 +1,4 @@
+---
 name: Lint Check
 
 on:
@@ -11,7 +12,7 @@ jobs:
     steps:
       - name: Check out source repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Python environment
         uses: actions/setup-python@v5
         with:
@@ -36,7 +37,7 @@ jobs:
       - name: Lint with Ruff
         run: |
           ruff check . --output-format=github
-          
+
       - name: Format check with Ruff
         run: |
           ruff format --check .
