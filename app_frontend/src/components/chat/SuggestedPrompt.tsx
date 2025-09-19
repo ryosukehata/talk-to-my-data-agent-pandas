@@ -29,7 +29,7 @@ export const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({
     : t('Send');
 
   return (
-    <div className="h-16 p-3 bg-[#22272b] rounded border justify-start items-center gap-2 inline-flex">
+    <div className="h-16 p-3 bg-suggested-prompt-bg rounded border justify-start items-center gap-2 inline-flex">
       <div className="grow shrink basis-0 text-primary text-sm font-normal leading-tight">
         {message}
       </div>
