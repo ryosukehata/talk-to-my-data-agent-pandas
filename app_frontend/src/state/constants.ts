@@ -1,5 +1,3 @@
-import { ValueOf } from './types';
-
 export const ACTION_TYPES = {
   HIDE_WELCOME_MODAL: 'HIDE_WELCOME_MODAL',
   SET_COLLAPSIBLE_PANEL_DEFAULT_OPEN: 'SET_COLLAPSIBLE_PANEL_DEFAULT_OPEN',
@@ -11,8 +9,6 @@ export const ACTION_TYPES = {
   SET_THEME: 'SET_THEME',
 } as const;
 
-export type StateActionType = ValueOf<typeof ACTION_TYPES>;
-
 export const STORAGE_KEYS = {
   HIDE_WELCOME_MODAL: 'HIDE_WELCOME_MODAL',
   COLLAPSIBLE_PANEL_DEFAULT_OPEN: 'COLLAPSIBLE_PANEL_DEFAULT_OPEN',
@@ -23,8 +19,6 @@ export const STORAGE_KEYS = {
   EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN: 'EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN',
   THEME: 'THEME',
 } as const;
-
-export const NEW_CHAT_ID = 'new';
 
 export const DATA_TABS = {
   DESCRIPTION: 'description',
