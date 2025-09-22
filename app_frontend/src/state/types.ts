@@ -11,7 +11,7 @@ export interface AppStateData {
   theme: 'light' | 'dark';
 }
 
-export interface AppStateActions {
+interface AppStateActions {
   hideWelcomeModal: () => void;
   setCollapsiblePanelDefaultOpen: (isOpen: boolean) => void;
   setEnableChartGeneration: (enabled: boolean) => void;
