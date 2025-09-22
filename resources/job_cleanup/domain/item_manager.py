@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class IItemManager(ABC):
     @abstractmethod
-    async def fetch_items(self, app_id: str) -> Optional[List[Dict]]:
+    async def fetch_items(self, app_id: str) -> Optional[List[Dict[str, Any]]]:
         pass
 
     @abstractmethod

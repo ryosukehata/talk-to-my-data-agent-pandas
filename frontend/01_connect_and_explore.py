@@ -55,7 +55,7 @@ Database = get_external_database()
 
 
 @st.cache_data  # キャッシュを使って、CSV変換を高速化
-def convert_df_to_csv(df):
+def convert_df_to_csv(df) -> str:
     # index=Falseとすることで、CSVにDataFrameのインデックスが出力されないようにする
     # .encode('utf-8')でUTF-8エンコーディングを指定し、日本語などの文字化けを防ぐ
     return df.to_csv(index=False).encode("utf_8_sig")
