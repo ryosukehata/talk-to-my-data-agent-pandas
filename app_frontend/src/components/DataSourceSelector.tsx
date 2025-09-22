@@ -16,8 +16,8 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
         <Label htmlFor="r1">{t('Local file or Data Registry')}</Label>
       </div>
       <div className="flex items-center space-x-2">
-          <RadioGroupItem value={DATA_SOURCES.REMOTE_CATALOG} id="r1" />
-          <Label htmlFor="r1">{t('Remote Data Registry')}</Label>
+        <RadioGroupItem value={DATA_SOURCES.REMOTE_CATALOG} id="r1" />
+        <Label htmlFor="r1">{t('Remote Data Registry')}</Label>
       </div>
       {/* Not yet putting a conditional here, though probably in a future release. */}
       <div className="flex items-center space-x-2">
