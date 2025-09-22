@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.3.9] - 2025-09-10
+
+### Features
+
+- Add functionality to analyze large datasets with DataRobot's data wrangling platform.
+
+### Improvements
+
+- Filter Data Registry download to datasets eligible to be downloaded.
+
 ## [0.3.8] - 2025-09-19
 
 ### Docs

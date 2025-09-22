@@ -13,7 +13,7 @@ DATASET_ACCESS_LOG_ID = config.DATASET_ACCESS_LOG_ID
 MODE = config.MODE
 
 
-def main():
+def main() -> None:
     logger.info("Starting job")
     logger.info(f"LLM Deployment ID: {LLM_DEPLOYMENT_ID}")
     logger.info(f"APP ID: {DATAROBOT_APPLICATION_ID}")

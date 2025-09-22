@@ -33,8 +33,8 @@ from helpers import state_empty, state_init
 
 from utils.analyst_db import AnalystDB, DataSourceType
 from utils.api import (
-    download_registry_datasets,
     list_registry_datasets,
+    load_registry_datasets,
     log_memory,
     process_data_and_update_state,
 )
@@ -55,7 +55,7 @@ Database = get_external_database()
 
 
 @st.cache_data  # キャッシュを使って、CSV変換を高速化
-def convert_df_to_csv(df):
+def convert_df_to_csv(df) -> str:
     # index=Falseとすることで、CSVにDataFrameのインデックスが出力されないようにする
     # .encode('utf-8')でUTF-8エンコーディングを指定し、日本語などの文字化けを防ぐ
     return df.to_csv(index=False).encode("utf_8_sig")
@@ -147,7 +147,7 @@ async def registry_download_callback() -> None:
                     ds["id"] for ds in st.session_state.selected_registry_datasets
                 ]
                 with st.session_state.datarobot_connect.use_user_token():
-                    dataframes = await download_registry_datasets(
+                    dataframes = await load_registry_datasets(
                         selected_ids, st.session_state.analyst_db
                     )
                 dataset_names = [
