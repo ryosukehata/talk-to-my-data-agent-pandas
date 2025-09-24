@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.3.11] - 2025-09-24
+
+### Improvements
+
+- Add setup prerequisites to README
+- Update localization assets
+
+### Bug Fixes
+
+- Fix streamlit local dev path issues, add new `make run-local-streamlit` helper
+- Fix issues while reloading app in browser
+- Fix streamlit e2e tests
+- Restore e2e test cleanup
+- Fixes and improvements for spark recipes
+
+
 ## [0.3.10] - 2025-09-24
 
 ### Fixes
