@@ -194,8 +194,10 @@ class SnowflakeCredentials(DRCredentials):
             from cryptography.hazmat.backends import default_backend
             from cryptography.hazmat.primitives import serialization
 
+            password_bytes = self.password.encode("utf-8") if self.password else None
+
             p_key = serialization.load_pem_private_key(
-                private_key_data, password=None, backend=default_backend()
+                private_key_data, password=password_bytes, backend=default_backend()
             )
             logger.info("Successfully loaded PEM key")
 
