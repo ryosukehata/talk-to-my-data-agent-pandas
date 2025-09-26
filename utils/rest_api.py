@@ -97,15 +97,21 @@ def _chart_trace_to_dataframe(trace: dict[str, Any]) -> pd.DataFrame:
 
     def register_sequence(name: str, values: Iterable[Any]) -> None:
         nonlocal max_len
-        normalized: list[Any] = []
-        for item in values:
+        # Convert to list for length and slicing
+        values_list = list(values)
+        if len(values_list) > MAX_EXCEL_ROWS:
+            logger.warning(f"Sequence '{name}' has {len(values_list)} items, truncating to {MAX_EXCEL_ROWS}.")
+            values_list = values_list[:MAX_EXCEL_ROWS]
+        # Use list comprehension for normalization
+        def normalize(item):
             if isinstance(item, (dict, list, tuple)):
                 try:
-                    normalized.append(json.dumps(item))
+                    return json.dumps(item)
                 except Exception:
-                    normalized.append(str(item))
+                    return str(item)
             else:
-                normalized.append(item)
+                return item
+        normalized = [normalize(item) for item in values_list]
         sequence_columns[name] = normalized
         max_len = max(max_len, len(normalized))
 
