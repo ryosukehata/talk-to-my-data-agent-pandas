@@ -24,7 +24,7 @@ import uuid
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Generator, List, Union, cast
+from typing import Any, Generator, Iterable, List, Union, cast
 
 import datarobot as dr
 import pandas as pd
@@ -88,6 +88,64 @@ from utils.schema import (
 logger = get_logger()
 
 MAX_EXCEL_ROWS = 50000  # Maximum rows to export to Excel to prevent memory issues
+
+
+def _chart_trace_to_dataframe(trace: dict[str, Any]) -> pd.DataFrame:
+    sequence_columns: dict[str, list[Any]] = {}
+    scalar_columns: dict[str, Any] = {}
+    max_len = 0
+
+    def register_sequence(name: str, values: Iterable[Any]) -> None:
+        nonlocal max_len
+        # Convert to list for length and slicing
+        values_list = list(values)
+        if len(values_list) > MAX_EXCEL_ROWS:
+            logger.warning(f"Sequence '{name}' has {len(values_list)} items, truncating to {MAX_EXCEL_ROWS}.")
+            values_list = values_list[:MAX_EXCEL_ROWS]
+        # Use list comprehension for normalization
+        def normalize(item):
+            if isinstance(item, (dict, list, tuple)):
+                try:
+                    return json.dumps(item)
+                except Exception:
+                    return str(item)
+            else:
+                return item
+        normalized = [normalize(item) for item in values_list]
+        sequence_columns[name] = normalized
+        max_len = max(max_len, len(normalized))
+
+    def register_scalar(name: str, value: Any) -> None:
+        scalar_columns[name] = value
+
+    def walk(current_key: str, value: Any) -> None:
+        if isinstance(value, (list, tuple)):
+            register_sequence(current_key, value)
+        elif isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                nested_key = f"{current_key}_{sub_key}" if current_key else sub_key
+                walk(nested_key, sub_value)
+        else:
+            register_scalar(current_key, value)
+
+    for key, value in trace.items():
+        walk(key, value)
+
+    if max_len == 0:
+        max_len = 1
+
+    padded_columns: dict[str, list[Any]] = {}
+    for name, values in sequence_columns.items():
+        if len(values) < max_len:
+            padded_columns[name] = values + [None] * (max_len - len(values))
+        else:
+            padded_columns[name] = values
+
+    df = pd.DataFrame(padded_columns, index=range(max_len))
+    for name, value in scalar_columns.items():
+        df[name] = value
+
+    return df
 
 
 async def get_database(user_id: str) -> AnalystDB:
@@ -1207,7 +1265,6 @@ async def save_chat_messages(
 
                 try:
                     dataset: pd.DataFrame = run_analysis_component.dataset.data.df
-
                     # Convert to pandas with error handling for large datasets
                     pandas_df = dataset
 
@@ -1225,7 +1282,6 @@ async def save_chat_messages(
                             ]
                         )
                         data_sheet.append([])
-
                     for r in dataframe_to_rows(pandas_df, index=False, header=True):
                         data_sheet.append(r)
 
@@ -1263,7 +1319,7 @@ async def save_chat_messages(
                                 0
                             ].copy()  # Create copy to avoid modifying original
                             [fig_json.pop(k, None) for k in ["marker", "name", "type"]]
-                            df = pd.DataFrame(fig_json)
+                            df = _chart_trace_to_dataframe(fig_json)
                             for r in dataframe_to_rows(df, index=False, header=True):
                                 charts_sheet.append(r)
 
