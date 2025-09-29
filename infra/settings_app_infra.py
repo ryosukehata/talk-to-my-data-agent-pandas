@@ -41,10 +41,22 @@ def get_frontend_path() -> Path:
 
 application_path = PROJECT_ROOT / get_frontend_path()
 
-app_source_args = ApplicationSourceArgs(
-    resource_name=f"Data Analyst App Source [{PROJECT_NAME}]",
-    base_environment_id=RuntimeEnvironments.PYTHON_312_APPLICATION_BASE.value.id,
-).model_dump(mode="json", exclude_none=True)
+app_environment = datarobot.ExecutionEnvironment(
+    resource_name=f"App Environment for Data Analyst[{PROJECT_NAME}]",
+    programming_language="python",
+    use_cases=["customApplication"],
+    description=f"App Environment for Data Analyst[{PROJECT_NAME}]",
+    docker_context_path=os.fspath((PROJECT_ROOT / "docker").resolve()),
+    name="Python 3.12 Data Analyst Environment with Japanese Font",
+)
+
+# Arguments for ApplicationSource as a plain dict.
+# Note: base_environment_id can be an Input[str] (i.e., Output[str]) and Pulumi will resolve it.
+app_source_args = {
+    "resource_name": f"Data Analyst App Source [{PROJECT_NAME}]",
+    "base_environment_id": app_environment.id,
+}
+
 
 app_resource_name: str = f"Data Analyst Application [{PROJECT_NAME}]"
 
