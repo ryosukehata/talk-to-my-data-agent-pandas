@@ -1,7 +1,8 @@
 FROM python:3.12-slim
 
-# 必要なフォントとKaleidoをインストール
-RUN apt-get update && apt-get install -y \
+# 必要なフォントをインストール
+# hadolint ignore=DL3008  # バージョン固定はしない運用のため
+RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 

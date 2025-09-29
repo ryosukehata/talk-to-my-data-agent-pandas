@@ -20,7 +20,6 @@ from typing import List, Sequence, Tuple
 import pulumi
 import pulumi_datarobot as datarobot
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
-from datarobot_pulumi_utils.schema.apps import ApplicationSourceArgs
 from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
 from settings_database import DATABASE_CONNECTION_TYPE
 
