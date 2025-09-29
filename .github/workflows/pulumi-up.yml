@@ -40,6 +40,7 @@ jobs:
           FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE }}
           SCHEDULER_HOUR: ${{ vars.SCHEDULER_HOUR }}
           DATAROBOT_DEFAULT_USE_CASE: ${{ secrets.DATAROBOT_DEFAULT_USE_CASE }}
+          APP_ENVIRONMENT_ID: ${{ secrets.APP_ENVIRONMENT_ID }}
 
       - uses: pulumi/actions@v6
         if: github.ref == 'refs/heads/dev'
@@ -57,4 +58,4 @@ jobs:
           FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE }}
           SCHEDULER_HOUR: ${{ vars.SCHEDULER_HOUR }}
           DATAROBOT_DEFAULT_USE_CASE: ${{ secrets.DATAROBOT_DEFAULT_USE_CASE }}
-
+          APP_ENVIRONMENT_ID: ${{ secrets.APP_ENVIRONMENT_ID }}
