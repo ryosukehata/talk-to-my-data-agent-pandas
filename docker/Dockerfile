@@ -2,6 +2,7 @@ FROM python:3.12-slim
 
 # 必要なフォントをインストール（存在するパッケージを自動選択し、Candidate にピン留め）
 # hadolint は式展開を解釈できない場合がありますが、実際には =version で固定しています
+# hadolint ignore=DL3008
 RUN set -eux; \
     apt-get update; \
     PKG="fonts-noto-cjk"; \
