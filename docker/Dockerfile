@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 
+# Set SHELL with pipefail for safer pipe operations
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # 必要なフォントをインストール（存在するパッケージを自動選択し、Candidate にピン留め）
 # hadolint は式展開を解釈できない場合がありますが、実際には =version で固定しています
 # hadolint ignore=DL3008
