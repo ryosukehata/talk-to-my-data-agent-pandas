@@ -17,9 +17,9 @@ import textwrap
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
+import pulumi
 import pulumi_datarobot as datarobot
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
-from datarobot_pulumi_utils.schema.apps import ApplicationSourceArgs
 from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
 from settings_database import DATABASE_CONNECTION_TYPE
 
@@ -41,10 +41,43 @@ def get_frontend_path() -> Path:
 
 application_path = PROJECT_ROOT / get_frontend_path()
 
-app_source_args = ApplicationSourceArgs(
-    resource_name=f"Data Analyst App Source [{PROJECT_NAME}]",
-    base_environment_id=RuntimeEnvironments.PYTHON_312_APPLICATION_BASE.value.id,
-).model_dump(mode="json", exclude_none=True)
+# Decide whether to use Japanese font (custom Docker env) and which base environment to use
+use_japanese_font_env_raw = os.environ.get("USE_JAPANESE_FONT_ENV")
+USE_JAPANESE_FONT_ENV = (
+    use_japanese_font_env_raw.lower() in {"1", "true", "yes", "y", "on"}
+    if use_japanese_font_env_raw is not None
+    else False
+)
+
+app_environment_id = os.environ.get("APP_ENVIRONMENT_ID")
+if app_environment_id:
+    pulumi.info(f"Using existing app environment '{app_environment_id}'")
+    app_environment = datarobot.ExecutionEnvironment.get(
+        id=app_environment_id,
+        resource_name="Data Analyst app environment [PRE-EXISTING]",
+    )
+    base_environment_id: pulumi.Input[str] = app_environment.id
+elif USE_JAPANESE_FONT_ENV:
+    app_environment = datarobot.ExecutionEnvironment(
+        resource_name=f"App Environment for Data Analyst[{PROJECT_NAME}]",
+        programming_language="python",
+        use_cases=["customApplication"],
+        description=f"App Environment for Data Analyst[{PROJECT_NAME}]",
+        docker_context_path=os.fspath((PROJECT_ROOT / "docker").resolve()),
+        name="Python 3.12 Data Analyst Environment with Japanese Font",
+    )
+    base_environment_id = app_environment.id
+else:
+    base_environment_id = RuntimeEnvironments.PYTHON_312_APPLICATION_BASE.value.id
+
+
+# Arguments for ApplicationSource as a plain dict.
+# Note: base_environment_id can be an Input[str] (i.e., Output[str]) and Pulumi will resolve it.
+app_source_args = {
+    "resource_name": f"Data Analyst App Source [{PROJECT_NAME}]",
+    "base_environment_id": base_environment_id,
+}
+
 
 app_resource_name: str = f"Data Analyst Application [{PROJECT_NAME}]"
 

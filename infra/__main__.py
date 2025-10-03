@@ -203,6 +203,7 @@ llm_deployment = CustomModelDeployment(
     deployment_args=settings_generative.deployment_args,
 )
 
+
 app_runtime_parameters = [
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
         key=llm_deployment_env_name,
@@ -259,6 +260,7 @@ if USE_LLM_GATEWAY:
             value="true",
         )
     )
+
 
 app_source = datarobot.ApplicationSource(
     files=app_frontend.stdout.apply(
