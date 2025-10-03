@@ -234,6 +234,13 @@ class SnowflakeCredentials(DRCredentials):
 
         return has_key_auth or has_password_auth
 
+    def with_schema(self, schema: str) -> "SnowflakeCredentials":
+        """Create a new instance with a different schema."""
+        # Create a copy with the new schema
+        new_creds = self.model_copy()
+        new_creds.db_schema = schema
+        return new_creds
+
 
 class SAPDatasphereCredentials(DRCredentials):
     """

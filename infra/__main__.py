@@ -54,6 +54,7 @@ from utils.resources import (
     llm_deployment_env_name,
 )
 from utils.schema import AppInfra
+from utils.csv_validator import validate_csv_for_upload
 
 TEXTGEN_DEPLOYMENT_ID = os.environ.get("TEXTGEN_DEPLOYMENT_ID")
 TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
@@ -212,6 +213,34 @@ app_runtime_parameters = [
         key="APP_LOCALE", type="string", value=LocaleSettings().app_locale
     ),
 ]
+
+
+if os.environ.get("DATABASE_DESCRIPTION_PATH", None):
+    try:
+        file_path = str(PROJECT_ROOT / os.environ.get("DATABASE_DESCRIPTION_PATH"))
+        
+        # Validate CSV file before upload
+        pulumi.info(f"Validating CSV file: {file_path}")
+
+        validate_csv_for_upload(file_path)
+        pulumi.info("CSV validation passed - file is ready for upload")
+        
+        dataset_description = datarobot.DatasetFromFile(
+            resource_name=f"UseCase Analyst AI Catalog Tools Dataset [{PROJECT_NAME}]",
+            file_path=file_path,
+            use_case_ids=[use_case.id],
+        )
+        app_runtime_parameters.append(
+            datarobot.ApplicationSourceRuntimeParameterValueArgs(
+                key="DATABASE_DESCRIPTION",
+                type="string",
+                value=dataset_description.id,
+            )
+        )
+    except (FileNotFoundError, ValueError) as e:
+        raise ValueError(f"CSV validation failed: {e}")
+    except Exception as e:
+        pulumi.warn(f"Could not create dataset from {os.environ.get('DATASET_DESCRIPTION_PATH')}: {e}")
 
 
 db_credential = get_database_credentials(DATABASE_CONNECTION_TYPE)

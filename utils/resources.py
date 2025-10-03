@@ -90,11 +90,20 @@ llm_deployment_env_name: str = "LLM_DEPLOYMENT_ID"
 
 dashboard_env_name: str = "DATAROBOT_DASHBOARD_ID"
 
+database_description_name: str = "DATABASE_DESCRIPTION"
 
 class LLMDeployment(DynamicSettings):
     id: str = Field(
         validation_alias=AliasChoices(
             "MLOPS_RUNTIME_PARAM_" + llm_deployment_env_name,
             llm_deployment_env_name,
+        ),
+    )
+
+class DatabaseDescription(DynamicSettings):
+    id: str = Field(
+        validation_alias=AliasChoices(
+            "MLOPS_RUNTIME_PARAM_" + database_description_name,
+            database_description_name,
         ),
     )

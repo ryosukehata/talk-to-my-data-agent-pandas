@@ -16,10 +16,10 @@ import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
 import { DataSourceSelector } from './DataSourceSelector';
 import { DATA_SOURCES } from '@/constants/dataSources';
 import { MultiSelect } from '@/components/ui-custom/multi-select';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileUploader } from './ui-custom/file-uploader';
 import { useFetchAllDatasets } from '@/api/datasets/hooks';
-import { useGetDatabaseTables, useLoadFromDatabaseMutation } from '@/api/database/hooks';
+import { useGetDatabaseSchemas, useGetDatabaseTables, useLoadFromDatabaseMutation, useGetDefaultSchema } from '@/api/database/hooks';
 import { useFileUploadMutation, UploadError } from '@/api/datasets/hooks';
 import { Separator } from '@radix-ui/react-separator';
 import loader from '@/assets/loader.svg';
@@ -27,11 +27,15 @@ import { useAppState } from '@/state/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AxiosError } from 'axios';
 import { TruncatedText } from './ui-custom/truncated-text';
+import { Label } from '@/components/ui/label';
 
 export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const { data } = useFetchAllDatasets();
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
-  const { data: dbTables } = useGetDatabaseTables();
+  const [selectedSchema, setSelectedSchema] = useState<string>('');
+  const { data: dbSchemas } = useGetDatabaseSchemas();
+  const { data: defaultSchema } = useGetDefaultSchema();
+  const { data: dbTables, isLoading: isLoadingTables } = useGetDatabaseTables(selectedSchema);
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const { setDataSource, dataSource } = useAppState();
   const [files, setFiles] = useState<File[]>([]);
@@ -63,6 +67,27 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
       console.error(error);
     },
   });
+
+  // Set default schema as initial selection when it's loaded
+  useEffect(() => {
+    if (defaultSchema && !selectedSchema) {
+      setSelectedSchema(defaultSchema);
+    }
+  }, [defaultSchema, selectedSchema]);
+
+  // Helper function to format schema display
+  const formatSchemaOption = (name: string, description: string) => {
+    return description === name 
+      ? name 
+      : `${name} - ${description}`;
+  };
+
+  // Helper function to format table display
+  const formatTableOption = (name: string, description: string) => {
+    return description === name 
+      ? name 
+      : `${name} - ${description}`;
+  };
 
   return (
     <Dialog
@@ -134,26 +159,60 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
 
         {dataSource == DATA_SOURCES.DATABASE && (
           <>
-            <h4>{t('Databases')}</h4>
-            <h6>{t('Select one or more tables')}</h6>
-            <MultiSelect
-              options={
-                dbTables
-                  ? dbTables.map(i => ({
-                      label: i,
-                      value: i,
-                    }))
-                  : []
-              }
-              onValueChange={setSelectedTables}
-              defaultValue={selectedTables}
-              placeholder={t('Select one or more items.')}
-              variant="inverted"
-              testId="database-table-select"
-              modalPopover
-              animation={2}
-              maxCount={3}
-            />
+            <div className="space-y-4">
+              <div>
+                <h4>{t('Database Schema')}</h4>
+                <h6>{t('Select a schema (optional)')}</h6>
+                <div className="flex flex-col space-y-2">
+                  <Label htmlFor="schema-select">{t('Schema')}</Label>
+                  <select
+                    id="schema-select"
+                    value={selectedSchema}
+                    onChange={(e) => {
+                      setSelectedSchema(e.target.value);
+                      setSelectedTables([]); // Reset selected tables when schema changes
+                    }}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {dbSchemas && Object.entries(dbSchemas).map(([name, description]) => (
+                      <option key={name} value={name}>
+                        {formatSchemaOption(name, description)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <h4>{t('Database Tables')}</h4>
+                <h6>{t('Select one or more tables')}</h6>
+                {isLoadingTables ? (
+                  <div className="flex items-center justify-center space-x-2 py-4">
+                    <img src={loader} alt={t('Loading tables...')} className="w-4 h-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">{t('Loading tables...')}</span>
+                  </div>
+                ) : (
+                  <MultiSelect
+                    options={
+                      dbTables
+                        ? Object.entries(dbTables).map(([name, description]) => ({
+                            label: formatTableOption(name, description),
+                            value: name,
+                          }))
+                        : []
+                    }
+                    onValueChange={setSelectedTables}
+                    defaultValue={selectedTables}
+                    placeholder={t('Select one or more tables.')}
+                    variant="inverted"
+                    testId="database-table-select"
+                    modalPopover
+                    animation={2}
+                    maxCount={3}
+                  />
+                )}
+              </div>
+            </div>
           </>
         )}
         <Separator className="border-t mt-6" />
@@ -173,7 +232,10 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
                 setIsPending(true);
                 if (dataSource === DATA_SOURCES.DATABASE) {
                   if (selectedTables.length > 0) {
-                    loadFromDatabase({ tableNames: selectedTables });
+                    loadFromDatabase({ 
+                      tableNames: selectedTables,
+                      schema: selectedSchema || undefined 
+                    });
                   }
                 } else {
                   mutate({ files, catalogIds: selectedDatasets });
