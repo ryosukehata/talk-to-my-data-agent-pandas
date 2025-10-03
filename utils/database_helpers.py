@@ -315,7 +315,7 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
     def get_schemas(self, timeout: int | None = None) -> list[str]:
         """Fetch list of available schemas from Snowflake database"""
         timeout = timeout if timeout is not None else self.default_timeout
-        
+
         conn: snowflake.connector.SnowflakeConnection
         try:
             with self.create_connection() as conn:
@@ -323,7 +323,7 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                     cursor.execute(
                         f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout}"
                     )
-                    
+
                     # Get all schemas in the database
                     cursor.execute(
                         f"""
@@ -334,12 +334,14 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                         """
                     )
                     results = cursor.fetchall()
-                    
+
                     schemas = [row[0] for row in results]
-                    
-                    logger.info(f"Found {len(schemas)} schemas in database {self._credentials.database}")
+
+                    logger.info(
+                        f"Found {len(schemas)} schemas in database {self._credentials.database}"
+                    )
                     return schemas
-                    
+
         except Exception as e:
             logger.error(f"Failed to fetch schemas: {str(e)}")
             # エラーが発生した場合は、少なくともデフォルトスキーマを返す
@@ -815,7 +817,9 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
         )
 
 
-def get_database_operator(app_infra: AppInfra, schema: str | None = None) -> DatabaseOperator[Any]:
+def get_database_operator(
+    app_infra: AppInfra, schema: str | None = None
+) -> DatabaseOperator[Any]:
     if app_infra.database == "bigquery":
         credentials: (
             GoogleCredentialsBQ
@@ -893,35 +897,35 @@ def get_external_database(schema: str | None = None) -> DatabaseOperator[Any]:
 def get_schemas_with_descriptions() -> dict[str, str]:
     """
     Get all available schemas with their descriptions.
-    
+
     Returns:
         Dictionary mapping schema names to descriptions.
         If no description is available, schema name is used as description.
     """
     from .database_config import SchemaTableConfigManager
-    
+
     config_manager = SchemaTableConfigManager()
     schemas = get_external_database().get_schemas()
     descriptions = config_manager.load_schema_descriptions()
-    
+
     return {schema: descriptions.get(schema, schema) for schema in schemas}
 
 
 def get_tables_with_descriptions(schema: str | None = None) -> dict[str, str]:
     """
     Get all available tables with their descriptions.
-    
+
     Args:
         schema: Schema name to filter tables (optional)
-    
+
     Returns:
         Dictionary mapping table names to descriptions.
         If no description is available, table name is used as description.
     """
     from .database_config import SchemaTableConfigManager
-    
+
     config_manager = SchemaTableConfigManager()
     tables = get_external_database(schema=schema).get_tables()
     descriptions = config_manager.load_table_descriptions()
-    
+
     return {table: descriptions.get(table, table) for table in tables}

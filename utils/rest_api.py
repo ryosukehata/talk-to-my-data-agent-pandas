@@ -52,7 +52,11 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from starlette.background import BackgroundTask
 
 from utils.analyst_db import AnalystDB, DatasetMetadata, DataSourceType
-from utils.database_helpers import get_external_database, get_schemas_with_descriptions, get_tables_with_descriptions
+from utils.database_helpers import (
+    get_external_database,
+    get_schemas_with_descriptions,
+    get_tables_with_descriptions,
+)
 from utils.logging_helper import get_logger
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))

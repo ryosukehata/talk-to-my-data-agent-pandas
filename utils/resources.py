@@ -92,6 +92,7 @@ dashboard_env_name: str = "DATAROBOT_DASHBOARD_ID"
 
 database_description_name: str = "DATABASE_DESCRIPTION"
 
+
 class LLMDeployment(DynamicSettings):
     id: str = Field(
         validation_alias=AliasChoices(
@@ -99,6 +100,7 @@ class LLMDeployment(DynamicSettings):
             llm_deployment_env_name,
         ),
     )
+
 
 class DatabaseDescription(DynamicSettings):
     id: str = Field(
