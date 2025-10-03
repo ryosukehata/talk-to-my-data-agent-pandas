@@ -27,7 +27,7 @@ from utils.resources import DatabaseDescription
 class SchemaTableConfigManager:
     """Manages schema and table descriptions from CSV files using pandas."""
 
-    def __init__(self, local: bool = True):  # "database_description.csv"):
+    def __init__(self, local: bool = False):  # "database_description.csv"):
         """
         Initialize the SchemaTableConfigManager.
 
