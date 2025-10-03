@@ -660,6 +660,7 @@ class DictionaryCellUpdate(BaseModel):
 
 class LoadDatabaseRequest(BaseModel):
     table_names: list[str]
+    schema_name: str | None = None  # Optional schema override
 
 
 class ChatCreate(BaseModel):

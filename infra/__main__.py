@@ -43,6 +43,7 @@ from infra.components.dr_credential import (
 )
 from infra.settings_database import DATABASE_CONNECTION_TYPE
 from infra.settings_proxy_llm import CHAT_MODEL_NAME
+from utils.csv_validator import validate_csv_for_upload
 from utils.custom_job_helper import (
     delete_all_custom_job_schedule,
     get_custom_job_by_name,
@@ -213,6 +214,36 @@ app_runtime_parameters = [
         key="APP_LOCALE", type="string", value=LocaleSettings().app_locale
     ),
 ]
+
+
+if os.environ.get("DATABASE_DESCRIPTION_PATH", None):
+    try:
+        file_path = str(PROJECT_ROOT / os.environ.get("DATABASE_DESCRIPTION_PATH"))
+
+        # Validate CSV file before upload
+        pulumi.info(f"Validating CSV file: {file_path}")
+
+        validate_csv_for_upload(file_path)
+        pulumi.info("CSV validation passed - file is ready for upload")
+
+        dataset_description = datarobot.DatasetFromFile(
+            resource_name=f"UseCase Analyst AI Catalog Tools Dataset [{PROJECT_NAME}]",
+            file_path=file_path,
+            use_case_ids=[use_case.id],
+        )
+        app_runtime_parameters.append(
+            datarobot.ApplicationSourceRuntimeParameterValueArgs(
+                key="DATABASE_DESCRIPTION",
+                type="string",
+                value=dataset_description.id,
+            )
+        )
+    except (FileNotFoundError, ValueError) as e:
+        raise ValueError(f"CSV validation failed: {e}")
+    except Exception as e:
+        pulumi.warn(
+            f"Could not create dataset from {os.environ.get('DATASET_DESCRIPTION_PATH')}: {e}"
+        )
 
 
 db_credential = get_database_credentials(DATABASE_CONNECTION_TYPE)

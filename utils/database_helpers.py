@@ -95,6 +95,10 @@ class DatabaseOperator(ABC, Generic[T]):
         return []
 
     @abstractmethod
+    def get_schemas(self, timeout: int | None = None) -> list[str]:
+        return []
+
+    @abstractmethod
     async def get_data(
         self,
         *table_names: str,
@@ -129,6 +133,9 @@ class NoDatabaseOperator(DatabaseOperator[NoDatabaseCredentialArgs]):
         return []
 
     def get_tables(self, timeout: int | None = 300) -> list[str]:
+        return []
+
+    def get_schemas(self, timeout: int | None = 300) -> list[str]:
         return []
 
     async def get_data(
@@ -305,6 +312,41 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
             logger.error(f"Error details: {str(e)}")
             return []
 
+    def get_schemas(self, timeout: int | None = None) -> list[str]:
+        """Fetch list of available schemas from Snowflake database"""
+        timeout = timeout if timeout is not None else self.default_timeout
+
+        conn: snowflake.connector.SnowflakeConnection
+        try:
+            with self.create_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout}"
+                    )
+
+                    # Get all schemas in the database
+                    cursor.execute(
+                        f"""
+                        SELECT SCHEMA_NAME
+                        FROM {self._credentials.database}.INFORMATION_SCHEMA.SCHEMATA
+                        WHERE SCHEMA_NAME NOT IN ('INFORMATION_SCHEMA')
+                        ORDER BY SCHEMA_NAME
+                        """
+                    )
+                    results = cursor.fetchall()
+
+                    schemas = [row[0] for row in results]
+
+                    logger.info(
+                        f"Found {len(schemas)} schemas in database {self._credentials.database}"
+                    )
+                    return schemas
+
+        except Exception as e:
+            logger.error(f"Failed to fetch schemas: {str(e)}")
+            # エラーが発生した場合は、少なくともデフォルトスキーマを返す
+            return [self._credentials.db_schema]
+
     @functools.lru_cache(maxsize=8)
     async def get_data(
         self,
@@ -464,6 +506,10 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
             logger.error(f"Error type: {type(e)}")
             logger.error(f"Error details: {str(e)}")
             return []
+
+    def get_schemas(self, timeout: int | None = None) -> list[str]:
+        """BigQuery schemas not implemented - return empty list"""
+        return []
 
     @functools.lru_cache(maxsize=8)
     async def get_data(
@@ -682,6 +728,10 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
             logger.error(f"Error details: {str(e)}")
             return []
 
+    def get_schemas(self, timeout: int | None = None) -> list[str]:
+        """SAP Data Sphere schemas not implemented - return empty list"""
+        return []
+
     @functools.lru_cache(maxsize=8)
     async def get_data(
         self,
@@ -767,7 +817,9 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
         )
 
 
-def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
+def get_database_operator(
+    app_infra: AppInfra, schema: str | None = None
+) -> DatabaseOperator[Any]:
     if app_infra.database == "bigquery":
         credentials: (
             GoogleCredentialsBQ
@@ -778,6 +830,9 @@ def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
         try:
             credentials = GoogleCredentialsBQ()
             if credentials.service_account_key and credentials.db_schema:
+                # Override schema if provided
+                if schema:
+                    credentials.db_schema = schema
                 return BigQueryOperator(credentials)
         except (ValidationError, ValueError):
             logger.warning(
@@ -788,6 +843,9 @@ def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
         try:
             credentials = SnowflakeCredentials()
             if credentials.is_configured():
+                # Override schema if provided
+                if schema:
+                    credentials = credentials.with_schema(schema)
                 return SnowflakeOperator(credentials)
         except (ValidationError, ValueError):
             logger.warning(
@@ -832,5 +890,42 @@ def load_app_infra() -> AppInfra:
                 ) from e
 
 
-def get_external_database() -> DatabaseOperator[Any]:
-    return get_database_operator(load_app_infra())
+def get_external_database(schema: str | None = None) -> DatabaseOperator[Any]:
+    return get_database_operator(load_app_infra(), schema=schema)
+
+
+def get_schemas_with_descriptions() -> dict[str, str]:
+    """
+    Get all available schemas with their descriptions.
+
+    Returns:
+        Dictionary mapping schema names to descriptions.
+        If no description is available, schema name is used as description.
+    """
+    from .database_config import SchemaTableConfigManager
+
+    config_manager = SchemaTableConfigManager()
+    schemas = get_external_database().get_schemas()
+    descriptions = config_manager.load_schema_descriptions()
+
+    return {schema: descriptions.get(schema, schema) for schema in schemas}
+
+
+def get_tables_with_descriptions(schema: str | None = None) -> dict[str, str]:
+    """
+    Get all available tables with their descriptions.
+
+    Args:
+        schema: Schema name to filter tables (optional)
+
+    Returns:
+        Dictionary mapping table names to descriptions.
+        If no description is available, table name is used as description.
+    """
+    from .database_config import SchemaTableConfigManager
+
+    config_manager = SchemaTableConfigManager()
+    tables = get_external_database(schema=schema).get_tables()
+    descriptions = config_manager.load_table_descriptions()
+
+    return {table: descriptions.get(table, table) for table in tables}
