@@ -19,7 +19,12 @@ import { MultiSelect } from '@/components/ui-custom/multi-select';
 import { useState, useEffect } from 'react';
 import { FileUploader } from './ui-custom/file-uploader';
 import { useFetchAllDatasets } from '@/api/datasets/hooks';
-import { useGetDatabaseSchemas, useGetDatabaseTables, useLoadFromDatabaseMutation, useGetDefaultSchema } from '@/api/database/hooks';
+import {
+  useGetDatabaseSchemas,
+  useGetDatabaseTables,
+  useLoadFromDatabaseMutation,
+  useGetDefaultSchema,
+} from '@/api/database/hooks';
 import { useFileUploadMutation, UploadError } from '@/api/datasets/hooks';
 import { Separator } from '@radix-ui/react-separator';
 import loader from '@/assets/loader.svg';
@@ -77,16 +82,12 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
 
   // Helper function to format schema display
   const formatSchemaOption = (name: string, description: string) => {
-    return description === name 
-      ? name 
-      : `${name} - ${description}`;
+    return description === name ? name : `${name} - ${description}`;
   };
 
   // Helper function to format table display
   const formatTableOption = (name: string, description: string) => {
-    return description === name 
-      ? name 
-      : `${name} - ${description}`;
+    return description === name ? name : `${name} - ${description}`;
   };
 
   return (
@@ -168,27 +169,32 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
                   <select
                     id="schema-select"
                     value={selectedSchema}
-                    onChange={(e) => {
+                    onChange={e => {
                       setSelectedSchema(e.target.value);
                       setSelectedTables([]); // Reset selected tables when schema changes
                     }}
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {dbSchemas && Object.entries(dbSchemas).map(([name, description]) => (
-                      <option key={name} value={name}>
-                        {formatSchemaOption(name, description)}
-                      </option>
-                    ))}
+                    {dbSchemas &&
+                      Object.entries(dbSchemas).map(([name, description]) => (
+                        <option key={name} value={name}>
+                          {formatSchemaOption(name, description)}
+                        </option>
+                      ))}
                   </select>
                 </div>
               </div>
-              
+
               <div>
                 <h4>{t('Database Tables')}</h4>
                 <h6>{t('Select one or more tables')}</h6>
                 {isLoadingTables ? (
                   <div className="flex items-center justify-center space-x-2 py-4">
-                    <img src={loader} alt={t('Loading tables...')} className="w-4 h-4 animate-spin" />
+                    <img
+                      src={loader}
+                      alt={t('Loading tables...')}
+                      className="w-4 h-4 animate-spin"
+                    />
                     <span className="text-sm text-muted-foreground">{t('Loading tables...')}</span>
                   </div>
                 ) : (
@@ -232,9 +238,9 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
                 setIsPending(true);
                 if (dataSource === DATA_SOURCES.DATABASE) {
                   if (selectedTables.length > 0) {
-                    loadFromDatabase({ 
+                    loadFromDatabase({
                       tableNames: selectedTables,
-                      schema: selectedSchema || undefined 
+                      schema: selectedSchema || undefined,
                     });
                   }
                 } else {

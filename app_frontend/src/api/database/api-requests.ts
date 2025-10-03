@@ -14,11 +14,7 @@ export const getDatabaseSchemas = async ({
   return data;
 };
 
-export const getDefaultSchema = async ({
-  signal,
-}: {
-  signal?: AbortSignal;
-}): Promise<string> => {
+export const getDefaultSchema = async ({ signal }: { signal?: AbortSignal }): Promise<string> => {
   const { data } = await apiClient.get<string>(`/v1/database/default-schema`, {
     signal,
   });
@@ -53,13 +49,9 @@ export const loadFromDatabase = async ({
   if (schema) {
     payload.schema_name = schema;
   }
-  
-  const { data } = await apiClient.post<string[]>(
-    '/v1/database/select',
-    payload,
-    {
-      signal,
-    }
-  );
+
+  const { data } = await apiClient.post<string[]>('/v1/database/select', payload, {
+    signal,
+  });
   return data;
 };

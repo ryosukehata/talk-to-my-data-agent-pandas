@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { databaseKeys } from './keys';
-import { getDatabaseSchemas, getDatabaseTables, loadFromDatabase, getDefaultSchema } from './api-requests';
+import {
+  getDatabaseSchemas,
+  getDatabaseTables,
+  loadFromDatabase,
+  getDefaultSchema,
+} from './api-requests';
 import { dictionaryKeys } from '../dictionaries/keys';
 import { DictionaryTable } from '../dictionaries/types';
 
