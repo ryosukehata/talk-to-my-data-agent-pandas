@@ -52,11 +52,7 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from starlette.background import BackgroundTask
 
 from utils.analyst_db import AnalystDB, DatasetMetadata, DataSourceType
-from utils.database_helpers import (
-    get_external_database,
-    get_schemas_with_descriptions,
-    get_tables_with_descriptions,
-)
+from utils.database_helpers import get_external_database
 from utils.logging_helper import get_logger
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -447,23 +443,7 @@ async def get_registry_datasets(
         return list_registry_datasets(limit)
 
 
-@router.get("/database/tables")
-async def get_database_tables(schema: str | None = None) -> dict[str, str]:
-    """Get list of available tables with descriptions"""
-    return get_tables_with_descriptions(schema=schema)
-
-
-@router.get("/database/schemas")
-async def get_database_schemas() -> dict[str, str]:
-    """Get list of available schemas with descriptions"""
-    return get_schemas_with_descriptions()
-
-
-@router.get("/database/default-schema")
-async def get_default_schema() -> str:
-    """Get the default schema name from environment configuration"""
-    db_operator = get_external_database()
-    return db_operator._credentials.db_schema
+# =============================================================================
 
 
 async def process_and_update(
@@ -1463,4 +1443,16 @@ async def store_datarobot_account(
     return {"success": True}
 
 
+# メインルーターの追加
 app.include_router(router)
+
+# カスタマイズAPIの統合
+try:
+    from utils.customize.rest_api import router as customize_router
+
+    app.include_router(customize_router, prefix="/api/v1")
+    print("✅ カスタマイズAPIエンドポイントを追加しました")
+except ImportError as e:
+    print(f"⚠️ カスタマイズモジュールが見つかりません: {e}")
+except Exception as e:
+    print(f"❌ カスタマイズモジュールの読み込みに失敗しました: {e}")

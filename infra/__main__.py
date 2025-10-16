@@ -43,10 +43,13 @@ from infra.components.dr_credential import (
 )
 from infra.settings_database import DATABASE_CONNECTION_TYPE
 from infra.settings_proxy_llm import CHAT_MODEL_NAME
-from utils.csv_validator import validate_csv_for_upload
 from utils.custom_job_helper import (
     delete_all_custom_job_schedule,
     get_custom_job_by_name,
+)
+from utils.customize.csv_validator import (
+    validate_prompt_template_csv,
+    validate_schema_table_description_csv,
 )
 from utils.i18n import LocaleSettings
 from utils.resources import (
@@ -223,11 +226,11 @@ if os.environ.get("DATABASE_DESCRIPTION_PATH", None):
         # Validate CSV file before upload
         pulumi.info(f"Validating CSV file: {file_path}")
 
-        validate_csv_for_upload(file_path)
+        validate_schema_table_description_csv(file_path)
         pulumi.info("CSV validation passed - file is ready for upload")
 
         dataset_description = datarobot.DatasetFromFile(
-            resource_name=f"UseCase Analyst AI Catalog Tools Dataset [{PROJECT_NAME}]",
+            resource_name=f"AI Catalog DATABASE DESCRIPTIONTools Dataset [{PROJECT_NAME}]",
             file_path=file_path,
             use_case_ids=[use_case.id],
         )
@@ -244,6 +247,54 @@ if os.environ.get("DATABASE_DESCRIPTION_PATH", None):
         pulumi.warn(
             f"Could not create dataset from {os.environ.get('DATASET_DESCRIPTION_PATH')}: {e}"
         )
+
+
+if os.environ.get("PROMPTS_TEMPLATE_PATH", None):
+    try:
+        file_path = str(PROJECT_ROOT / os.environ.get("PROMPTS_TEMPLATE_PATH"))
+
+        # Validate CSV file before upload
+        pulumi.info(f"Validating CSV file: {file_path}")
+
+        validate_prompt_template_csv(file_path)
+        pulumi.info("CSV validation passed - file is ready for upload")
+
+        dataset_prompts_template = datarobot.DatasetFromFile(
+            resource_name=f"AI Catalog Prompts Template Dataset [{PROJECT_NAME}]",
+            file_path=file_path,
+            use_case_ids=[use_case.id],
+        )
+        app_runtime_parameters.append(
+            datarobot.ApplicationSourceRuntimeParameterValueArgs(
+                key="PROMPT_TEMPLATE_AI_CATALOG",
+                type="string",
+                value=dataset_prompts_template.id,
+            )
+        )
+    except (FileNotFoundError, ValueError) as e:
+        raise ValueError(f"CSV validation failed: {e}")
+    except Exception as e:
+        pulumi.warn(
+            f"Could not create dataset from {os.environ.get('DATASET_DESCRIPTION_PATH')}: {e}"
+        )
+
+if os.environ.get("VITE_ENABLE_TEMPLATE_EDIT"):
+    app_runtime_parameters.append(
+        datarobot.ApplicationSourceRuntimeParameterValueArgs(
+            key="VITE_ENABLE_TEMPLATE_EDIT",
+            type="string",
+            value=os.environ.get("VITE_ENABLE_TEMPLATE_EDIT"),
+        )
+    )
+
+if os.environ.get("VITE_ENABLE_CUSTOM_PROMPTS"):
+    app_runtime_parameters.append(
+        datarobot.ApplicationSourceRuntimeParameterValueArgs(
+            key="VITE_ENABLE_CUSTOM_PROMPTS",
+            type="string",
+            value=os.environ.get("VITE_ENABLE_CUSTOM_PROMPTS"),
+        )
+    )
 
 
 db_credential = get_database_credentials(DATABASE_CONNECTION_TYPE)

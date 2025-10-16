@@ -5,6 +5,7 @@ import Pages from './pages';
 import { useDataRobotInfo } from './api/user/hooks';
 import { useAppState } from '@/state/hooks';
 import i18n, { getSavedLanguage } from './i18n';
+import { CustomPromptStateProvider } from '@/components/custom-prompts';
 
 function App() {
   const { data: dataRobotInfo } = useDataRobotInfo();
@@ -30,10 +31,10 @@ function App() {
   }, [theme]);
 
   return (
-    <>
+    <CustomPromptStateProvider>
       {isReady && <Pages />}
       <Toaster />
-    </>
+    </CustomPromptStateProvider>
   );
 }
 

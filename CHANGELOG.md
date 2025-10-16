@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8.2] - 2025-10-17
+
+### Features
+- Add custom prompt template system
+  - Enable developers to register custom prompt templates via CSV
+  - Support template categorization and search functionality
+  - Implement template reload functionality for administrators
+- Add user prompt management
+  - Allow users to save custom prompts for future use
+  - Provide prompt retrieval and deletion capabilities
+  - Enable personalized prompt collections per user
+- Add feature flag system
+  - Support environment-based feature toggles
+  - Enable selective feature activation for different deployments
+  - Implement MLOPS runtime parameter integration
+- Add job cleanup system with user prompt preservation
+
+### Improvements
+- Enhanced settings modal with scrollable interface
+- Improved React Query cache management for better data consistency
+- Added comprehensive error handling for custom prompt operations
+- Integrated template management into administrative interface
+
+## [0.3.8.1] - 2025-10-04
+
+### Improvements
+- Add database connection features
+  - Support encrypted private keys with passphrase protection
+  - Enable users to select database schemas
+  - Allow users to add descriptions for schemas and tables
+- Support chat export with Japanese font rendering
+
 
 ## [0.3.8.1] - 2025-10-04
 

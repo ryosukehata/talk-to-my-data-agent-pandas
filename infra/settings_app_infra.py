@@ -130,6 +130,11 @@ def get_app_files(
         for f in (PROJECT_ROOT / "utils").glob("*.py")
         if f.is_file()
     ]
+    utils_files += [
+        (str(PROJECT_ROOT / f"utils/customize/{f.name}"), f"utils/customize/{f.name}")
+        for f in (PROJECT_ROOT / "utils/customize").glob("*.py")
+        if f.is_file()
+    ]
 
     # Add the metadata.yaml file
     source_files.extend(utils_files)

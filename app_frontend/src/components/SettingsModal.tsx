@@ -17,6 +17,8 @@ import { useDataRobotInfo, useUpdateApiToken } from '@/api/user/hooks';
 import { fetchAndStoreDataRobotToken } from '@/api/user/api-requests';
 import { Input } from './ui/input';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { useReloadTemplates } from '@/api/templates/reloadHooks';
+import { toast } from 'sonner';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -44,6 +46,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
     refetch: refetchDataRobotInfo,
   } = useDataRobotInfo();
   const updateApiTokenMutation = useUpdateApiToken();
+  const reloadTemplatesMutation = useReloadTemplates();
   const [isRefreshingConnection, setIsRefreshingConnection] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [apiToken, setApiToken] = useState<string>('');
@@ -70,14 +73,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-center">{t('Settings')}</DialogTitle>
           <DialogDescription className="text-center">
             {t('Customize your chat experience')}
           </DialogDescription>
         </DialogHeader>
-        <div>
+        <div className="overflow-y-auto flex-1 pr-2">
+          {/* スクロール可能なコンテンツエリア */}
           <div className="flex items-center justify-between gap-4 py-2">
             <Label htmlFor="theme-toggle" className="cursor-pointer">
               Dark theme
@@ -144,6 +148,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
               />
             </div>
           </>
+
+          <Separator className="border-t my-2" />
+
+          {/* Template Management Section */}
+          <div className="mt-4 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold">{t('Template Management')}</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={reloadTemplatesMutation.isPending}
+                onClick={async () => {
+                  try {
+                    const result = await reloadTemplatesMutation.mutateAsync();
+                    toast.success(
+                      `${t('Templates reloaded successfully')} (${result.total_templates} ${t('templates')}, ${result.categories} ${t('categories')})`
+                    );
+                  } catch (error) {
+                    console.error('Failed to reload templates:', error);
+                    toast.error(
+                      error instanceof Error ? error.message : t('Failed to reload templates')
+                    );
+                  }
+                }}
+              >
+                {reloadTemplatesMutation.isPending ? t('Reloading...') : t('Reload Templates')}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t('Reload prompt templates from the data source to get the latest updates.')}
+            </p>
+          </div>
 
           <Separator className="border-t my-2" />
 
@@ -277,8 +313,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
             </div>
           </div>
         </div>
+        {/* スクロール可能エリア終了 */}
         <Separator className="border-t mt-2" />
-        <DialogFooter className="mt-4">
+        <DialogFooter className="mt-4 flex-shrink-0">
+          {/* フッター固定 */}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('Cancel')}
           </Button>
