@@ -11,6 +11,10 @@ import { ConfirmDialog } from '../ui-custom/confirm-dialog';
 import { formatMessageDate } from './utils';
 import { toast } from 'sonner';
 import { IChatMessage } from '@/api/chat-messages/types';
+import { SavePromptButton } from '@/components/custom-prompts';
+import { useCreateCustomPrompt } from '@/api/custom-prompts';
+import { SavePromptData } from '@/components/custom-prompts/types';
+import { useCustomPromptState } from '@/components/custom-prompts';
 
 interface MessageHeaderProps {
   messageId?: string;
@@ -23,6 +27,8 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
   const [open, setOpen] = useState(false);
   const { mutate: deleteMessage, isPending: isDeleting } = useDeleteMessage();
   const { exportChat, isLoading: isExporting } = useExport();
+  const { mutate: createCustomPrompt } = useCreateCustomPrompt();
+  const { setPendingUpdate } = useCustomPromptState();
 
   // If no message is found by id - get optimistically created one (it has no id yet).
   const message = getMessage(messages, messageId) || messages?.[0];
@@ -55,6 +61,26 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
     }
 
     exportChat({ chatId, messageId });
+  };
+
+  const handleSavePrompt = async (data: SavePromptData) => {
+    try {
+      await createCustomPrompt({
+        name: data.name,
+        description: data.description,
+        prompt_text_template: data.prompt_text_template,
+      });
+      toast.success(t('Custom prompt saved successfully'));
+
+      // 保存成功後、更新が完了するまでしばらく待つ
+      setTimeout(() => {
+        setPendingUpdate(false);
+      }, 5000); // 5秒後にリセット
+    } catch (error) {
+      console.error('Failed to save custom prompt:', error);
+      toast.error(t('Failed to save custom prompt'));
+      setPendingUpdate(false);
+    }
   };
 
   const isUserMessage = message.role === 'user';
@@ -101,6 +127,7 @@ export const MessageHeader: React.FC<MessageHeaderProps> = ({ messageId, chatId,
         </div>
         {isUserMessage && (
           <div className="flex items-center">
+            <SavePromptButton promptText={message.content} onSave={handleSavePrompt} />
             <Button
               variant="ghost"
               size="sm"

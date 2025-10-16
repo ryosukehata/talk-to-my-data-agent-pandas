@@ -218,6 +218,7 @@ frontend_react/deploy/app_infra.json
 
 !frontend_react/react_src/src/lib
 **/*.csv
+!assets/prompt_templates.csv
 **/*.parquet
 app_backend/metadata.yaml
 app_backend/app_infra.json

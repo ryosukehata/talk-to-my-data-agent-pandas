@@ -4,6 +4,7 @@ import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { AppStateProvider } from '@/state';
+import { CustomPromptStateProvider } from '@/components/custom-prompts/CustomPromptStateContext';
 import { vi } from 'vitest';
 
 const createTestQueryClient = () =>
@@ -21,7 +22,9 @@ export function renderWithProviders(children: ReactNode) {
   return render(
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
-        <AppStateProvider>{children}</AppStateProvider>
+        <CustomPromptStateProvider>
+          <AppStateProvider>{children}</AppStateProvider>
+        </CustomPromptStateProvider>
       </QueryClientProvider>
     </MemoryRouter>
   );

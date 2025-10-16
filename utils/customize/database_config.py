@@ -27,19 +27,23 @@ from utils.resources import DatabaseDescription
 class SchemaTableConfigManager:
     """Manages schema and table descriptions from CSV files using pandas."""
 
-    def __init__(self, local: bool = False):  # "database_description.csv"):
+    def __init__(self, local: bool = True):  # "database_description.csv"):
         """
         Initialize the SchemaTableConfigManager.
 
         Args:
             csv_path: Path to the CSV file containing schema and table descriptions
         """
+        self.local = local
+        self._load()
+
+    def _load(self) -> None:
         self.db_description = None
 
-        if local and os.getenv("DATABASE_DESCRIPTION_PATH") is not None:
+        if self.local and os.getenv("DATABASE_DESCRIPTION_PATH") is not None:
             self.db_description = pd.read_csv(
                 os.path.join(
-                    Path(__file__).resolve().parent.parent.absolute(),
+                    Path(__file__).resolve().parent.parent.parent.absolute(),
                     os.getenv("DATABASE_DESCRIPTION_PATH"),
                 )
             )
@@ -146,17 +150,3 @@ class SchemaTableConfigManager:
         """
         _, table_dict = self.load_all_descriptions()
         return table_dict
-
-    def has_descriptions(self) -> bool:
-        """Check if description file exists."""
-        return self.csv_path.exists()
-
-    def has_schema_descriptions(self) -> bool:
-        """Check if CSV contains any schema descriptions."""
-        schema_dict = self.load_schema_descriptions()
-        return len(schema_dict) > 0
-
-    def has_table_descriptions(self) -> bool:
-        """Check if CSV contains any table descriptions."""
-        table_dict = self.load_table_descriptions()
-        return len(table_dict) > 0

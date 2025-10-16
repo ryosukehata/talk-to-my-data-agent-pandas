@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { PromptInput } from '@/components/ui-custom/prompt-input';
+import { Button } from '@/components/ui/button';
 import { usePostMessage } from '@/api/chat-messages/hooks';
 import { useAppState } from '@/state';
 import { useTranslation } from '@/i18n';
 import { DATA_SOURCES } from '@/constants/dataSources';
+import { TemplateButton } from '@/components/template';
 import type { IChat } from '@/api/chat-messages/types';
+import type { PromptTemplate } from '@/api/templates/types';
 
 export const UserPrompt = ({
   chatId,
@@ -26,6 +29,9 @@ export const UserPrompt = ({
     dataSource: globalDataSource,
   } = useAppState();
   const { mutate: postMessage } = usePostMessage();
+  const [selectedTemplateText, setSelectedTemplateText] = useState<string>('');
+  const promptInputRef = useRef<HTMLTextAreaElement>(null);
+
   const isDataUploadRequired = !allowedDataSources?.[0];
   const chatDataSource = useMemo(() => {
     const dataSource = activeChat?.data_source || globalDataSource;
@@ -35,26 +41,81 @@ export const UserPrompt = ({
       : allowedDataSources?.[0] || DATA_SOURCES.FILE;
   }, [activeChat?.data_source, globalDataSource, allowedDataSources]);
 
+  const handleTemplateSelect = (template: PromptTemplate) => {
+    setSelectedTemplateText(template.prompt_text_template);
+    // Focus the input after template selection
+    setTimeout(() => {
+      promptInputRef.current?.focus();
+    }, 100);
+  };
+
+  const handleSend = (message: string) => {
+    postMessage({
+      message,
+      chatId,
+      enableChartGeneration,
+      enableBusinessInsights,
+      dataSource: chatDataSource,
+    });
+    // Clear template text after sending
+    setSelectedTemplateText('');
+  };
+
+  const handleClearTemplate = () => {
+    setSelectedTemplateText('');
+    promptInputRef.current?.focus();
+  };
+
+  // Update the input value when template is selected
+  useEffect(() => {
+    if (selectedTemplateText && promptInputRef.current) {
+      // Set the value and trigger change event for proper state sync
+      const event = new Event('input', { bubbles: true });
+      promptInputRef.current.value = selectedTemplateText;
+      promptInputRef.current.dispatchEvent(event);
+    }
+  }, [selectedTemplateText]);
+
   return (
-    <PromptInput
-      sendButtonArrangement="append"
-      onSend={(message: string) =>
-        postMessage({
-          message,
-          chatId,
-          enableChartGeneration,
-          enableBusinessInsights,
-          dataSource: chatDataSource,
-        })
-      }
-      isProcessing={hasInProgressMessages}
-      placeholder={
-        isDataUploadRequired
-          ? t('Please upload and process data using the sidebar before starting the chat')
-          : t('Ask another question about your datasets.')
-      }
-      isDisabled={isDataUploadRequired}
-      testId={testId}
-    />
+    <div className="w-full max-w-3xl">
+      {/* Template selection area */}
+      <div className="w-full flex justify-between items-center mb-4">
+        <TemplateButton
+          onSelectTemplate={handleTemplateSelect}
+          onSendDirectly={handleSend}
+          mode="send"
+          variant="outline"
+          size="sm"
+          disabled={isDataUploadRequired || hasInProgressMessages}
+          testId="user-prompt-template-button"
+        />
+        {selectedTemplateText && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearTemplate}
+            className="text-xs text-muted-foreground"
+          >
+            {t('Clear Template')}
+          </Button>
+        )}
+      </div>
+
+      {/* Prompt input */}
+      <PromptInput
+        ref={promptInputRef}
+        sendButtonArrangement="append"
+        onSend={handleSend}
+        initialValue={selectedTemplateText}
+        isProcessing={hasInProgressMessages}
+        placeholder={
+          isDataUploadRequired
+            ? t('Please upload and process data using the sidebar before starting the chat')
+            : t('Ask another question about your datasets.')
+        }
+        isDisabled={isDataUploadRequired}
+        testId={testId}
+      />
+    </div>
   );
 };

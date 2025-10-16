@@ -14,23 +14,28 @@
 
 import csv
 from pathlib import Path
+from typing import List
 
 
-def validate_csv_for_upload(file_path: str) -> None:
+def validate_csv_with_required_columns(
+    file_path: str, required_columns: List[str]
+) -> None:
     """
-    Validate CSV file for upload to DataRobot.
+    Validate CSV file contains required columns and has data.
 
     Checks:
     1. File exists
     2. File has .csv extension
-    3. File contains required columns: schema_name, schema_description, table_name, table_description
+    3. File contains all required columns
+    4. File has actual data rows (not just headers)
 
     Args:
         file_path: Path to the CSV file to validate
+        required_columns: List of column names that must be present in the CSV
 
     Raises:
         FileNotFoundError: If file doesn't exist
-        ValueError: If file is not a CSV or missing required columns
+        ValueError: If file is not a CSV, missing required columns, or has no data
     """
     file_path_obj = Path(file_path)
 
@@ -44,7 +49,9 @@ def validate_csv_for_upload(file_path: str) -> None:
 
     # Check if file has required columns
     try:
-        with open(file_path, "r", encoding="utf-8") as csvfile:
+        with open(
+            file_path, "r", encoding="utf-8-sig"
+        ) as csvfile:  # BOM処理のためutf-8-sigを使用
             # Read the first line to get headers
             reader = csv.reader(csvfile)
             headers = next(reader, None)
@@ -54,13 +61,8 @@ def validate_csv_for_upload(file_path: str) -> None:
 
             # Convert headers to set for comparison
             actual_columns = set(header.strip() for header in headers)
-            required_columns = {
-                "schema_name",
-                "schema_description",
-                "table_name",
-                "table_description",
-            }
-            missing_columns = required_columns - actual_columns
+            required_columns_set = set(required_columns)
+            missing_columns = required_columns_set - actual_columns
 
             if missing_columns:
                 raise ValueError(
@@ -88,3 +90,45 @@ def validate_csv_for_upload(file_path: str) -> None:
         )
     except Exception as e:
         raise ValueError(f"Error reading CSV file {file_path}: {e}")
+
+
+def validate_schema_table_description_csv(file_path: str) -> None:
+    """
+    Validate CSV file contains proper schema and table descriptions.
+
+    Checks:
+    1. File exists
+    2. File has .csv extension
+    3. File contains required columns: schema_name, schema_description, table_name, table_description
+    4. File has actual data rows (not just headers)
+
+    Args:
+        file_path: Path to the schema/table description CSV file to validate
+
+    Raises:
+        FileNotFoundError: If file doesn't exist
+        ValueError: If file is not a CSV, missing required columns, or has no data
+    """
+    required_columns = [
+        "schema_name",
+        "schema_description",
+        "table_name",
+        "table_description",
+    ]
+    validate_csv_with_required_columns(file_path, required_columns)
+
+
+def validate_prompt_template_csv(file_path: str) -> None:
+    """
+    Validate CSV file contains proper prompt template data.
+
+    Args:
+        file_path: Path to the prompt template CSV file to validate
+    """
+    required_columns = [
+        "name",
+        "category",
+        "description",
+        "prompt_text_template",
+    ]
+    validate_csv_with_required_columns(file_path, required_columns)
