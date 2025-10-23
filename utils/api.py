@@ -1474,7 +1474,9 @@ async def _generate_database_analysis_code(
         df = (await analyst_db.get_dataset(table)).to_df()
         schema_str, table_str = table.split(".")
 
-        sample_str = f"Schema: {schema_str}, Table: {table_str}\n{df.head(10).to_string()}"
+        sample_str = (
+            f"Schema: {schema_str}, Table: {table_str}\n{df.head(10).to_string()}"
+        )
         all_samples.append(sample_str)
 
     # Create messages for OpenAI
