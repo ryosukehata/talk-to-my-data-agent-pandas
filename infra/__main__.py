@@ -220,15 +220,14 @@ app_runtime_parameters = [
 
 
 if os.environ.get("DATABASE_DESCRIPTION_PATH", None):
+    file_path = str(PROJECT_ROOT / os.environ.get("DATABASE_DESCRIPTION_PATH"))
+
+    # Validate CSV file before upload
+    pulumi.info(f"Validating CSV file: {file_path}")
+
+    validate_schema_table_description_csv(file_path)
+    pulumi.info("CSV validation passed - file is ready for upload")
     try:
-        file_path = str(PROJECT_ROOT / os.environ.get("DATABASE_DESCRIPTION_PATH"))
-
-        # Validate CSV file before upload
-        pulumi.info(f"Validating CSV file: {file_path}")
-
-        validate_schema_table_description_csv(file_path)
-        pulumi.info("CSV validation passed - file is ready for upload")
-
         dataset_description = datarobot.DatasetFromFile(
             resource_name=f"AI Catalog DATABASE DESCRIPTIONTools Dataset [{PROJECT_NAME}]",
             file_path=file_path,
@@ -250,15 +249,14 @@ if os.environ.get("DATABASE_DESCRIPTION_PATH", None):
 
 
 if os.environ.get("PROMPTS_TEMPLATE_PATH", None):
+    file_path = str(PROJECT_ROOT / os.environ.get("PROMPTS_TEMPLATE_PATH"))
+
+    # Validate CSV file before upload
+    pulumi.info(f"Validating CSV file: {file_path}")
+
+    validate_prompt_template_csv(file_path)
+    pulumi.info("CSV validation passed - file is ready for upload")
     try:
-        file_path = str(PROJECT_ROOT / os.environ.get("PROMPTS_TEMPLATE_PATH"))
-
-        # Validate CSV file before upload
-        pulumi.info(f"Validating CSV file: {file_path}")
-
-        validate_prompt_template_csv(file_path)
-        pulumi.info("CSV validation passed - file is ready for upload")
-
         dataset_prompts_template = datarobot.DatasetFromFile(
             resource_name=f"AI Catalog Prompts Template Dataset [{PROJECT_NAME}]",
             file_path=file_path,

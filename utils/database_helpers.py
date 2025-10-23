@@ -40,11 +40,13 @@ from utils.credentials import (
     SAPDatasphereCredentials,
     SnowflakeCredentials,
 )
+from utils.customize.prompts import (
+    SYSTEM_PROMPT_SNOWFLAKE,
+)
 from utils.logging_helper import get_logger
 from utils.prompts import (
     SYSTEM_PROMPT_BIGQUERY,
     SYSTEM_PROMPT_SAP_DATASPHERE,
-    SYSTEM_PROMPT_SNOWFLAKE,
 )
 from utils.schema import (
     AnalystDataset,
@@ -392,7 +394,12 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                         data = cursor.fetchall()
                         pandas_df = pd.DataFrame(data=data, columns=columns, dtype=str)
                         # If you want to use Polars later, do it after validation/registration
-                        dataframes.append(AnalystDataset(name=table, data=pandas_df))
+                        # 修正後のコード
+                        table_with_schema = f"{self._credentials.db_schema}.{table}"
+                        dataframes.append(
+                            AnalystDataset(name=table_with_schema, data=pandas_df)
+                        )
+                        # dataframes.append(AnalystDataset(name=table, data=pandas_df))
 
                     except Exception as e:
                         logger.error(f"Error loading table {table}: {str(e)}")
@@ -424,7 +431,6 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
             content=SYSTEM_PROMPT_SNOWFLAKE.format(
                 warehouse=self._credentials.warehouse,
                 database=self._credentials.database,
-                schema=self._credentials.db_schema,
             ),
         )
 
