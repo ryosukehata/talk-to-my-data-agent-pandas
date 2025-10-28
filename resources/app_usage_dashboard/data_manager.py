@@ -373,10 +373,16 @@ def get_or_generate_data(_today_str):
             # Try to load existing data if refresh failed
             if chat_path.exists() and raw_path.exists():
                 logger.warning("Using existing data files despite refresh failure.")
+                try:
+                    df_chat = pd.read_parquet(chat_path)
+                    df_raw = pd.read_parquet(raw_path)
+                    logger.info("Existing data loaded successfully!")
+                except Exception as load_e:
+                    logger.error(f"Failed to load existing data: {str(load_e)}")
+                    df_chat, df_raw = pd.DataFrame(), pd.DataFrame()
             else:
                 logger.error("No existing data files found. Cannot proceed.")
-                # Return empty dataframes
-                return pd.DataFrame(), pd.DataFrame()
+                df_chat, df_raw = pd.DataFrame(), pd.DataFrame()
     else:
         logger.info("Loading existing data...")
         try:
@@ -385,8 +391,7 @@ def get_or_generate_data(_today_str):
             logger.info("Data loaded successfully!")
         except Exception as e:
             logger.error(f"Failed to load existing data: {str(e)}")
-            # Return empty dataframes if loading fails
-            return pd.DataFrame(), pd.DataFrame()
+            df_chat, df_raw = pd.DataFrame(), pd.DataFrame()
     return df_chat, df_raw
 
 
