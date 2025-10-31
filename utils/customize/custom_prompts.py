@@ -1,6 +1,8 @@
-import json
-import os
-
+from utils.customize.cache import (
+    NullPersistentStorage,
+    PersistentCache,
+    atomic_write_json,
+)
 from utils.logging_helper import get_logger
 from utils.persistent_storage import PersistentStorage
 
@@ -10,29 +12,15 @@ class UserPrompts:
         self.user_id = user_id
         self.filename = f"user_prompt_{self.user_id}"
         self.json_filename = self.filename + ".json"
-        self._storage = PersistentStorage(self.user_id)
+        try:
+            self._storage = PersistentStorage(self.user_id)
+        except Exception:
+            self._storage = NullPersistentStorage(self.user_id)
+        self._cache = PersistentCache(self._storage)
 
     def _write_prompts_safely(self, prompts: list[dict]) -> None:
-        """プロンプトデータを原子的にファイルに書き込む
-
-        Args:
-            prompts: 書き込むプロンプトのリスト
-        """
-        temp_filename = self.json_filename + ".tmp"
-
-        try:
-            # 一時ファイルに書き込み
-            with open(temp_filename, "w", encoding="utf-8") as f:
-                json.dump(prompts, f, ensure_ascii=False, indent=4)
-
-            # 原子的にファイルを置換
-            os.replace(temp_filename, self.json_filename)
-
-        except Exception:
-            # 失敗時は一時ファイルをクリーンアップ
-            if os.path.exists(temp_filename):
-                os.remove(temp_filename)
-            raise
+        """プロンプトデータを原子的にファイルに書き込む"""
+        atomic_write_json(self.json_filename, prompts)
 
     def save_prompt(self, name: str, prompt: str, description: str = None):
         """新しいプロンプトを保存する
@@ -53,30 +41,31 @@ class UserPrompts:
         self._write_prompts_safely(prompts)
 
         # 永続ストレージに保存
-        self._storage.save_to_storage(self.filename, self.json_filename)
+        self._cache.save_from_file(self.filename, self.json_filename)
         get_logger().info(f"User prompt saved for user_id: {self.user_id}")
 
     def load_prompts(self) -> list[dict]:
-        # 永続ストレージから読み込む
-        if not os.path.exists(self.json_filename):
-            self._storage.fetch_from_storage(self.filename, self.json_filename)
-
-        # ファイルからJSONデータを読み込む (load)
-        try:
-            with open(self.json_filename, "r", encoding="utf-8") as f:
-                prompts = json.load(f)
-                # リストでなければ空リストを返す
-                if not isinstance(prompts, list):
-                    get_logger().warning(
-                        f"Invalid prompt format for user_id: {self.user_id}. "
-                        f"Expected list, got {type(prompts).__name__}"
-                    )
-                    return []
-                get_logger().info(f"User prompt loaded for user_id: {self.user_id}")
-                return prompts
-        except (FileNotFoundError, json.JSONDecodeError):
-            get_logger().warning(f"No prompt file found for user_id: {self.user_id}")
+        # 永続ストレージから読み込む（キャッシュ→ローダの順）
+        def _loader() -> list[dict]:
+            # デフォルトで空のリスト（空は永続化しない）
             return []
+
+        prompts = self._cache.get_or_load_json(
+            key=self.filename,
+            local_path=self.json_filename,
+            loader=_loader,
+            persist_when=lambda obj: isinstance(obj, list) and len(obj) > 0,
+        )
+
+        # 形式チェック
+        if not isinstance(prompts, list):
+            get_logger().warning(
+                f"Invalid prompt format for user_id: {self.user_id}. "
+                f"Expected list, got {type(prompts).__name__}"
+            )
+            return []
+        get_logger().info(f"User prompt loaded for user_id: {self.user_id}")
+        return prompts
 
     def delete_prompt(self, name: str) -> bool:
         """指定された名前のプロンプトを削除する
@@ -105,7 +94,7 @@ class UserPrompts:
         self._write_prompts_safely(prompts)
 
         # 永続ストレージに保存
-        self._storage.save_to_storage(self.filename, self.json_filename)
+        self._cache.save_from_file(self.filename, self.json_filename)
         get_logger().info(f"User prompt '{name}' deleted for user_id: {self.user_id}")
         return True
 
