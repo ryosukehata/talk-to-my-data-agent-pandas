@@ -353,7 +353,8 @@ async def get_database_schemas() -> dict[str, str]:
 async def get_default_schema() -> str:
     """Get the default schema name from environment configuration"""
     db_operator = get_external_database()
-    return db_operator._credentials.db_schema
+    credentials = getattr(db_operator, "_credentials", None)
+    return getattr(credentials, "db_schema", "") if credentials else ""
 
 
 # =============================================================================

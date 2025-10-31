@@ -105,7 +105,8 @@ class LLMDeployment(DynamicSettings):
 
 
 class DatabaseDescription(DynamicSettings):
-    id: str = Field(
+    id: str | None = Field(
+        default=None,
         validation_alias=AliasChoices(
             "MLOPS_RUNTIME_PARAM_" + database_description_name,
             database_description_name,

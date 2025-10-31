@@ -88,7 +88,7 @@ class SchemaTableConfigManager:
             missing_columns = [col for col in required_columns if col not in df.columns]
             if missing_columns:
                 raise ValueError(
-                    f"CSV file {self.csv_path} is missing required columns: {missing_columns}"
+                    f"Database description dataset is missing required columns: {missing_columns}"
                 )
 
             # Extract schema descriptions (remove duplicates, keep first occurrence)
@@ -126,7 +126,7 @@ class SchemaTableConfigManager:
 
         except Exception as e:
             # Log error but don't fail - return empty dicts
-            print(f"Warning: Could not load descriptions from {self.csv_path}: {e}")
+            print(f"Warning: Could not load database descriptions: {e}")
             return {}, {}
 
     def load_schema_descriptions(self) -> Dict[str, str]:
