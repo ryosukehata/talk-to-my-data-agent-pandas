@@ -14,6 +14,7 @@ import pandas as pd
 from utils.api import download_registry_dataset_as_dataframe
 from utils.logging_helper import get_logger
 from utils.resources import PromptsTemplateAICatalog
+from utils.persistent_storage import PersistentStorage
 
 
 class TemplateManager:
@@ -32,6 +33,19 @@ class TemplateManager:
         """
         self.logger = get_logger("TemplateManager")
         self.local = local
+        # 永続ストレージ（テンプレートはグローバル扱い）
+        self._storage: Optional[PersistentStorage] = None
+        self._storage_key: str = "prompts_template"
+        # レポジトリ直下にキャッシュCSVを用意（/tmpでも可）
+        self._cache_csv_path = os.path.join(
+            Path(__file__).resolve().parent.parent.parent.absolute(),
+            f"{self._storage_key}.csv",
+        )
+        try:
+            self._storage = PersistentStorage(user_id="global")
+        except Exception as e:
+            # DataRobot環境外などでAPPLICATION_IDが未設定の場合に備える
+            self.logger.warning(f"Persistent storage unavailable, skip caching. reason={e}")
         self._load()
 
     def _load(self) -> None:
@@ -46,15 +60,34 @@ class TemplateManager:
                 f"Loading prompt templates from local path: {self.csv_path}"
             )
             self._load_templates()
+            # ローカル読み込みに成功したら永続ストレージにもキャッシュ
+            self._persist_current_df()
         else:
-            prompts_template = PromptsTemplateAICatalog()
-            if prompts_template.id:
+            # 1) まず永続ストレージからの復元を試みる
+            if self._storage is not None:
                 try:
-                    self.df = download_registry_dataset_as_dataframe(
-                        prompts_template.id
-                    )
+                    self._storage.fetch_from_storage(self._storage_key, self._cache_csv_path)
+                    if os.path.exists(self._cache_csv_path):
+                        self.csv_path = self._cache_csv_path
+                        self.logger.info(
+                            f"Loading prompt templates from persistent cache: {self.csv_path}"
+                        )
+                        self._load_templates()
                 except Exception as e:
-                    print(f"Error downloading prompts template: {e}")
+                    self.logger.warning(f"Failed to fetch templates from persistent storage: {e}")
+
+            # 2) キャッシュが無い/空の場合はレジストリから取得
+            if self.df is None or (hasattr(self, "df") and getattr(self, "df").empty):
+                prompts_template = PromptsTemplateAICatalog()
+                if prompts_template.id:
+                    try:
+                        self.df = download_registry_dataset_as_dataframe(
+                            prompts_template.id
+                        )
+                        # レジストリから取得できたらキャッシュへ保存
+                        self._persist_current_df()
+                    except Exception as e:
+                        self.logger.error(f"Error downloading prompts template: {e}")
 
     def _load_templates(self) -> None:
         """CSVファイルからテンプレートを読み込み"""
@@ -92,12 +125,29 @@ class TemplateManager:
                 columns=["name", "category", "description", "prompt_text_template"]
             )
 
+    def _persist_current_df(self) -> None:
+        """現在のDataFrameをCSV化し、永続ストレージにキャッシュ保存する"""
+        try:
+            if self._storage is None:
+                return
+            if self.df is None or self.df.empty:
+                return
+            # ローカルCSVへ保存してから永続ストレージへ
+            os.makedirs(os.path.dirname(self._cache_csv_path), exist_ok=True)
+            self.df.to_csv(self._cache_csv_path, index=False, encoding="utf-8")
+            self._storage.save_to_storage(self._storage_key, self._cache_csv_path)
+            self.logger.info("✅ Templates cached to persistent storage")
+        except Exception as e:
+            self.logger.warning(f"Failed to persist templates cache: {e}")
+
     def get_all_categories(self) -> List[str]:
         """全カテゴリのリストを取得
 
         Returns:
             カテゴリ名のリスト（重複なし、アルファベット順）
         """
+        if self.df is None:
+            self._load()
         if self.df is None or self.df.empty:
             return []
         return sorted(self.df["category"].unique().tolist())
@@ -111,6 +161,8 @@ class TemplateManager:
         Returns:
             テンプレート辞書のリスト
         """
+        if self.df is None:
+            self._load()
         if self.df is None or self.df.empty:
             return []
 
@@ -123,6 +175,8 @@ class TemplateManager:
         Returns:
             全テンプレート辞書のリスト
         """
+        if self.df is None:
+            self._load()
         if self.df is None or self.df.empty:
             return []
         return self.df.to_dict("records")
@@ -136,6 +190,8 @@ class TemplateManager:
         Returns:
             該当テンプレートの辞書、見つからない場合はNone
         """
+        if self.df is None:
+            self._load()
         if self.df is None or self.df.empty:
             return None
 
@@ -156,6 +212,8 @@ class TemplateManager:
         Returns:
             マッチしたテンプレート辞書のリスト
         """
+        if self.df is None:
+            self._load()
         if self.df is None or self.df.empty or not keyword:
             return []
 
@@ -172,6 +230,8 @@ class TemplateManager:
 
     def get_template_count(self) -> int:
         """テンプレート総数を取得"""
+        if self.df is None:
+            self._load()
         if self.df is None or self.df.empty:
             return 0
         return len(self.df)
@@ -182,6 +242,8 @@ class TemplateManager:
         Returns:
             {カテゴリ名: テンプレート数} の辞書
         """
+        if self.df is None:
+            self._load()
         if self.df is None or self.df.empty:
             return {}
 
