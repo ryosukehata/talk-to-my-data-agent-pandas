@@ -189,11 +189,9 @@ def run_job_once(custom_job_id: str) -> str:
     import pulumi
 
     pulumi.log.info(f"[run_job_once] Called with custom_job_id: {custom_job_id}")
-    runtime_parameters = [
-        {"fieldName": "MODE", "value": "overwrite", "type": "string"},
-    ]
     try:
-        custom_run_id = run_custom_job(custom_job_id, runtime_parameters)
+        # No runtime parameters required
+        custom_run_id = run_custom_job(custom_job_id)
         pulumi.log.info(
             f"[run_job_once] run_custom_job returned run_id: {custom_run_id}"
         )

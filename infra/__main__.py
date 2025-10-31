@@ -359,11 +359,13 @@ def create_monitoring_resources():
     dataset_trace = datarobot.DatasetFromFile(
         "dataset_trace",
         file_path=settings_job_infra.dataset_trace_path,
+        name=settings_job_infra.dataset_trace_name,
         use_case_ids=[use_case.id],
     )
     dataset_access_log = datarobot.DatasetFromFile(
         "dataset_access_log",
         file_path=settings_job_infra.dataset_access_log_path,
+        name=settings_job_infra.dataset_access_log_name,
         use_case_ids=[use_case.id],
     )
 
@@ -385,7 +387,6 @@ def create_monitoring_resources():
             "DATAROBOT_APPLICATION_ID": app.id,
             "DATASET_TRACE_ID": dataset_trace.id,
             "DATASET_ACCESS_LOG_ID": dataset_access_log.id,
-            "MODE": "append",
         }.items()
     ]
 
@@ -444,25 +445,12 @@ def create_monitoring_resources():
                 {"custom_job_id": custom_job_id},
                 opts,
             )
-            import pulumi.runtime
-
-            # Only run the job if we're in the actual update phase, not preview
-            if not pulumi.runtime.is_dry_run():
-                result = custom_job_id.apply(
-                    lambda id: settings_job_infra.run_job_once(id)
-                )
-                self.custom_run_id = result.apply(
-                    lambda r: r["run_id"] if r["success"] else "NA"
-                )
-            else:
-                self.custom_run_id = pulumi.Output.from_input("NA")
             self.schedule_id = custom_job_id.apply(
                 lambda id: settings_job_infra.create_job_schedule(id)
             )
             # Register outputs for stack export
             self.register_outputs(
                 {
-                    "custom_run_id": self.custom_run_id,
                     "schedule_id": self.schedule_id,
                 }
             )
@@ -474,9 +462,7 @@ def create_monitoring_resources():
         opts=pulumi.ResourceOptions(depends_on=[custom_job]),
     )
 
-    pulumi.export("CUSTOM_JOB_RUN_ID", post_actions.custom_run_id)
     pulumi.export("CUSTOM_JOB_SCHEDULE_ID", post_actions.schedule_id)
-    pulumi.export("MODE", "append")
 
     dashboard_runtime_parameters = [
         datarobot.ApplicationSourceRuntimeParameterValueArgs(
