@@ -40,11 +40,13 @@ from utils.credentials import (
     SAPDatasphereCredentials,
     SnowflakeCredentials,
 )
+from utils.customize.prompts import (
+    SYSTEM_PROMPT_SNOWFLAKE,
+)
 from utils.logging_helper import get_logger
 from utils.prompts import (
     SYSTEM_PROMPT_BIGQUERY,
     SYSTEM_PROMPT_SAP_DATASPHERE,
-    SYSTEM_PROMPT_SNOWFLAKE,
 )
 from utils.schema import (
     AnalystDataset,
@@ -94,6 +96,10 @@ class DatabaseOperator(ABC, Generic[T]):
     def get_tables(self, timeout: int | None = None) -> list[str]:
         return []
 
+    @abstractmethod
+    def get_schemas(self, timeout: int | None = None) -> list[str]:
+        return []
+    
     @functools.lru_cache(maxsize=8)
     @abstractmethod
     async def get_data(
@@ -132,6 +138,9 @@ class NoDatabaseOperator(DatabaseOperator[NoDatabaseCredentialArgs]):
     def get_tables(self, timeout: int | None = 300) -> list[str]:
         return []
 
+    def get_schemas(self, timeout: int | None = 300) -> list[str]:
+        return []
+    
     @functools.lru_cache(8)
     async def get_data(
         self,
@@ -307,6 +316,41 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
             logger.error(f"Error details: {str(e)}")
             return []
 
+    def get_schemas(self, timeout: int | None = None) -> list[str]:
+        """Fetch list of available schemas from Snowflake database"""
+        timeout = timeout if timeout is not None else self.default_timeout
+
+        conn: snowflake.connector.SnowflakeConnection
+        try:
+            with self.create_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout}"
+                    )
+
+                    # Get all schemas in the database
+                    cursor.execute(
+                        f"""
+                        SELECT SCHEMA_NAME
+                        FROM {self._credentials.database}.INFORMATION_SCHEMA.SCHEMATA
+                        WHERE SCHEMA_NAME NOT IN ('INFORMATION_SCHEMA')
+                        ORDER BY SCHEMA_NAME
+                        """
+                    )
+                    results = cursor.fetchall()
+
+                    schemas = [row[0] for row in results]
+
+                    logger.info(
+                        f"Found {len(schemas)} schemas in database {self._credentials.database}"
+                    )
+                    return schemas
+
+        except Exception as e:
+            logger.error(f"Failed to fetch schemas: {str(e)}")
+            # エラーが発生した場合は、少なくともデフォルトスキーマを返す
+            return [self._credentials.db_schema]
+
     @functools.lru_cache(maxsize=8)
     async def get_data(
         self,
@@ -352,7 +396,12 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
                         data = cursor.fetchall()
                         pandas_df = pd.DataFrame(data=data, columns=columns, dtype=str)
                         # If you want to use Polars later, do it after validation/registration
-                        dataframes.append(AnalystDataset(name=table, data=pandas_df))
+                        # 修正後のコード
+                        table_with_schema = f"{self._credentials.db_schema}.{table}"
+                        dataframes.append(
+                            AnalystDataset(name=table_with_schema, data=pandas_df)
+                        )
+                        # dataframes.append(AnalystDataset(name=table, data=pandas_df))
 
                     except Exception as e:
                         logger.error(f"Error loading table {table}: {str(e)}")
@@ -384,7 +433,6 @@ class SnowflakeOperator(DatabaseOperator[SnowflakeCredentialArgs]):
             content=SYSTEM_PROMPT_SNOWFLAKE.format(
                 warehouse=self._credentials.warehouse,
                 database=self._credentials.database,
-                schema=self._credentials.db_schema,
             ),
         )
 
@@ -466,6 +514,10 @@ class BigQueryOperator(DatabaseOperator[BigQueryCredentialArgs]):
             logger.error(f"Error type: {type(e)}")
             logger.error(f"Error details: {str(e)}")
             return []
+
+    def get_schemas(self, timeout: int | None = None) -> list[str]:
+        """BigQuery schemas not implemented - return empty list"""
+        return []
 
     @functools.lru_cache(maxsize=8)
     async def get_data(
@@ -685,6 +737,10 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
             logger.error(f"Error details: {str(e)}")
             return []
 
+    def get_schemas(self, timeout: int | None = None) -> list[str]:
+        """SAP Data Sphere schemas not implemented - return empty list"""
+        return []
+
     @functools.lru_cache(maxsize=8)
     async def get_data(
         self,
@@ -770,7 +826,9 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
         )
 
 
-def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
+def get_database_operator(
+    app_infra: AppInfra, schema: str | None = None
+) -> DatabaseOperator[Any]:
     if app_infra.database == "bigquery":
         credentials: (
             GoogleCredentialsBQ
@@ -781,6 +839,9 @@ def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
         try:
             credentials = GoogleCredentialsBQ()
             if credentials.service_account_key and credentials.db_schema:
+                # Override schema if provided
+                if schema:
+                    credentials.db_schema = schema
                 return BigQueryOperator(credentials)
         except (ValidationError, ValueError):
             logger.warning(
@@ -791,6 +852,9 @@ def get_database_operator(app_infra: AppInfra) -> DatabaseOperator[Any]:
         try:
             credentials = SnowflakeCredentials()
             if credentials.is_configured():
+                # Override schema if provided
+                if schema:
+                    credentials = credentials.with_schema(schema)
                 return SnowflakeOperator(credentials)
         except (ValidationError, ValueError):
             logger.warning(
@@ -830,5 +894,5 @@ def load_app_infra() -> AppInfra:
     ) from error
 
 
-def get_external_database() -> DatabaseOperator[Any]:
-    return get_database_operator(load_app_infra())
+def get_external_database(schema: str | None = None) -> DatabaseOperator[Any]:
+    return get_database_operator(load_app_infra(), schema=schema)

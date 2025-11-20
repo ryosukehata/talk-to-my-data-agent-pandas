@@ -122,7 +122,7 @@
     --border-purple: 255 57% 70%; /* Purple border for light theme */
     --border-blue: 213 93% 68%; /* #44BFFC - DataRobot Blue */
     --shadow-blue: 213 93% 68%; /* #44BFFC - Blue shadow */
-    
+
     --suggested-prompt-bg: 210 40% 96%; /* Light theme suggested prompt background */
 
     --animation-blink-border-and-shadow: blinkBorderAndShadow 1.5s ease-in-out infinite;
@@ -183,7 +183,7 @@
     --border-purple: 255 57 70;
     --border-blue: 233 83% 76%;
     --shadow-blue: 227 83% 73%;
-    
+
     --suggested-prompt-bg: 207 12% 15%; /* Dark theme suggested prompt background */
 
     --animation-blink-border-and-shadow: blinkBorderAndShadow 1.5s ease-in-out infinite;

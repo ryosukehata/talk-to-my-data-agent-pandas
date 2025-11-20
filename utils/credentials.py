@@ -194,8 +194,10 @@ class SnowflakeCredentials(DRCredentials):
             from cryptography.hazmat.backends import default_backend
             from cryptography.hazmat.primitives import serialization
 
+            password_bytes = self.password.encode("utf-8") if self.password else None
+
             p_key = serialization.load_pem_private_key(
-                private_key_data, password=None, backend=default_backend()
+                private_key_data, password=password_bytes, backend=default_backend()
             )
             logger.info("Successfully loaded PEM key")
 
@@ -231,6 +233,13 @@ class SnowflakeCredentials(DRCredentials):
         has_password_auth = self.password is not None
 
         return has_key_auth or has_password_auth
+
+    def with_schema(self, schema: str) -> "SnowflakeCredentials":
+        """Create a new instance with a different schema."""
+        # Create a copy with the new schema
+        new_creds = self.model_copy()
+        new_creds.db_schema = schema
+        return new_creds
 
 
 class SAPDatasphereCredentials(DRCredentials):

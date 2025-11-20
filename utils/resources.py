@@ -90,11 +90,34 @@ llm_deployment_env_name: str = "LLM_DEPLOYMENT_ID"
 
 dashboard_env_name: str = "DATAROBOT_DASHBOARD_ID"
 
+database_description_name: str = "DATABASE_DESCRIPTION"
+
+prompt_template_ai_catalog_name: str = "PROMPT_TEMPLATE_AI_CATALOG"
+
 
 class LLMDeployment(DynamicSettings):
     id: str = Field(
         validation_alias=AliasChoices(
             f"MLOPS_RUNTIME_PARAM_{llm_deployment_env_name}",
             llm_deployment_env_name,
+        ),
+    )
+
+
+class DatabaseDescription(DynamicSettings):
+    id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "MLOPS_RUNTIME_PARAM_" + database_description_name,
+            database_description_name,
+        ),
+    )
+
+
+class PromptsTemplateAICatalog(DynamicSettings):
+    id: str = Field(
+        validation_alias=AliasChoices(
+            "MLOPS_RUNTIME_PARAM_" + prompt_template_ai_catalog_name,
+            prompt_template_ai_catalog_name,
         ),
     )

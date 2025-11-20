@@ -10,7 +10,6 @@ LLM_DEPLOYMENT_ID = config.LLM_DEPLOYMENT_ID
 DATAROBOT_APPLICATION_ID = config.DATAROBOT_APPLICATION_ID
 DATASET_TRACE_ID = config.DATASET_TRACE_ID
 DATASET_ACCESS_LOG_ID = config.DATASET_ACCESS_LOG_ID
-MODE = config.MODE
 
 
 def main() -> None:
@@ -19,7 +18,7 @@ def main() -> None:
     logger.info(f"APP ID: {DATAROBOT_APPLICATION_ID}")
     logger.info(f"TRACE ID: {DATASET_TRACE_ID}")
     logger.info(f"ACCESS LOG ID: {DATASET_ACCESS_LOG_ID}")
-    logger.info(f"MODE: {MODE}")  # not used eventually
+    # MODE deprecated; parameter removed from runtime configuration
 
     logger.info("Starting export trace data")
     path_trace = run_trace_update_workflow()

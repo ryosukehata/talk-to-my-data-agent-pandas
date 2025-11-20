@@ -47,6 +47,10 @@ from utils.custom_job_helper import (
     delete_all_custom_job_schedule,
     get_custom_job_by_name,
 )
+from utils.customize.csv_validator import (
+    validate_prompt_template_csv,
+    validate_schema_table_description_csv,
+)
 from utils.i18n import LocaleSettings
 from utils.resources import (
     app_env_name,
@@ -202,6 +206,7 @@ llm_deployment = CustomModelDeployment(
     deployment_args=settings_generative.deployment_args,
 )
 
+
 app_runtime_parameters = [
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
         key=llm_deployment_env_name,
@@ -212,6 +217,82 @@ app_runtime_parameters = [
         key="APP_LOCALE", type="string", value=LocaleSettings().app_locale
     ),
 ]
+
+
+if os.environ.get("DATABASE_DESCRIPTION_PATH", None):
+    file_path = str(PROJECT_ROOT / os.environ.get("DATABASE_DESCRIPTION_PATH"))
+
+    # Validate CSV file before upload
+    pulumi.info(f"Validating CSV file: {file_path}")
+
+    validate_schema_table_description_csv(file_path)
+    pulumi.info("CSV validation passed - file is ready for upload")
+    try:
+        dataset_description = datarobot.DatasetFromFile(
+            resource_name=f"AI Catalog DATABASE DESCRIPTIONTools Dataset [{PROJECT_NAME}]",
+            file_path=file_path,
+            use_case_ids=[use_case.id],
+        )
+        app_runtime_parameters.append(
+            datarobot.ApplicationSourceRuntimeParameterValueArgs(
+                key="DATABASE_DESCRIPTION",
+                type="string",
+                value=dataset_description.id,
+            )
+        )
+    except (FileNotFoundError, ValueError) as e:
+        raise ValueError(f"CSV validation failed: {e}")
+    except Exception as e:
+        pulumi.warn(
+            f"Could not create dataset from {os.environ.get('DATASET_DESCRIPTION_PATH')}: {e}"
+        )
+
+
+if os.environ.get("PROMPTS_TEMPLATE_PATH", None):
+    file_path = str(PROJECT_ROOT / os.environ.get("PROMPTS_TEMPLATE_PATH"))
+
+    # Validate CSV file before upload
+    pulumi.info(f"Validating CSV file: {file_path}")
+
+    validate_prompt_template_csv(file_path)
+    pulumi.info("CSV validation passed - file is ready for upload")
+    try:
+        dataset_prompts_template = datarobot.DatasetFromFile(
+            resource_name=f"AI Catalog Prompts Template Dataset [{PROJECT_NAME}]",
+            file_path=file_path,
+            use_case_ids=[use_case.id],
+        )
+        app_runtime_parameters.append(
+            datarobot.ApplicationSourceRuntimeParameterValueArgs(
+                key="PROMPT_TEMPLATE_AI_CATALOG",
+                type="string",
+                value=dataset_prompts_template.id,
+            )
+        )
+    except (FileNotFoundError, ValueError) as e:
+        raise ValueError(f"CSV validation failed: {e}")
+    except Exception as e:
+        pulumi.warn(
+            f"Could not create dataset from {os.environ.get('DATASET_DESCRIPTION_PATH')}: {e}"
+        )
+
+if os.environ.get("VITE_ENABLE_TEMPLATE_EDIT"):
+    app_runtime_parameters.append(
+        datarobot.ApplicationSourceRuntimeParameterValueArgs(
+            key="VITE_ENABLE_TEMPLATE_EDIT",
+            type="string",
+            value=os.environ.get("VITE_ENABLE_TEMPLATE_EDIT"),
+        )
+    )
+
+if os.environ.get("VITE_ENABLE_CUSTOM_PROMPTS"):
+    app_runtime_parameters.append(
+        datarobot.ApplicationSourceRuntimeParameterValueArgs(
+            key="VITE_ENABLE_CUSTOM_PROMPTS",
+            type="string",
+            value=os.environ.get("VITE_ENABLE_CUSTOM_PROMPTS"),
+        )
+    )
 
 
 db_credential = get_database_credentials(DATABASE_CONNECTION_TYPE)
@@ -230,6 +311,7 @@ if USE_LLM_GATEWAY:
             value="true",
         )
     )
+
 
 app_source = datarobot.ApplicationSource(
     files=app_frontend.stdout.apply(
@@ -276,11 +358,13 @@ def create_monitoring_resources():
     dataset_trace = datarobot.DatasetFromFile(
         "dataset_trace",
         file_path=settings_job_infra.dataset_trace_path,
+        name=settings_job_infra.dataset_trace_name,
         use_case_ids=[use_case.id],
     )
     dataset_access_log = datarobot.DatasetFromFile(
         "dataset_access_log",
         file_path=settings_job_infra.dataset_access_log_path,
+        name=settings_job_infra.dataset_access_log_name,
         use_case_ids=[use_case.id],
     )
 
@@ -302,7 +386,6 @@ def create_monitoring_resources():
             "DATAROBOT_APPLICATION_ID": app.id,
             "DATASET_TRACE_ID": dataset_trace.id,
             "DATASET_ACCESS_LOG_ID": dataset_access_log.id,
-            "MODE": "append",
         }.items()
     ]
 
@@ -361,25 +444,12 @@ def create_monitoring_resources():
                 {"custom_job_id": custom_job_id},
                 opts,
             )
-            import pulumi.runtime
-
-            # Only run the job if we're in the actual update phase, not preview
-            if not pulumi.runtime.is_dry_run():
-                result = custom_job_id.apply(
-                    lambda id: settings_job_infra.run_job_once(id)
-                )
-                self.custom_run_id = result.apply(
-                    lambda r: r["run_id"] if r["success"] else "NA"
-                )
-            else:
-                self.custom_run_id = pulumi.Output.from_input("NA")
             self.schedule_id = custom_job_id.apply(
                 lambda id: settings_job_infra.create_job_schedule(id)
             )
             # Register outputs for stack export
             self.register_outputs(
                 {
-                    "custom_run_id": self.custom_run_id,
                     "schedule_id": self.schedule_id,
                 }
             )
@@ -391,9 +461,7 @@ def create_monitoring_resources():
         opts=pulumi.ResourceOptions(depends_on=[custom_job]),
     )
 
-    pulumi.export("CUSTOM_JOB_RUN_ID", post_actions.custom_run_id)
     pulumi.export("CUSTOM_JOB_SCHEDULE_ID", post_actions.schedule_id)
-    pulumi.export("MODE", "append")
 
     dashboard_runtime_parameters = [
         datarobot.ApplicationSourceRuntimeParameterValueArgs(

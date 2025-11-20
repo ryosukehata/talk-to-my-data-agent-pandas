@@ -61,26 +61,49 @@ with st.spinner("Loading data..."):
     today_str = datetime.datetime.now().strftime(
         "%Y-%m-%d %H:%M:00"
     )  # floor to minutes
-    trace_chat_df, trace_raw_df = data_manager.get_or_generate_data(today_str)
-    st.session_state.trace_chat = trace_chat_df
-    st.session_state.trace_raw = trace_raw_df
+    try:
+        trace_chat_df, trace_raw_df = data_manager.get_or_generate_data(today_str)
+        st.session_state.trace_chat = trace_chat_df
+        st.session_state.trace_raw = trace_raw_df
+    except Exception as e:
+        st.error(f"Failed to load data: {str(e)}")
+        st.session_state.trace_chat = pd.DataFrame()
+        st.session_state.trace_raw = pd.DataFrame()
 
-# if trace_raw_df is only 1 row, show a warning and stop the app
-if st.session_state.trace_raw.shape[0] == 1:
+# Check if we have meaningful data (more than just empty DataFrames)
+if st.session_state.trace_chat.empty or st.session_state.trace_raw.empty:
     st.warning("No usage data found. Please run the data pipeline to generate data.")
-    st.stop()
+    st.info("The dashboard will show empty charts and metrics until data is available.")
+    # Don't stop the app, just show empty state
+elif st.session_state.trace_raw.shape[0] <= 1:
+    st.warning(
+        "Very limited usage data found. The dashboard may show minimal information."
+    )
+    st.info("Consider running the data pipeline to generate more comprehensive data.")
 
 # Get all user emails
 user_emails = (
     sorted(st.session_state.trace_chat["user_email"].dropna().unique().tolist())
     if not st.session_state.trace_chat.empty
+    and "user_email" in st.session_state.trace_chat.columns
     else []
 )
 if "input_date_range" not in st.session_state:
-    st.session_state["input_date_range"] = (
-        st.session_state.trace_chat["date"].min(),
-        st.session_state.trace_chat["date"].max(),
-    )
+    if (
+        not st.session_state.trace_chat.empty
+        and "date" in st.session_state.trace_chat.columns
+    ):
+        st.session_state["input_date_range"] = (
+            st.session_state.trace_chat["date"].min(),
+            st.session_state.trace_chat["date"].max(),
+        )
+    else:
+        # Default to last 30 days if no data
+        today = datetime.date.today()
+        st.session_state["input_date_range"] = (
+            today - datetime.timedelta(days=30),
+            today,
+        )
 
 # Status indicators and refresh button in sidebar
 with st.sidebar:
@@ -266,7 +289,11 @@ end = end.date()
 
 # Filter by user if not ALL
 filtered_df = st.session_state.trace_chat.copy()
-if user_email != "ALL":
+if (
+    user_email != "ALL"
+    and not filtered_df.empty
+    and "user_email" in filtered_df.columns
+):
     filtered_df = filtered_df[filtered_df["user_email"] == user_email]
 
 # Calculate KPIs

@@ -40,6 +40,10 @@ jobs:
           FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE }}
           SCHEDULER_HOUR: ${{ vars.SCHEDULER_HOUR }}
           DATAROBOT_DEFAULT_USE_CASE: ${{ secrets.DATAROBOT_DEFAULT_USE_CASE }}
+          APP_ENVIRONMENT_ID: ${{ secrets.APP_ENVIRONMENT_ID }}
+          VITE_ENABLE_TEMPLATE_EDIT: ${{ secrets.VITE_ENABLE_TEMPLATE_EDIT }}
+          VITE_ENABLE_CUSTOM_PROMPTS: ${{ secrets.VITE_ENABLE_CUSTOM_PROMPTS }}
+          PROMPTS_TEMPLATE_PATH: ${{ secrets.PROMPTS_TEMPLATE_PATH }}
 
       - uses: pulumi/actions@v6
         if: github.ref == 'refs/heads/dev'
@@ -57,4 +61,7 @@ jobs:
           FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE }}
           SCHEDULER_HOUR: ${{ vars.SCHEDULER_HOUR }}
           DATAROBOT_DEFAULT_USE_CASE: ${{ secrets.DATAROBOT_DEFAULT_USE_CASE }}
-
+          APP_ENVIRONMENT_ID: ${{ secrets.APP_ENVIRONMENT_ID }}
+          VITE_ENABLE_TEMPLATE_EDIT: ${{ secrets.VITE_ENABLE_TEMPLATE_EDIT }}
+          VITE_ENABLE_CUSTOM_PROMPTS: ${{ secrets.VITE_ENABLE_CUSTOM_PROMPTS }}
+          PROMPTS_TEMPLATE_PATH: ${{ secrets.PROMPTS_TEMPLATE_PATH }}

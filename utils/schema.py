@@ -458,7 +458,7 @@ class RunChartsResult(BaseModel):
     def fig1(self) -> go.Figure | None:
         if self.fig1_json:
             fig = go.Figure(json.loads(self.fig1_json))
-            fig.update_layout(font=dict(family="font/NotoSansJP-VariableFont_wght.ttf"))
+            fig.update_layout(font=dict(family="Noto Sans JP"))
             return fig
         return None
 
@@ -466,7 +466,7 @@ class RunChartsResult(BaseModel):
     def fig2(self) -> go.Figure | None:
         if self.fig2_json:
             fig = go.Figure(json.loads(self.fig2_json))
-            fig.update_layout(font=dict(family="font/NotoSansJP-VariableFont_wght.ttf"))
+            fig.update_layout(font=dict(family="Noto Sans JP"))
             return fig
         return None
 
@@ -660,6 +660,7 @@ class DictionaryCellUpdate(BaseModel):
 
 class LoadDatabaseRequest(BaseModel):
     table_names: list[str]
+    schema_name: str | None = None  # Optional schema override
 
 
 class ChatCreate(BaseModel):
