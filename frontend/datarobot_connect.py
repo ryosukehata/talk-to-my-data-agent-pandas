@@ -43,7 +43,7 @@ class DataRobotTokenManager:
 
     _API_URLS = {
         "account": "/api/v2/account/info/",
-        "apikeys": "/api/v2/account/apiKeys/?limit=5",
+        "apikeys": "/api/v2/account/apiKeys/?isScoped=false",
     }
 
     _JS_COMMAND_TEMPLATE = """fetch(

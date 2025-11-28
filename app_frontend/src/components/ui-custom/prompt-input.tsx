@@ -40,12 +40,15 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
     const [message, setMessage] = useState(initialValue);
 
     useImperativeHandle(ref, () => internalRef.current as HTMLTextAreaElement);
+<<<<<<< HEAD
 
     // Update message when initialValue changes
     useEffect(() => {
       setMessage(initialValue);
     }, [initialValue]);
 
+=======
+>>>>>>> upstream/main
     useEffect(() => {
       // Auto-resize textarea based on content
       const textarea = internalRef.current;
@@ -101,6 +104,10 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
             className
           )}
           rows={1}
+<<<<<<< HEAD
+=======
+          autoFocus={props.autoFocus}
+>>>>>>> upstream/main
           onCompositionStart={() => setIsComposing(true)}
           onCompositionEnd={() => setIsComposing(false)}
           onKeyDown={event => {

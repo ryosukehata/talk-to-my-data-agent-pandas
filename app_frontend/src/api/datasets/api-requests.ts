@@ -9,6 +9,15 @@ type Dataset = {
   file_size?: number;
 };
 
+type DatasetResponse = {
+  dataset: {
+    name: string;
+    data_records: Record<string, unknown>[];
+  };
+  cleaning_report?: unknown[];
+  dataset_name?: string;
+};
+
 export const getDatasets = async ({
   limit,
   remote,
@@ -20,6 +29,26 @@ export const getDatasets = async ({
 }): Promise<Dataset[]> => {
   const { data } = await apiClient.get<Dataset[]>(
     `/v1/registry/datasets?limit=${limit}&remote=${remote}`,
+    {
+      signal,
+    }
+  );
+  return data;
+};
+
+export const getDatasetById = async ({
+  datasetId,
+  skip = 0,
+  limit = 1000,
+  signal,
+}: {
+  datasetId: string;
+  skip?: number;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<DatasetResponse> => {
+  const { data } = await apiClient.get<DatasetResponse>(
+    `/v1/datasets/${datasetId}?skip=${skip}&limit=${limit}`,
     {
       signal,
     }
@@ -76,3 +105,39 @@ export async function getSupportedDataSourceTypes(): Promise<string[]> {
 
   return data.supported_types;
 }
+
+export const downloadDataset = async ({
+  datasetId,
+  signal,
+  includeBom,
+}: {
+  datasetId: string;
+  signal?: AbortSignal;
+  includeBom?: boolean;
+}): Promise<void> => {
+  try {
+    const response = await apiClient.get(`/v1/datasets/${datasetId}/download`, {
+      params: { bom: includeBom },
+      responseType: 'blob',
+      signal,
+    });
+
+    const blob = response.data;
+    const contentDisposition = response.headers['content-disposition'];
+    const filename = contentDisposition?.match(/filename="?([^"]+)"?/)?.[1] || 'dataset.csv';
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (error) {
+    console.error('DEBUG Error downloading dataset:', error);
+    throw error;
+  }
+};

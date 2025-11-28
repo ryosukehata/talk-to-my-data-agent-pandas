@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
+
+from jinja2 import Environment
+
 
 from utils.i18n import gettext
 
@@ -35,6 +39,9 @@ Respond with a JSON object containing the following fields:
 1) columns: A list of all of the columns in the dataset
 2) descriptions: A list of descriptions for each column.
 
+LANGUAGE POLICY:
+Always respond in English for consistency and persistence. Do not translate.
+
 EXAMPLE OUTPUT:
 {
     columns: [a,taco,mpg],
@@ -42,30 +49,40 @@ EXAMPLE OUTPUT:
 }
 """)
 DICTIONARY_BATCH_SIZE = 5
-SYSTEM_PROMPT_SUGGEST_A_QUESTION = gettext("""\
-YOUR ROLE:
-Your job is to examine some meta data and suggest 3 business analytics questions that might yeild interesting insight from the data.
-Inspect the user's metadata and suggest 3 different questions. They might be related, or completely unrelated to one another.
-Your suggested questions might require analysis across multiple tables, or might be confined to 1 table.
-Another analyst will turn your question into a SQL query. As such, your suggested question should not require advanced statistics or machine learning to answer and should be straightforward to implement in SQL.
+SYSTEM_PROMPT_SUMMARIZE_CONVERSATION = """
+ROLE
+You are an AI assistant that summarizes conversation histories between a user and an AI data analyst. Create a concise summary that preserves critical context needed for future analysis requests.
 
-CONTEXT:
-You will be provided with meta data about some tables in Snowflake.
-For each question, consider all of the tables.
+WHAT TO INCLUDE (in order of priority)
+1. Main datasets analyzed (by name only, not structure details)
+2. Key business questions and insights discovered
+3. Important findings: significant patterns, trends, or anomalies
+4. Critical filters or constraints that shaped the analysis
+5. Decisions or conclusions reached by the user
+
+WHAT TO OMIT
+- Column names, table schemas, or technical details
+- Redundant or repeated questions
+- Formatting instructions (chart types, colors, styles)
+- Casual conversation or pleasantries
+- Technical errors, retry attempts, or failed queries
+- Intermediate exploratory steps
+
+OUTPUT FORMAT
+Write concise paragraphs optimized for context efficiency. Use third person (e.g., "The user analyzed..."). Focus on high-level narrative: what was explored, what was found, what mattered. Be brief - aim for maximum information density.
+
+LANGUAGE
+Maintain the same language as the conversation. If multiple languages are used, use the dominant language.
 
 YOUR RESPONSE:
-Each question should be 1 or 2 sentences, no more.
-Format your response as a JSON object with the following fields:
-1) question1: A business question that might be answered by the data.
-2) question2: A second, totally different business question that might be answered by the data.
-3) question3: A third business question that touches on a different aspect of the data.
-
-NECESSARY CONSIDERATIONS:
-Do not refer to specific column names or tables in the data. Just use common language when suggesting a question. Let the next analyst figure out which columns and tables they'll need to use.
-""")
-SYSTEM_PROMPT_REPHRASE_MESSAGE = gettext("""\
+Provide a brief but comprehensive summary of the conversation history below.
+"""
+SYSTEM_PROMPT_REPHRASE_MESSAGE = """
 ROLE
 You are an AI assistant whose job is to review the entire chat history between the user and the AI, then paraphrase the user’s latest message in a way that captures their complete intent. This paraphrased statement will be passed along to an analytics engine, so it must accurately and comprehensively represent the user’s question, including any relevant context from previous messages if needed.
+
+LANGUAGE POLICY
+Detect the language of the latest user message and paraphrase STRICTLY in that same language. Do not translate to another language. If the conversation uses multiple languages, ALWAYS use the latest user message’s language regardless of any earlier messages or examples. Output only the paraphrase.
 
 DECISION LOGIC
 Check if this is the very first user message
@@ -90,6 +107,12 @@ User: “Show me the sales by store, aggregated by year.”
 Assistant (Paraphrased Response):
 Understood. Let’s get the sales by store, aggregated by year.
 
+Non‑English (Japanese) Example
+
+User: 「年別に店舗別売上を集計して見せてください。」
+Assistant (Paraphrased Response):
+年別に店舗別売上を集計して表示してください。
+
 Follow-Up / Revision
 
 User (first message): “Show me the sales by store, aggregated by year.”
@@ -112,6 +135,10 @@ Avoid changing the user’s intent; simply clarify or reorganize it.
 Speak in first-person and be concise, yet thorough.
 Do not add extra data or assumptions that the user did not request.
 If the user explicitly references the entire conversation (“like we did before,” “use that same chart but change X,” etc.), make sure to incorporate that historical context into your paraphrase.
+
+LANGUAGE
+Paraphrase strictly in the language of the latest user message. Do not translate to another language. If the language cannot be determined, default to the language used by the latest user message; only if truly unclear, default to English.
+
 YOUR RESPONSE:
 Based on these guidelines, provide a single paraphrased statement that captures the user’s most recent request and any necessary context.
 """)
@@ -216,6 +243,9 @@ To ensure case sensitivity of column names, use quotes around column names.
 This query will be executed using the Snowflake Python Connector. Make sure the query will be compatible with the Snowflake Python Connector.
 Always reference tables fully quoted and qualified, as in '{database}.{schema}."TABLE_NAME"' and quote any column names in the query.
 
+LANGUAGE:
+Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. SQL remains SQL.
+
 
 REATTEMPT:
 It's possible that your query will fail due to a SQL error or return an empty result set.
@@ -265,6 +295,9 @@ Carefully consider the metadata and the sample data when constructing your query
 For example, seemingly numeric columns might contain non-numeric formatting such as $1,234.91 which could require special handling.
 When performing date operations on a date column, consider using SAFE_CAST, PARSE_DATE, or the appropriate BigQuery date functions for error redundancy.
 This query will be executed using the BigQuery Python client library. Make sure the query is compatible with standard SQL in BigQuery.
+
+LANGUAGE:
+Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. SQL remains SQL.
 
 REATTEMPT:
 It's possible that your query will fail due to a SQL error or return an empty result set.
@@ -325,6 +358,9 @@ When referring to columns in your code, spell them EXACTLY as they appear in the
 For example, if the question asks "What is the total amount paid ("AMTPAID") for each type of order?" but the metadata does not contain "AMTPAID" but rather "TOTAL_AMTPAID", you should use "TOTAL_AMTPAID" in your code because that's the column name in the data.
 Data Availability: If some data is missing, plot what you can in the most sensible way.
 Package Imports: If your code requires a package to run, such as statsmodels, numpy, scipy, etc, you must import the package within your function.
+
+LANGUAGE:
+Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. Code remains code.
 
 Data Handling:
 If there are more than 100 rows, consider grouping or aggregating data for clarity.
@@ -533,50 +569,6 @@ Common HANA SQL syntax differences:
 - For string concatenation use: '||' operator
 - Date formatting: 'TO_VARCHAR(date_column, 'YYYY-MM-DD')'
 
-REATTEMPT:
-It's possible that your query will fail due to a SQL error or return an empty result set.
-If this happens, you will be provided the failed query and the error message.
-Take this failed SQL code and error message into consideration when building your query so that the problem doesn't happen again.
-"""
-SYSTEM_PROMPT_DATAROBOT = """
-ROLE:
-Your job is to write a Spark SQL query that analyzes one or more tables.
-The query will be executed against these tables, performing the necessary calculations and aggregations required to answer the user's business question.
-Carefully inspect the information and metadata provided to ensure your query will execute and return data.
-The result set should not only answer the question, but provide the necessary context so the user can fully understand how the data answers the question.
-For example, if the user asks, "Which State has the highest revenue?" Your query might return the top 10 states by revenue sorted in descending order since this would help the user understand how the state with the highest revenue compares to the other states.
-
-CONTEXT:
-You will be provided a data dictionary for the tables that identifies the data type and meaning of each column.
-You will also be provided a small sample of data from the table. This will help you understand the content of the columns as you build your query reducing the risk of errors.
-You will also be provided a list of frequently occurring values from VARCHAR / categorical columns. This will be helpful when adding WHERE clauses in your query.
-Based on this metadata, build your query so that it will run without error and return data.
-Your query should return not just the facts directly related to the question, but also return related information that could be part of the root cause or provide additional analytics value.
-Your query will be executed with Spark SQL.
-
-RESPONSE:
-Your response shall be a single, executable Spark SQL query that retrieves, analyzes, aggregates and returns the information required to answer the user's question.
-In addition, your response should return any relevant, supporting or contextual information to help the user better understand the results.
-Try to ensure that your query does not return an empty result set.
-Your code may not include any operations that could alter or corrupt the data.
-You may not use DELETE, UPDATE, TRUNCATE, DROP, DML Operations, ALTER TABLE or anything that could permanently alter the data.
-Your code should be robust against errors, with a high likelihood of successfully executing.
-The dataset may contain very large amounts of data. Your query result must not be excessively lengthy, therefore consider appropriate GROUP BY clauses and aggregations.
-The result of this query will be analyzed by humans and plotted in charts, so consider appropriate ways to organize and sort the data so that it is easy to interpret.
-Do not provide multiple queries that must be executed in different steps – the query must execute in a single step.
-Include comments to explain your code.
-Your response shall be formatted as JSON with the following fields:
-1) code: Spark SQL code that will execute and return the data
-2) description: A brief description of how the code works, and how the results can be interpreted to answer the question.
-
-NECESSARY CONSIDERATIONS:
-Carefully consider the metadata and the sample data when constructing your query to avoid errors or an empty result.
-For example, seemingly numeric columns might contain non-numeric formatting such as $1,234.91 which could require special handling.
-When performing date operations on a date column, consider using appropriate Spark SQL date functions for error redundancy.
-This query will be executed using the Spark SQL dialect.
-Reference the datasets using backticks around the dataset name: `{{dataset_name}}`
-Use standard Spark SQL syntax and functions.
-
 LANGUAGE:
 Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. SQL remains SQL.
 
@@ -585,3 +577,238 @@ It's possible that your query will fail due to a SQL error or return an empty re
 If this happens, you will be provided the failed query and the error message.
 Take this failed SQL code and error message into consideration when building your query so that the problem doesn't happen again.
 """
+
+
+def sql_prompt_template(
+    *,
+    language_variant: str,
+    base_language: str,
+    execution_environment: str,
+    table_context: dict[str, str],
+    extra_necessary_considerations: str,
+    prohibited_commands_example: str,
+    varchar_categorical: str,
+    where: str,
+    group_by: str,
+) -> str:
+    sql_variant = f"{language_variant} {base_language}"
+    return (
+        Environment()
+        .from_string(
+            """
+ROLE:
+Your job is to write a {{sql_variant}} query that analyzes one or more tables.
+The query will be executed against these tables, performing the necessary calculations and aggregations required to answer the user's business question.
+Carefully inspect the information and metadata provided to ensure your query will execute and return data.
+The result set should not only answer the question, but provide the necessary context so the user can fully understand how the data answers the question.
+For example, if the user asks, "Which State has the highest revenue?" Your query might return the top 10 states by revenue sorted in descending order since this would help the user understand how the state with the highest revenue compares to the other states.
+
+CONTEXT:
+You will be provided a data dictionary for the tables that identifies the data type and meaning of each column.
+You will also be provided a small sample of data from the table. This will help you understand the content of the columns as you build your query reducing the risk of errors.
+You will also be provided a list of frequently occurring values from {{varchar_categorical}} columns. This will be helpful when adding {{where}} clauses in your query.
+Based on this metadata, build your query so that it will run without error and return data.
+Your query should return not just the facts directly related to the question, but also return related information that could be part of the root cause or provide additional analytics value.
+Your query will be executed with {{sql_variant}}.
+
+RESPONSE:
+Your response shall be a single, executable {{sql_variant}} query that retrieves, analyzes, aggregates and returns the information required to answer the user's question.
+In addition, your response should return any relevant, supporting or contextual information to help the user better understand the results.
+Try to ensure that your query does not return an empty result set.
+Your code may not include any operations that could alter or corrupt the data.
+You may not use {{prohibited_commands_example}} or anything that could permanently alter the data.
+Your code should be robust against errors, with a high likelihood of successfully executing.
+The dataset may contain very large amounts of data. Your query result must not be excessively lengthy, therefore consider appropriate {{group_by}} clauses and aggregations.
+The result of this query will be analyzed by humans and plotted in charts, so consider appropriate ways to organize and sort the data so that it is easy to interpret.
+Do not provide multiple queries that must be executed in different steps – the query must execute in a single step.
+Include comments to explain your code.
+Your response shall be formatted as JSON with the following fields:
+1) code: {{sql_variant}} code that will execute and return the data
+2) description: A brief description of how the code works, and how the results can be interpreted to answer the question.
+{% if table_context %}
+{{execution_environment.upper()}} ENVIRONMENT:
+{% for k, v in table_context.items() %}
+{{k}}: {{v}}
+{% endfor %}
+{% endif %}
+NECESSARY CONSIDERATIONS:
+Carefully consider the metadata and the sample data when constructing your query to avoid errors or an empty result.
+For example, seemingly numeric columns might contain non-numeric formatting such as $1,234.91 which could require special handling.
+This query will be executed using {{execution_environment}}.
+Use standard {{sql_variant}} syntax and functions.
+{{extra_necessary_considerations}}
+
+LANGUAGE:
+Any natural-language text in your response (e.g., the "description") must be in the same language as the user's question. If the language cannot be determined, default to English. {{base_language}} remains {{base_language}}.
+
+REATTEMPT:
+It's possible that your query will fail due to a {{base_language}} error or return an empty result set.
+If this happens, you will be provided the failed query and the error message.
+Take this failed {{base_language}} code and error message into consideration when building your query so that the problem doesn't happen again.
+"""
+        )
+        .render(locals())
+        .strip()
+    )
+
+
+class QueryPromptFactory(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def language_variant(self) -> str:
+        pass
+
+    @property
+    def base_language(self) -> str:
+        return "SQL"
+
+    @property
+    @abc.abstractmethod
+    def execution_environment(self) -> str:
+        pass
+
+    @property
+    def extra_necessary_considerations(self) -> str:
+        return ""
+
+    @property
+    def prohibited_commands_example(self) -> str:
+        return "DELETE, UPDATE, TRUNCATE, DROP, DML Operations, ALTER TABLE"
+
+    @property
+    def varchar_categorical(self) -> str:
+        return "VARCHAR / categorical"
+
+    @property
+    def where(self) -> str:
+        return "WHERE"
+
+    @property
+    def group_by(self) -> str:
+        return "GROUP BY"
+
+    @abc.abstractmethod
+    def adapt_datasource_to_table_context(
+        self,
+        *,
+        catalog: str | None = None,
+        schema: str | None = None,
+    ) -> dict[str, str]:
+        pass
+
+    def prompt_for_datasource(
+        self,
+        *,
+        catalog: str | None = None,
+        schema: str | None = None,
+    ) -> str:
+        return sql_prompt_template(
+            language_variant=self.language_variant,
+            base_language=self.base_language,
+            execution_environment=self.execution_environment,
+            table_context=self.adapt_datasource_to_table_context(
+                catalog=catalog, schema=schema
+            ),
+            extra_necessary_considerations=self.extra_necessary_considerations,
+            prohibited_commands_example=self.prohibited_commands_example,
+            where=self.where,
+            varchar_categorical=self.varchar_categorical,
+            group_by=self.group_by,
+        )
+
+    def adapt_table_path(self, path: str) -> str:
+        return path
+
+
+class SparkPromptFactory(QueryPromptFactory):
+    @property
+    def language_variant(self) -> str:
+        return "Spark"
+
+    @property
+    def execution_environment(self) -> str:
+        return "Spark SQL"
+
+    @property
+    def extra_necessary_considerations(self) -> str:
+        return """
+When performing date operations on a date column, consider using appropriate Spark SQL date functions for error redundancy.
+Table references will be provided already properly quoted in backticks.
+""".strip()
+
+    def adapt_table_path(self, path: str) -> str:
+        return f"`{path}`"
+
+    def adapt_datasource_to_table_context(
+        self, *, catalog: str | None = None, schema: str | None = None
+    ) -> dict[str, str]:
+        if catalog or schema:
+            raise ValueError("Catalog/Schema not supported for Spark.")
+        return {}
+
+
+class PostgresPromptFactory(QueryPromptFactory):
+    @property
+    def language_variant(self) -> str:
+        return "Postgres"
+
+    @property
+    def execution_environment(self) -> str:
+        return "PostgreSQL"
+
+    @property
+    def extra_necessary_considerations(self) -> str:
+        return """
+When performing date operations on a date column, consider using appropriate PostgreSQL date functions for error redundancy.
+The table name will be provided in fully quoted form, with catalog and schema (if present). No need to add quotes.
+""".strip()
+
+    def adapt_datasource_to_table_context(
+        self, *, catalog: str | None = None, schema: str | None = None
+    ) -> dict[str, str]:
+        context = {}
+        if catalog:
+            context["Catalog"] = catalog
+        if schema:
+            context["Schema"] = schema
+        return context
+
+    def adapt_table_path(self, path: str) -> str:
+        return ".".join(f'"{part}"' for part in path.split("."))
+
+
+class RedshiftPromptFactory(PostgresPromptFactory):
+    @property
+    def language_variant(self) -> str:
+        return "Redshift (PostgreSQL)"
+
+    @property
+    def execution_environment(self) -> str:
+        return "Redshift"
+
+    @property
+    def extra_necessary_considerations(self) -> str:
+        # See https://docs.aws.amazon.com/redshift/latest/dg/c_redshift-and-postgres-sql.html
+        # In order to not bloat the prompt, I'm not listing every difference below, just some  key ones.
+        return """
+When performing date operations on a date column, consider using appropriate Redshift date functions for error redundancy.
+The table name will be provided in fully quoted form, with catalog and schema (if present). No need to add quotes.
+
+Redshift's query language is mostly equal to PostgreSQL, but it does not support all PostgreSQL functions. 
+Do NOT attempt to use any of the following functions unsupported by Redshift:
+- STRING_AGG
+- ARRAY_AGG
+- EVERY
+- CONVERT
+- FORMAT
+""".strip()
+
+    def adapt_datasource_to_table_context(
+        self, *, catalog: str | None = None, schema: str | None = None
+    ) -> dict[str, str]:
+        context = {}
+        if catalog:
+            context["Catalog"] = catalog
+        if schema:
+            context["Schema"] = schema
+        return context

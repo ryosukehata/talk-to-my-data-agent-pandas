@@ -75,7 +75,7 @@ export const InitialPrompt = ({
               {t('Type a question about your dataset')}
             </strong>
           </h4>
-          <p className="text-center mb-6">
+          <p className="text-center mb-10">
             {t(
               "Ask specific questions about your datasets to get insights, generate visualizations, and discover patterns. Include column names and the kind of analysis you're looking for to get more accurate results."
             )}
@@ -98,11 +98,20 @@ export const InitialPrompt = ({
             key={selectedTemplateText ? 'with-template' : 'empty'}
             ref={promptInputRef}
             sendButtonArrangement="append"
-            onSend={handleSend}
+            onSend={(message: string) =>
+              sendMessage({
+                message,
+                chatId,
+                enableChartGeneration,
+                enableBusinessInsights,
+                dataSource: chatDataSource,
+              })
+            }
             initialValue={selectedTemplateText}
             isDisabled={isDisabled}
             testId="initial-prompt-input"
             placeholder={t('Ask another question about your datasets.')}
+            autoFocus
           />
         </div>
       </div>
