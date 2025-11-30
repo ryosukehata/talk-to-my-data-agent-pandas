@@ -73,7 +73,7 @@ llm_blueprint_args = LLMBlueprintArgs(
     resource_name=f"Generative Analyst LLM Blueprint [{PROJECT_NAME}]",
     llm_id=LLM.name,
     llm_settings=LLMSettings(
-        max_completion_length=4096,
+        max_completion_length=2048,
         temperature=0.1,
     ),
 )
