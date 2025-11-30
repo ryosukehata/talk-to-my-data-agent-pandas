@@ -379,7 +379,7 @@ app_source = datarobot.ApplicationSource(
     ),
     runtime_parameter_values=app_runtime_parameters,
     resources=datarobot.ApplicationSourceResourcesArgs(
-        resource_label=CustomAppResourceBundles.CPU_8XL.value.id,
+        resource_label=CustomAppResourceBundles.CPU_7XL.value.id,
         replicas=1,
         session_affinity=True,
     ),
