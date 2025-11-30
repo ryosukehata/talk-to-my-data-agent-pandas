@@ -1,19 +1,12 @@
 import React, { useMemo } from 'react';
 import { useAppState } from '@/state/hooks';
-<<<<<<< HEAD
-import { DATA_SOURCES } from '@/constants/dataSources';
-=======
 import { DATA_SOURCES, EXTERNAL_DATA_STORE_PREFIX } from '@/constants/dataSources';
->>>>>>> upstream/main
 import { DatasetMetadata } from '@/api/cleansed-datasets/api-requests';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import { useFetchAllChats, useUpdateChatDataSource } from '@/api/chat-messages/hooks';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from '@/i18n';
-<<<<<<< HEAD
-=======
 import { friendlySourceName } from '@/api/datasources/utils';
->>>>>>> upstream/main
 
 interface IDataSourceToggleProps {
   multipleMetadata?: {
@@ -70,14 +63,11 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
       ) {
         acc.push(name);
       }
-<<<<<<< HEAD
-=======
 
       if (currentValue.startsWith(EXTERNAL_DATA_STORE_PREFIX) && currentValue === data_source) {
         acc.push(name);
       }
 
->>>>>>> upstream/main
       return acc;
     }, [] as string[]);
   }, [multipleMetadata, currentValue]);
@@ -124,8 +114,6 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
           <div className="m-2">{t('Local Registry / File')}</div>
         </ToggleGroupItem>
       )}
-<<<<<<< HEAD
-=======
       {allowedDataSources
         ?.filter(ds => ds.startsWith(EXTERNAL_DATA_STORE_PREFIX))
         .map(ds => {
@@ -138,7 +126,6 @@ export const DataSourceToggle: React.FC<IDataSourceToggleProps> = ({
             </>
           );
         })}
->>>>>>> upstream/main
     </ToggleGroup>
   );
 };

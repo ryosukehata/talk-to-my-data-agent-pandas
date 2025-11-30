@@ -20,11 +20,11 @@ import { MultiSelect } from '@/components/ui-custom/multi-select';
 import { useState, useEffect } from 'react';
 import { FileUploader } from './ui-custom/file-uploader';
 import { useFetchDatasets } from '@/api/datasets/hooks';
-import { 
+import {
   useGetDatabaseSchemas,
   useGetDatabaseTables,
   useLoadFromDatabaseMutation,
-  useGetDefaultSchema, 
+  useGetDefaultSchema,
 } from '@/api/database/hooks';
 import { useFileUploadMutation, UploadError } from '@/api/datasets/hooks';
 import { Separator } from '@radix-ui/react-separator';
@@ -37,7 +37,6 @@ import { Label } from '@/components/ui/label';
 import { useListAvailableDataStores, useSelectDataSourcesMutation } from '@/api/datasources/hooks';
 import { externalDataSourceName, ExternalDataStore } from '@/api/datasources/api-requests';
 import { SingleSelect } from './ui-custom/single-select';
-
 
 export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const { data } = useFetchDatasets();
@@ -125,7 +124,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const formatTableOption = (name: string, description: string) => {
     return description === name ? name : `${name} - ${description}`;
   };
-  
+
   const { mutate: selectDataSources } = useSelectDataSourcesMutation({
     onSuccess: () => {
       setIsPending(false);
