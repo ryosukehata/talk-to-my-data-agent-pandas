@@ -79,6 +79,20 @@ class CompletionsProxy:
 
         return result
 
+    async def create_with_completion(self, *args: Any, **kwargs: Any) -> Any:
+        """Intercept create calls to track tokens."""
+        messages = kwargs.get("messages", [])
+        model = kwargs.get("model", "unknown")
+
+        # Call underlying implementation
+        result, org = await self._completions.create_with_completion(*args, **kwargs)
+
+        # Track tokens if tracker is available
+        if self._tracker:
+            self._tracker.track_call(messages, result, model)
+
+        return result, org
+
 
 class AsyncLLMClient:
     """
@@ -144,7 +158,6 @@ class AsyncLLMClient:
         self._instructor_client = instructor.from_openai(
             self._openai_client, mode=instructor.Mode.MD_JSON
         )
-
         # Return proxy that tracks tokens
         return TokenTrackingProxy(self._instructor_client, self.token_tracker)
 

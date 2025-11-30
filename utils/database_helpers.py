@@ -100,7 +100,7 @@ class DatabaseOperator(ABC, Generic[T]):
     @abstractmethod
     def get_schemas(self, timeout: int | None = None) -> list[str]:
         return []
-    
+
     @functools.lru_cache(maxsize=8)
     @abstractmethod
     async def get_data(
@@ -145,7 +145,7 @@ class NoDatabaseOperator(DatabaseOperator[NoDatabaseCredentialArgs]):
 
     def get_schemas(self, timeout: int | None = 300) -> list[str]:
         return []
-    
+
     @functools.lru_cache(8)
     async def get_data(
         self,

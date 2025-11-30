@@ -61,6 +61,7 @@ def convert_df_to_csv(df) -> str:
     # .encode('utf-8')でUTF-8エンコーディングを指定し、日本語などの文字化けを防ぐ
     return df.to_csv(index=False).encode("utf_8_sig")
 
+
 # Initialize telemetry for connect & explore page
 explore_logger: Optional[Any] = None
 

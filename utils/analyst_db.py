@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import os
 import re
@@ -2034,7 +2033,7 @@ class AnalystDB:
         file_size: int = 0,
         external_id: str | None = None,
         clobber: bool = False,
-    ) -> None:
+    ) -> dict[str, object]:
         if isinstance(df, CleansedDataset):
             is_cleansed = True
             await self.dataset_handler.store_cleansing_report(
@@ -2044,7 +2043,7 @@ class AnalystDB:
             is_cleansed = False
         try:
             await self.dataset_handler.register_dataframe(
-                dataset_df,
+                df.to_df(),
                 f"{df.name}_cleansed" if is_cleansed else df.name,
                 dataset_type=(
                     DatasetType.CLEANSED if is_cleansed else DatasetType.STANDARD

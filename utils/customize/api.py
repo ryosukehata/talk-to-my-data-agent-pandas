@@ -1,7 +1,8 @@
+from io import StringIO
+
+import datarobot as dr
 import pandas as pd
 import requests
-import datarobot as dr
-from io import StringIO
 
 
 def download_registry_dataset_as_dataframe(dataset_id: str) -> pd.DataFrame:

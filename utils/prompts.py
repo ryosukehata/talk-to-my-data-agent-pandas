@@ -15,7 +15,6 @@ import abc
 
 from jinja2 import Environment
 
-
 from utils.i18n import gettext
 
 SYSTEM_PROMPT_GET_DICTIONARY = gettext("""\
@@ -141,7 +140,7 @@ Paraphrase strictly in the language of the latest user message. Do not translate
 
 YOUR RESPONSE:
 Based on these guidelines, provide a single paraphrased statement that captures the user’s most recent request and any necessary context.
-""")
+"""
 SYSTEM_PROMPT_PYTHON_ANALYST = """
 ROLE:
 Your job is to write a Python function that analyzes one or more input dataframes, performing the necessary merges, calculations and aggregations required to answer the user's business question.

@@ -23,7 +23,7 @@ import tempfile
 import uuid
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Generator, Iterable, List, Union, cast
+from typing import Any, Iterable, List, Union, cast
 
 import datarobot as dr
 import pandas as pd
@@ -1577,7 +1577,7 @@ async def save_chat_messages(
                 data_sheet = analysis_workbook.create_sheet(data_sheet_name)
 
                 try:
-                    dataset: pd.DataFrame = run_analysis_component.dataset.data.df
+                    dataset: pd.DataFrame = dataset_to_export.data.df
                     # Convert to pandas with error handling for large datasets
                     pandas_df = dataset
 

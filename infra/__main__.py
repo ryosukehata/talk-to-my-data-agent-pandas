@@ -163,7 +163,6 @@ if settings_generative.LLM == LLMs.DEPLOYED_LLM:
         )
 
 
-
 LocaleSettings().setup_locale()
 
 check_feature_flags(PROJECT_ROOT / "infra" / "feature_flag_requirements.yaml")
@@ -373,7 +372,6 @@ if USE_LLM_GATEWAY:
     )
 
 app_source = datarobot.ApplicationSource(
-
     files=app_frontend.stdout.apply(
         lambda _: settings_app_infra.get_app_files(
             runtime_parameter_values=app_runtime_parameters

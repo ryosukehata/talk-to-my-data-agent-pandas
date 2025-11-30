@@ -106,7 +106,7 @@ from utils.data_cleansing_helpers import (
     add_summary_statistics,
     process_column,
 )
-from utils.database_helpers import DatabaseOperator, DatabaseOperator, get_external_database
+from utils.database_helpers import DatabaseOperator, get_external_database
 from utils.dr_helper import async_submit_actuals_to_datarobot
 from utils.i18n import gettext
 from utils.logging_helper import get_logger, log_api_call
@@ -144,16 +144,11 @@ from utils.schema import (
     TokenUsageInfo,
     Tool,
     UsageInfoComponent,
-    ValidatedQuestion,
 )
 
 logger = get_logger()
 logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("openai.http_client").setLevel(logging.WARNING)
-
-VALUE_ERROR_MESSAGE = "Input data cannot be empty (no dataset provided)"
-DEFAULT_LLM_GATEWAY_MODEL = "azure/gpt-4o"
-DEFAULT_LLM_GATEWAY_MODEL_SMALL = "azure/gpt-4o-mini"
 
 
 def log_memory() -> None:
@@ -188,17 +183,6 @@ def initialize_deployment() -> tuple[RESTClientObject, str]:
             "If running in DataRobot, verify your runtime parameters have been set correctly."
         ) from e
 
-
-ALTERNATIVE_LLM_BIG = "datarobot-deployed-llm"
-ALTERNATIVE_LLM_SMALL = "datarobot-deployed-llm"
-DICTIONARY_BATCH_SIZE = 10
-MAX_REGISTRY_DATASET_SIZE = 400e6  # aligns to 400MB set in streamlit config.toml
-REGISTRY_DATASET_SIZE_CUTOFF: Final[float] = (
-    200e6  # at 200MB we move from downloading to analyzing remotely with dataset
-)
-DISK_CACHE_LIMIT_BYTES = 512e6
-DICTIONARY_PARALLEL_BATCH_SIZE = 2
-DICTIONARY_TIMEOUT = 45.0
 
 _memory = Memory(tempfile.gettempdir(), verbose=0)
 _memory.clear(warn=False)  # clear cache on startup
@@ -552,7 +536,7 @@ async def _get_dictionary_batch(
     columns: list[str],
     df: pd.DataFrame,
     batch_size: int = 5,
-    telemetry_json: dict[str, Any] | None = None,,
+    telemetry_json: dict[str, Any] | None = None,
     token_tracker: TokenUsageTracker | None = None,
 ) -> list[DataDictionaryColumn]:
     """Process a batch of columns to get their descriptions"""
@@ -645,10 +629,10 @@ async def _get_dictionary_batch(
             with telemetry.time(
                 f"{_get_dictionary_batch.__module__}.{_get_dictionary_batch.__qualname__}.llm_call"
             ):
-            (
-                completion: DictionaryGeneration,
-                completion_org,
-            ) = await client.chat.completions.create_with_completion(
+                (
+                    completion,
+                    completion_org,
+                ) = await client.chat.completions.create_with_completion(
                     response_model=DictionaryGeneration,
                     model=ALTERNATIVE_LLM_SMALL,
                     messages=messages,
@@ -790,132 +774,6 @@ async def get_dictionary(
         )
 
 
-def _validate_question_feasibility(
-    question: str, available_columns: list[str]
-) -> ValidatedQuestion | None:
-    """Validate if a question can be answered with available data
-
-    Checks if common data elements mentioned in the question exist in columns
-    """
-    # Convert question and columns to lowercase for matching
-    question_lower = question.lower()
-    columns_lower = [col.lower() for col in available_columns]
-
-    # Extract potential column references from question
-    words = set(re.findall(r"\b\w+\b", question_lower))
-
-    # Find matches and missing terms
-    found_columns = [col for col in columns_lower if any(word in col for word in words)]
-
-    is_valid = len(found_columns) > 0
-    if is_valid:
-        return ValidatedQuestion(
-            question=question,
-        )
-    return None
-
-
-@log_api_call
-async def suggest_questions(
-    datasets: list[AnalystDataset],
-    max_columns: int = 40,
-    telemetry_json: dict[str, Any] | None = None,
-) -> list[ValidatedQuestion]:
-    """Generate and validate suggested analysis questions
-
-    Args:
-        dictionary: DataFrame containing data dictionary
-        max_columns: Maximum number of columns to include in prompt
-
-    Returns:
-        Dict containing:
-            - questions: list of validated question objects
-            - metadata: Dictionary of processing information
-    """
-    if telemetry_json is not None:
-        telemetry_send = deepcopy(telemetry_json)
-        telemetry_send["startTimestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    else:
-        telemetry_send = None
-    # Validate input
-    dictionary = sum(
-        [
-            DataDictionary.from_analyst_df(
-                ds.to_df(),
-                column_descriptions=f"Column from dataset {ds.name}",
-            ).column_descriptions
-            for ds in datasets
-        ],
-        [],
-    )
-
-    if len(dictionary) < 1:
-        raise ValueError("Dictionary DataFrame cannot be empty")
-
-    # Limit columns for OpenAI prompt
-    total_columns = len(dictionary)
-    if total_columns > max_columns:
-        # Take first and last 20 columns
-        half_max = max_columns // 2
-        first_half = dictionary[:half_max]
-        last_half = dictionary[-half_max:]
-
-        # Remove any duplicates
-        dictionary = first_half + last_half
-
-        # deduplicate
-        dictionary = list({item.column: item for item in dictionary}.values())
-
-    # Convert dictionary to format expected by OpenAI
-    dict_data = {
-        "columns": [d.column for d in dictionary],
-        "descriptions": [d.description for d in dictionary],
-        "data_types": [d.data_type for d in dictionary],
-    }
-
-    # Create OpenAI messages
-    messages: list[ChatCompletionMessageParam] = [
-        ChatCompletionSystemMessageParam(
-            role="system", content=prompts.SYSTEM_PROMPT_SUGGEST_A_QUESTION
-        ),
-        ChatCompletionUserMessageParam(
-            role="user",
-            content=f"Data Dictionary:\n{json.dumps(dict_data, ensure_ascii=False)}",
-        ),
-    ]
-    async with AsyncLLMClient() as client:
-        (
-            completion,
-            completion_org,
-        ) = await client.chat.completions.create_with_completion(
-            response_model=QuestionListGeneration,
-            model=ALTERNATIVE_LLM_SMALL,
-            messages=messages,
-        )
-
-    available_columns = dict_data["columns"]
-    validated_questions: list[ValidatedQuestion] = []
-
-    for question in completion.questions:
-        validated_question = _validate_question_feasibility(question, available_columns)
-        if validated_question is not None:
-            validated_questions.append(validated_question)
-
-    association_id = completion_org.datarobot_moderations["association_id"]
-    logger.info(f"Association ID: {association_id}")
-
-    if telemetry_send is not None:
-        # add query type to telemetry
-        telemetry_send["query_type"] = "01_generate_suggested_questions"
-        # submit telemetry
-        asyncio.create_task(
-            async_submit_actuals_to_datarobot(
-                association_id=association_id, telemetry_json=telemetry_send
-            )
-        )
-    return validated_questions
-
-
 def find_imports(module: ModuleType) -> list[str]:
     """
     Get top-level third-party imports from a Python module.
@@ -1040,7 +898,10 @@ async def _generate_run_charts_python_code(
         with telemetry.time(
             f"{_generate_run_charts_python_code.__module__}.{_generate_run_charts_python_code.__qualname__}.llm_call"
         ):
-            response, response_org = await client.chat.completions.create_with_completion(
+            (
+                response,
+                response_org,
+            ) = await client.chat.completions.create_with_completion(
                 response_model=CodeGeneration,
                 model=ALTERNATIVE_LLM_BIG,
                 temperature=0,
@@ -1193,9 +1054,9 @@ async def _generate_run_analysis_python_code(
             f"{_generate_run_analysis_python_code.__module__}.{_generate_run_analysis_python_code.__qualname__}.llm_call"
         ):
             (
-            completion,
-            completion_org,
-        ) = await client.chat.completions.create_with_completion(
+                completion,
+                completion_org,
+            ) = await client.chat.completions.create_with_completion(
                 response_model=CodeGeneration,
                 model=ALTERNATIVE_LLM_BIG,
                 temperature=0.1,
@@ -1266,7 +1127,7 @@ async def cleanse_dataframe(dataset: AnalystDataset) -> CleansedDataset:
 async def summarize_conversation(
     messages: list[ChatCompletionMessageParam],
     token_tracker: TokenUsageTracker | None = None,
-    telemetry_json: dict[str, Any] | None = None
+    telemetry_json: dict[str, Any] | None = None,
 ) -> str:
     """Summarize a conversation history, when getting close to model's context window limit.
 
@@ -1300,28 +1161,89 @@ async def summarize_conversation(
             f"Summarizing conversation: {token_count} tokens, {len(messages)} messages"
         )
 
+        prompt_messages: list[ChatCompletionMessageParam] = [
+            ChatCompletionSystemMessageParam(
+                content=prompts.SYSTEM_PROMPT_SUMMARIZE_CONVERSATION,
+                role="system",
+            ),
+            ChatCompletionUserMessageParam(
+                content=f"Conversation History:\n{messages_str}",
+                role="user",
+            ),
+        ]
+
+        async with AsyncLLMClient(token_tracker=token_tracker) as client:
+            with telemetry.time(
+                f"{summarize_conversation.__module__}.{summarize_conversation.__qualname__}.llm_call"
+            ):
+                completion: ConversationSummary = (
+                    await client.chat.completions.create_with_completion(
+                        response_model=ConversationSummary,
+                        model=ALTERNATIVE_LLM_SMALL,
+                        messages=prompt_messages,
+                    )
+                )
+
+        logger.info(f"Summary created: {len(completion.summary)} characters")
+        return completion.summary
+
+    except Exception as e:
+        logger.error(f"Error preparing messages for summarization: {str(e)}")
+        raise
+
+
+@log_api_call
+@telemetry.meter_and_trace
+async def rephrase_message(
+    messages: ChatRequest,
+    token_tracker: TokenUsageTracker | None = None,
+    telemetry_json: dict[str, Any] | None = None,
+) -> str:
+    """Process chat messages history and return a new question
+
+    Args:
+        messages: list of message dictionaries with 'role' and 'content' fields
+        token_tracker: Optional token usage tracker
+
+    Returns:
+        Dict[str, str]: Dictionary containing response content
+    """
+    if telemetry_json is not None:
+        telemetry_send = deepcopy(telemetry_json)
+        telemetry_send["startTimestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        telemetry_send = None
+
+    # Debug logging
+    token_count = count_messages_tokens(messages.messages, ALTERNATIVE_LLM_BIG)
+
+    logger.info(
+        f"DEBUG rephrase_message: {token_count} tokens, {len(messages.messages)} messages"
+    )
+
+    # Build prompt: system message + actual conversation history
     prompt_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
             content=prompts.SYSTEM_PROMPT_REPHRASE_MESSAGE,
             role="system",
-        ),
-        ChatCompletionUserMessageParam(
-            content=f"Message History:\n{messages_str}",
-            role="user",
-        ),
+        )
     ]
+
+    # Add the actual conversation messages (already includes summary if present)
+    prompt_messages.extend(messages.messages)
+
     async with AsyncLLMClient(token_tracker=token_tracker) as client:
         with telemetry.time(
-                f"{summarize_conversation.__module__}.{summarize_conversation.__qualname__}.llm_call"
-            ):
+            f"{rephrase_message.__module__}.{rephrase_message.__qualname__}.llm_call"
+        ):
             (
-            completion,
-            completion_org,
-             ) = await client.chat.completions.create(
-            response_model=EnhancedQuestionGeneration,
-            model=ALTERNATIVE_LLM_BIG,
-            messages=prompt_messages,
-        )
+                completion,
+                completion_org,
+            ) = await client.chat.completions.create_with_completion(
+                response_model=EnhancedQuestionGeneration,
+                model=ALTERNATIVE_LLM_BIG,
+                messages=prompt_messages,
+            )
 
     association_id = completion_org.datarobot_moderations["association_id"]
     logger.info(f"Association ID: {association_id}")
@@ -1408,14 +1330,15 @@ async def _run_charts(
 @log_api_call
 @telemetry.meter_and_trace
 async def run_charts(
-    
-    request: RunChartsRequest, 
+    request: RunChartsRequest,
     token_tracker: TokenUsageTracker | None = None,
-    telemetry_json: dict[str, Any] | None = None
+    telemetry_json: dict[str, Any] | None = None,
 ) -> RunChartsResult:
     """Execute analysis workflow on datasets."""
     try:
-        chart_result = await _run_charts(request, token_tracker=token_tracker, telemetry_json=telemetry_json)
+        chart_result = await _run_charts(
+            request, token_tracker=token_tracker, telemetry_json=telemetry_json
+        )
         return chart_result
     except ValidationError:
         return RunChartsResult(
@@ -1466,7 +1389,6 @@ async def get_business_analysis(
             df, MAX_CSV_TOKENS, initial_rows, ALTERNATIVE_LLM_BIG
         )
 
-
         # Create messages for OpenAI
         messages: list[ChatCompletionMessageParam] = [
             ChatCompletionSystemMessageParam(
@@ -1489,9 +1411,9 @@ async def get_business_analysis(
                 f"{get_business_analysis.__module__}.{get_business_analysis.__qualname__}.llm_call"
             ):
                 (
-                completion,
-                completion_org,
-            ) = await client.chat.completions.create_with_completion(
+                    completion,
+                    completion_org,
+                ) = await client.chat.completions.create_with_completion(
                     response_model=BusinessAnalysisGeneration,
                     model=ALTERNATIVE_LLM_BIG,
                     temperature=0.1,
@@ -1509,7 +1431,7 @@ async def get_business_analysis(
                 async_submit_actuals_to_datarobot(
                     association_id=association_id, telemetry_json=telemetry_send
                 )
-                )
+            )
         duration = (datetime.now() - start).total_seconds()
         # Ensure all response fields are present
         metadata = GetBusinessAnalysisMetadata(
@@ -1632,16 +1554,17 @@ async def run_analysis(
     request: RunAnalysisRequest,
     analyst_db: AnalystDB,
     token_tracker: TokenUsageTracker | None = None,
-    telemetry_json: dict[str, Any],
+    telemetry_json: dict[str, Any] | None = None,
 ) -> RunAnalysisResult:
     """Execute analysis workflow on datasets."""
     logger.debug("Entering run_analysis")
     log_memory()
     try:
         return await _run_analysis(
-            request, analyst_db=analyst_db,
+            request,
+            analyst_db=analyst_db,
             token_tracker=token_tracker,
-            telemetry_json=telemetry_json
+            telemetry_json=telemetry_json,
         )
     except MaxReflectionAttempts as e:
         return RunAnalysisResult(
@@ -1702,10 +1625,10 @@ async def _generate_database_analysis_code(
         df = (await analyst_db.get_dataset(table)).to_df()
         schema_str, table_str = table.split(".")
 
-        friendly_name = database.query_friendly_name(table)
+        # friendly_name = database.query_friendly_name(table)
 
         sample_str = (
-            f"Schema: {schema_str}, Table: {friendly_name_str}\n{df.head(10).to_string()}"
+            f"Schema: {schema_str}, Table: {table_str}\n{df.head(10).to_string()}"
         )
         all_samples.append(sample_str)
 
@@ -1749,9 +1672,9 @@ async def _generate_database_analysis_code(
             f"{_generate_database_analysis_code.__module__}.{_generate_database_analysis_code.__qualname__}.llm_call"
         ):
             (
-            completion,
-            completion_org,
-        ) = await client.chat.completions.create_with_completion(
+                completion,
+                completion_org,
+            ) = await client.chat.completions.create_with_completion(
                 response_model=DatabaseAnalysisCodeGeneration,
                 model=ALTERNATIVE_LLM_BIG,
                 temperature=0.1,
@@ -1899,13 +1822,17 @@ async def execute_business_analysis_and_charts(
         # Run both analyses concurrently
         result = await asyncio.gather(
             run_charts(chart_request, token_tracker, telemetry_json=telemetry_json),
-            get_business_analysis(business_request, token_tracker, telemetry_json=telemetry_json),
+            get_business_analysis(
+                business_request, token_tracker, telemetry_json=telemetry_json
+            ),
             return_exceptions=True,
         )
 
         return (result[0], result[1])
     elif enable_chart_generation:
-        charts_result = await run_charts(chart_request, token_tracker, telemetry_json=telemetry_json)
+        charts_result = await run_charts(
+            chart_request, token_tracker, telemetry_json=telemetry_json
+        )
         return charts_result, None
     else:
         business_result = await get_business_analysis(
@@ -1934,7 +1861,7 @@ async def run_complete_analysis(
         yield AnalysisGenerationError("Message not found")
 
         return
-   # Get enhanced message
+    # Get enhanced message
     if telemetry_json is not None:
         telemetry_json["chat_id"] = chat_id
         telemetry_json["chat_seq"] = len(chat_request.messages)
@@ -1945,9 +1872,10 @@ async def run_complete_analysis(
     try:
         token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
 
- 
         logger.info("Getting rephrased question...")
-        enhanced_message = await rephrase_message(chat_request, token_tracker, telemetry_json)
+        enhanced_message = await rephrase_message(
+            chat_request, token_tracker=token_tracker, telemetry_json=telemetry_json
+        )
         logger.info("Getting rephrased question done")
 
         yield enhanced_message
@@ -2209,8 +2137,7 @@ async def run_complete_analysis(
         await analyst_db.update_chat_message(
             message_id=assistant_message.id, message=assistant_message
         )
-
-            yield business_result
+        yield business_result
 
     except Exception as e:
         error_message = f"Error setting up additional analysis: {str(e)}"
@@ -2278,7 +2205,7 @@ async def process_data_and_update_state(
                 )
 
                 cleansed_dataset = await cleanse_dataframe(analysis_dataset)
-                await analyst_db.register_dataset(
+                reg_result = await analyst_db.register_dataset(
                     cleansed_dataset, data_source=InternalDataSourceType.GENERATED
                 )
                 if not reg_result["success"]:
