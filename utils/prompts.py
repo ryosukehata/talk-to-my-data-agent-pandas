@@ -38,9 +38,6 @@ Respond with a JSON object containing the following fields:
 1) columns: A list of all of the columns in the dataset
 2) descriptions: A list of descriptions for each column.
 
-LANGUAGE POLICY:
-Always respond in English for consistency and persistence. Do not translate.
-
 EXAMPLE OUTPUT:
 {
     columns: [a,taco,mpg],
