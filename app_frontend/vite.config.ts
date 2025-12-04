@@ -78,11 +78,5 @@ export default defineConfig({
     typecheck: {
       tsconfig: './tsconfig.test.json',
     },
-    pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
   },
 });
