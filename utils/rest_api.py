@@ -731,7 +731,7 @@ async def get_dataset_by_id(
         )
 
         if skip > 0 or limit > 0:
-            df = df.iloc[skip: skip+limit]
+            df = df.iloc[skip : skip + limit]
 
         metadata = await analyst_db.dataset_handler.get_dataset_metadata(dataset_id)
 
