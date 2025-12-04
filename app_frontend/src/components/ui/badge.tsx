@@ -25,8 +25,7 @@ const badgeVariants = cva(
 );
 
 interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof badgeVariants> {
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {
   testId?: string;
 }
 
