@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.19.1] - 2025-12-09
+
+### Added
+
+- Question Refiner feature: AI-powered question refinement to improve analysis quality.
+  - New RefinerButton component next to template selection.
+  - Backend API endpoint (`POST /api/v1/refiner`) for question refinement.
+  - Two feature flags: `VITE_ENABLE_QUESTION_REFINER` and `VITE_ENABLE_REFINER_AUTO_SEND`.
+  - i18n support for English and Japanese.
+- MSW test handlers for feature-flags, templates, and template categories endpoints.
+
+### Changed
+
+- Improved light mode theme consistency:
+  - Fixed text colors from cyan to proper foreground colors across components.
+  - Updated `SuggestedPrompt`, `HeaderSection`, `SuggestedQuestionsSection`, `AddDataModal`, and `Sidebar` components.
+  - Changed suggested prompt background to use `bg-muted` for better visual consistency.
+- Updated infrastructure to include all files under `utils/customize/` directory recursively.
+
+### Fixed
+
+- Added `node_modules/` to yamlfmt exclude list to prevent linting errors from third-party packages.
+
 ## [0.3.19] - 2025-11-11
 
 ### Added
