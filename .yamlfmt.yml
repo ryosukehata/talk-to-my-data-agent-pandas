@@ -7,3 +7,5 @@ formatter:
   max_line_length: 120
 exclude:
   - .datarobot/
+  - node_modules/
+  - "**/node_modules/"

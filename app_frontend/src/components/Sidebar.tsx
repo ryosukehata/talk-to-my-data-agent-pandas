@@ -117,7 +117,7 @@ export const Sidebar = () => {
             className="w-[130px] cursor-pointer mb-4"
             onClick={() => navigate(ROUTES.DATA)}
           />
-          <h1 className="text-xl font-bold text-primary-light">{t('Talk to my data')}</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('Talk to my data')}</h1>
           <p className="text-sm text-muted-foreground">
             {t(
               'Add the data you want to analyze, then ask DataRobot questions to generate insights.'
