@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from utils.customize.api_endpoints.question_refiner import refiner_router
 from utils.customize.custom_prompts import UserPrompts
 from utils.customize.database_helpers import (
     get_schemas_with_descriptions,
@@ -21,6 +22,9 @@ from utils.database_helpers import get_external_database
 
 # カスタマイズ用のルーター
 router = APIRouter()
+
+# Question Refinerのルーターを統合
+router.include_router(refiner_router)
 
 
 # =============================================================================

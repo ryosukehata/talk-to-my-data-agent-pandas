@@ -519,7 +519,7 @@ async def upload_files(
 
                     # Register dataset with the database
                     reg_result = await analyst_db.register_dataset(
-                        dataset, DataSourceType.FILE, file_size=file_size
+                        dataset, InternalDataSourceType.FILE, file_size=file_size
                     )
                     if not reg_result["success"]:
                         error_response: FileUploadResponse = {
@@ -554,7 +554,9 @@ async def upload_files(
                             dataset_name = f"{base_name}_{sheet_name}"
                             dataset = AnalystDataset(name=dataset_name, data=data)
                             reg_result = await analyst_db.register_dataset(
-                                dataset, DataSourceType.FILE, file_size=file_size
+                                dataset,
+                                InternalDataSourceType.FILE,
+                                file_size=file_size,
                             )
                             if not reg_result["success"]:
                                 error_response: FileUploadResponse = {
@@ -577,7 +579,7 @@ async def upload_files(
                         dataset_name = base_name
                         dataset = AnalystDataset(name=dataset_name, data=excel_dataset)
                         reg_result = await analyst_db.register_dataset(
-                            dataset, DataSourceType.FILE, file_size=file_size
+                            dataset, InternalDataSourceType.FILE, file_size=file_size
                         )
                         if not reg_result["success"]:
                             error_response: FileUploadResponse = {

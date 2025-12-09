@@ -18,7 +18,7 @@ export const SuggestedQuestionsSection: React.FC<SuggestedQuestionsSectionProps>
 
   return (
     <>
-      <div className="text-primary text-base font-semibold leading-tight">
+      <div className="text-foreground text-base font-semibold leading-tight">
         Suggested follow-up questions
       </div>
       <div className="mt-2 flex-col flex gap-2.5">

@@ -20,8 +20,10 @@ def get_feature_flags() -> Dict[str, Any]:
             "VITE_ENABLE_TEMPLATE_EDIT", default=False
         ),
         "customPromptsEnabled": _get_bool_env(
-            "VITE_ENABLE_CUSTOM_PROMPTS", default=True
+            "VITE_ENABLE_CUSTOM_PROMPTS", default=False
         ),
+        "refinerEnabled": _get_bool_env("VITE_ENABLE_QUESTION_REFINER", default=False),
+        "refinerAutoSend": _get_bool_env("VITE_ENABLE_REFINER_AUTO_SEND", default=True),
         # Add more feature flags here as needed
     }
     return feature_flags

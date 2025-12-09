@@ -173,7 +173,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
         {dataSource == DATA_SOURCES.FILE && (
           <>
             <div className="h-10 flex-col justify-start items-start inline-flex">
-              <div className="text-primary text-sm font-semibold leading-normal">
+              <div className="text-foreground text-sm font-semibold leading-normal">
                 {t('Local files')}
               </div>
               <div className="text-muted-foreground text-sm font-normal leading-normal">
