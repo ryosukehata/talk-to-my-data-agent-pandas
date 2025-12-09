@@ -75,6 +75,14 @@ export const UserPrompt = ({
     }, 100);
   };
 
+  const handleAutoSend = (message: string) => {
+    handleSend(message);
+    // Clear the input field after auto-send
+    if (promptInputRef.current) {
+      promptInputRef.current.value = '';
+    }
+  };
+
   // Update the input value when template is selected
   useEffect(() => {
     if (selectedTemplateText && promptInputRef.current) {
@@ -103,7 +111,7 @@ export const UserPrompt = ({
             inputRef={promptInputRef}
             dataSource={chatDataSource}
             onRefineComplete={handleRefineComplete}
-            onAutoSend={handleSend}
+            onAutoSend={handleAutoSend}
             disabled={isDataUploadRequired || hasInProgressMessages}
             testId="user-prompt-refiner-button"
           />

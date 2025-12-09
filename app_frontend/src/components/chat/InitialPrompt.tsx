@@ -64,6 +64,14 @@ export const InitialPrompt = ({
     }, 100);
   };
 
+  const handleAutoSend = (message: string) => {
+    handleSend(message);
+    // Clear the input field after auto-send
+    if (promptInputRef.current) {
+      promptInputRef.current.value = '';
+    }
+  };
+
   // Focus the input when template is selected
   useEffect(() => {
     if (selectedTemplateText && promptInputRef.current) {
@@ -105,7 +113,7 @@ export const InitialPrompt = ({
               inputRef={promptInputRef}
               dataSource={chatDataSource}
               onRefineComplete={handleRefineComplete}
-              onAutoSend={handleSend}
+              onAutoSend={handleAutoSend}
               disabled={isDisabled}
               testId="initial-refiner-button"
             />
