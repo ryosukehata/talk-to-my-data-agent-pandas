@@ -336,23 +336,20 @@ if os.environ.get("PROMPTS_TEMPLATE_PATH", None):
             f"Could not create dataset from {os.environ.get('DATASET_DESCRIPTION_PATH')}: {e}"
         )
 
-if os.environ.get("VITE_ENABLE_TEMPLATE_EDIT"):
-    app_runtime_parameters.append(
-        datarobot.ApplicationSourceRuntimeParameterValueArgs(
-            key="VITE_ENABLE_TEMPLATE_EDIT",
-            type="string",
-            value=os.environ.get("VITE_ENABLE_TEMPLATE_EDIT"),
+for env_var in [
+    "VITE_ENABLE_TEMPLATE_EDIT",
+    "VITE_ENABLE_CUSTOM_PROMPTS",
+    "VITE_ENABLE_QUESTION_REFINER",
+    "VITE_ENABLE_REFINER_AUTO_SEND",
+]:
+    if os.environ.get(env_var):
+        app_runtime_parameters.append(
+            datarobot.ApplicationSourceRuntimeParameterValueArgs(
+                key=env_var,
+                type="string",
+                value=os.environ.get(env_var),
+            )
         )
-    )
-
-if os.environ.get("VITE_ENABLE_CUSTOM_PROMPTS"):
-    app_runtime_parameters.append(
-        datarobot.ApplicationSourceRuntimeParameterValueArgs(
-            key="VITE_ENABLE_CUSTOM_PROMPTS",
-            type="string",
-            value=os.environ.get("VITE_ENABLE_CUSTOM_PROMPTS"),
-        )
-    )
 
 
 db_credential = get_database_credentials(DATABASE_CONNECTION_TYPE)
