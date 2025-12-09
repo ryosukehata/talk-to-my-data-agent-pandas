@@ -6,6 +6,7 @@ import { useTranslation } from '@/i18n';
 import { useAppState } from '@/state/hooks';
 import { DATA_SOURCES } from '@/constants/dataSources';
 import { TemplateButton } from '@/components/template';
+import { RefinerButton } from '@/components/refiner';
 import type { IChat } from '@/api/chat-messages/types';
 import type { PromptTemplate } from '@/api/templates/types';
 
@@ -55,6 +56,14 @@ export const InitialPrompt = ({
     setSelectedTemplateText('');
   };
 
+  const handleRefineComplete = (refinedMessage: string) => {
+    setSelectedTemplateText(refinedMessage);
+    // Focus the input after refining
+    setTimeout(() => {
+      promptInputRef.current?.focus();
+    }, 100);
+  };
+
   // Focus the input when template is selected
   useEffect(() => {
     if (selectedTemplateText && promptInputRef.current) {
@@ -82,7 +91,7 @@ export const InitialPrompt = ({
           </p>
 
           {/* Template selection area */}
-          <div className="w-full flex justify-center items-center mb-4">
+          <div className="w-full flex justify-center items-center gap-2 mb-4">
             <TemplateButton
               onSelectTemplate={handleTemplateSelect}
               onSendDirectly={handleSend}
@@ -91,6 +100,14 @@ export const InitialPrompt = ({
               size="sm"
               disabled={isDisabled}
               testId="initial-template-button"
+            />
+            <RefinerButton
+              inputRef={promptInputRef}
+              dataSource={chatDataSource}
+              onRefineComplete={handleRefineComplete}
+              onAutoSend={handleSend}
+              disabled={isDisabled}
+              testId="initial-refiner-button"
             />
           </div>
 
