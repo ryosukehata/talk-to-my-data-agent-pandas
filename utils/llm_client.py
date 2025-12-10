@@ -150,7 +150,7 @@ class AsyncLLMClient:
         self._openai_client = AsyncOpenAI(
             api_key=self._dr_client.token,
             base_url=self._deployment_base_url,
-            timeout=90,
+            timeout=180,
             max_retries=2,
         )
 
