@@ -15,6 +15,7 @@ from starlette.requests import Request
 
 from utils.analyst_db import AnalystDB
 from utils.customize.domain.report.domain import (
+    QuestionStatus,
     Report,
     ReportQuestionsGenerationRequest,
     ReportStatus,
@@ -23,12 +24,19 @@ from utils.customize.infrastructure.analyst_db.data_retriever import (
     RefinerDataInfoMessageFactory,
     get_datasets_names,
 )
+from utils.customize.infrastructure.analyst_db.section_data_retriever import (
+    AnalystDBSectionDataRetriever,
+)
 from utils.customize.infrastructure.chat.chat_executor import ChatExecutor
 from utils.customize.infrastructure.llm.report_questions_generator import (
     LLMReportQuestionsGenerationService,
 )
+from utils.customize.infrastructure.llm.report_summary_generator import (
+    LLMReportSummaryService,
+)
 from utils.customize.infrastructure.storage.report_storage import ReportStorage
 from utils.customize.infrastructure.word.word_generator import WordGenerator
+from utils.customize.usecase.prompt.builder import SummaryPromptBuilder
 from utils.customize.usecase.report import (
     DeleteReportUseCase,
     ExecuteQuestionsUseCase,
@@ -60,6 +68,9 @@ class ReportSummary(BaseModel):
     progress: tuple[int, int]  # (完了数, 全体数)
     created_at: str
     updated_at: str
+    word_file_path: str | None = None
+    summary: str | None = None
+    conclusion: str | None = None
 
 
 class ReportListResponse(BaseModel):
@@ -113,7 +124,6 @@ class DeleteResponse(BaseModel):
 
 def get_user_id(request: Request) -> str:
     """リクエストからユーザーIDを取得"""
-    # ヘッダーからユーザーIDを取得（実際の認証に応じて調整）
     user_id = request.headers.get("x-user-id") or request.headers.get("x-user-email")
     if not user_id:
         user_id = "anonymous"
@@ -135,6 +145,9 @@ def report_to_summary(report: Report) -> ReportSummary:
         progress=report.get_progress(),
         created_at=report.created_at.isoformat(),
         updated_at=report.updated_at.isoformat(),
+        word_file_path=report.word_file_path,
+        summary=report.summary,
+        conclusion=report.conclusion,
     )
 
 
@@ -153,7 +166,6 @@ async def list_reports(
     request: Request,
     analyst_db: AnalystDB = Depends(get_initialized_db),
 ) -> ReportListResponse:
-    """ユーザーのレポート一覧を取得"""
     user_id = get_user_id(request)
     repository = get_repository(request)
 
@@ -177,7 +189,6 @@ async def get_report(
     request: Request,
     analyst_db: AnalystDB = Depends(get_initialized_db),
 ) -> ReportDetailResponse:
-    """指定されたレポートの詳細を取得"""
     repository = get_repository(request)
 
     usecase = GetReportUseCase(repository)
@@ -368,7 +379,12 @@ async def generate_word(
     repository = get_repository(request)
     word_generator = WordGenerator()
 
-    # レポートの存在確認
+    section_data_retriever = AnalystDBSectionDataRetriever(analyst_db)
+    summary_service = LLMReportSummaryService()
+    summary_prompt_builder = SummaryPromptBuilder(
+        section_data_factory=section_data_retriever
+    )
+
     report = await repository.get(report_id)
     if report is None:
         raise HTTPException(
@@ -383,10 +399,15 @@ async def generate_word(
             detail="Not all questions are completed. Execute questions first.",
         )
 
-    # バックグラウンドで実行
     async def generate_in_background() -> None:
-        usecase = GenerateWordUseCase(repository, word_generator)
-        await usecase.run(report_id, analyst_db, author=user_id)
+        usecase = GenerateWordUseCase(
+            repository=repository,
+            word_generator=word_generator,
+            section_data_retriever=section_data_retriever,
+            summary_service=summary_service,
+            summary_prompt_builder=summary_prompt_builder,
+        )
+        await usecase.run(report_id, author=user_id)
 
     background_tasks.add_task(generate_in_background)
 
@@ -407,10 +428,8 @@ async def download_word(
     request: Request,
     analyst_db: AnalystDB = Depends(get_initialized_db),
 ) -> FileResponse:
-    """生成されたWord文書をダウンロード"""
     repository = get_repository(request)
 
-    # レポートの存在確認
     report = await repository.get(report_id)
     if report is None:
         raise HTTPException(
@@ -424,7 +443,6 @@ async def download_word(
             detail="Word document is not ready. Generate it first.",
         )
 
-    # ファイルを取得
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_file:
         local_path = tmp_file.name
 
@@ -436,9 +454,9 @@ async def download_word(
         )
 
     return FileResponse(
-        path=local_path,
+        local_path,
+        filename=f"report_{report_id}.docx",
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        filename=f"{report.title}.docx",
     )
 
 
