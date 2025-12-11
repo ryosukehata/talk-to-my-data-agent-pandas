@@ -84,6 +84,8 @@ class GenerateWordUseCase:
                         heading=heading,
                         question=question.refined_question,
                         content="",
+                        answer=question.answer,
+                        bottom_line=question.bottom_line,
                         chart_paths=[],
                     )
 
@@ -93,7 +95,7 @@ class GenerateWordUseCase:
                     ReportSectionContent(
                         heading=section_data.heading,
                         question=section_data.question,
-                        content=section_data.content,
+                        content=self._build_section_content(section_data),
                         chart_paths=section_data.chart_paths,
                     )
                 )
@@ -137,6 +139,13 @@ class GenerateWordUseCase:
             report.error_message = str(e)
             await self._repository.save(report)
             raise
+        finally:
+            if self._section_data_retriever:
+                cleanup = getattr(
+                    self._section_data_retriever, "cleanup_generated_charts", None
+                )
+                if callable(cleanup):
+                    cleanup()
 
         return report
 
@@ -158,3 +167,15 @@ class GenerateWordUseCase:
             "各分析結果は、データに基づいた客観的な知見を提供しています。"
             "これらの結果を踏まえ、今後の意思決定や戦略立案にお役立てください。"
         )
+
+    def _build_section_content(self, section: ReportSectionData) -> str:
+        lines: list[str] = []
+        if section.content:
+            lines.append(section.content)
+        if section.answer:
+            lines.extend(["", "【回答】", section.answer])
+        if section.bottom_line:
+            lines.extend(["", "【ボトムライン】", section.bottom_line])
+        if section.conversation:
+            lines.extend(["", "【会話ログ】", *section.conversation])
+        return "\n".join(lines) if lines else "(結果が記録されていません)"

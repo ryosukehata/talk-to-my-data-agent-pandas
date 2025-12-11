@@ -50,6 +50,7 @@ export interface ReportSummary {
   progress: number;
   created_at: string;
   updated_at: string;
+  word_file_path?: string | null;
 }
 
 /**

@@ -65,7 +65,7 @@ class ReportSummary(BaseModel):
     report_id: str
     title: str
     status: ReportStatus
-    progress: tuple[int, int]  # (完了数, 全体数)
+    progress: float
     created_at: str
     updated_at: str
     word_file_path: str | None = None
@@ -138,11 +138,28 @@ def get_repository(request: Request) -> ReportStorage:
 
 def report_to_summary(report: Report) -> ReportSummary:
     """ReportをReportSummaryに変換"""
+
+    total_questions = len(report.questions)
+    if total_questions > 0:
+        refined_count = sum(
+            1
+            for q in report.questions
+            if q.refined_question and q.refined_question != q.original_direction
+        )
+        executed_count = sum(
+            1 for q in report.questions if q.status == QuestionStatus.COMPLETED
+        )
+        progress_value = 0.5 * (refined_count / total_questions) + 0.5 * (
+            executed_count / total_questions
+        )
+    else:
+        progress_value = 0.0
+
     return ReportSummary(
         report_id=report.report_id,
         title=report.title,
         status=report.status,
-        progress=report.get_progress(),
+        progress=progress_value,
         created_at=report.created_at.isoformat(),
         updated_at=report.updated_at.isoformat(),
         word_file_path=report.word_file_path,
@@ -344,6 +361,7 @@ async def execute_questions(
     """レポートの質問を実行（バックグラウンド）"""
     repository = get_repository(request)
     chat_executor = ChatExecutor()
+    user_id = get_user_id(request)
 
     # レポートの存在確認
     report = await repository.get(report_id)
@@ -356,7 +374,19 @@ async def execute_questions(
     # バックグラウンドで実行
     async def execute_in_background() -> None:
         usecase = ExecuteQuestionsUseCase(repository, chat_executor)
-        await usecase.run(report_id, analyst_db, request)
+        updated_report = await usecase.run(report_id, analyst_db, request)
+
+        if updated_report.is_all_questions_completed():
+            logger.info(
+                "Auto-generating Word document for report %s after question execution",
+                report_id,
+            )
+            await _run_word_generation(
+                report_id=report_id,
+                repository=repository,
+                analyst_db=analyst_db,
+                author=user_id,
+            )
 
     background_tasks.add_task(execute_in_background)
 
@@ -382,14 +412,6 @@ async def generate_word(
     """レポートのWord文書を生成"""
     user_id = get_user_id(request)
     repository = get_repository(request)
-    word_generator = WordGenerator()
-
-    section_data_retriever = AnalystDBSectionDataRetriever(analyst_db)
-    summary_service = LLMReportSummaryService()
-    summary_prompt_builder = SummaryPromptBuilder(
-        section_data_factory=section_data_retriever
-    )
-
     report = await repository.get(report_id)
     if report is None:
         raise HTTPException(
@@ -405,14 +427,12 @@ async def generate_word(
         )
 
     async def generate_in_background() -> None:
-        usecase = GenerateWordUseCase(
+        await _run_word_generation(
+            report_id=report_id,
             repository=repository,
-            word_generator=word_generator,
-            section_data_retriever=section_data_retriever,
-            summary_service=summary_service,
-            summary_prompt_builder=summary_prompt_builder,
+            analyst_db=analyst_db,
+            author=user_id,
         )
-        await usecase.run(report_id, author=user_id)
 
     background_tasks.add_task(generate_in_background)
 
@@ -422,6 +442,34 @@ async def generate_word(
         word_file_path=None,
         message="Word generation started in background",
     )
+
+
+async def _run_word_generation(
+    *,
+    report_id: str,
+    repository: ReportStorage,
+    analyst_db: AnalystDB,
+    author: str | None,
+) -> None:
+    word_generator = WordGenerator()
+    section_data_retriever = AnalystDBSectionDataRetriever(analyst_db)
+    summary_service = LLMReportSummaryService()
+    summary_prompt_builder = SummaryPromptBuilder(
+        section_data_factory=section_data_retriever
+    )
+
+    usecase = GenerateWordUseCase(
+        repository=repository,
+        word_generator=word_generator,
+        section_data_retriever=section_data_retriever,
+        summary_service=summary_service,
+        summary_prompt_builder=summary_prompt_builder,
+    )
+
+    try:
+        await usecase.run(report_id, author=author)
+    finally:
+        section_data_retriever.cleanup_generated_charts()
 
 
 @report_router.get(

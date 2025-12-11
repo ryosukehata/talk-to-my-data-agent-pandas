@@ -304,6 +304,8 @@
 - Plotlyグラフを画像化（PNG形式）
 - サイズ: 幅600px、高さ400px（統一）
 - Word内での配置: 中央揃え
+- RunChartsResult の `fig1` / `fig2` から一時PNGを生成し、セクションごとに埋め込む
+- Word生成完了後は生成した一時ファイルを即座に削除し、ストレージを汚さない
 
 ### 4.3 サマリー・結論生成
 
@@ -610,6 +612,11 @@ for generated_question in generated_questions:
 - `StatusBadge` で `ready` ケースが重複し、TypeScript警告が出ていた箇所を修正
 - `index.html` で `_dr_env.js` をESMとして解決できずビルドが停止していたため、実行時フェッチ+挿入方式に変更
 - `PATCH /reports/{report_id}/questions/{question_id}` が `status` を受け取れず422となっていたため、バックエンドで `status` の任意更新を許可（`status` 未指定で `refined_question` だけ送った場合は READY へ自動遷移）
+- 質問実行が全て完了した際に `GenerateWordUseCase` を自動起動し、レポートWord生成までバックエンドで完結するように変更
+- フロント詳細画面に「Download Word」ボタンを追加し、生成済みドキュメントをUIから直接取得できるようにした
+- 一覧ページの各レポートカードにも「Download Word」ボタンを設置し、完了済みレポートをトップから即ダウンロードできる導線を追加
+- レポート進捗（一覧・詳細とも）を「洗練（50%）＋チャット実行（50%）」の合算で表示するよう更新（未データ時のNaN回避）
+- Word生成時に各質問の回答テキスト／会話ログを取得・格納し、ドキュメントに回答・会話要約・bottom_lineが出力されるように拡張
 
 ### 既知の課題（Known Issues）
 

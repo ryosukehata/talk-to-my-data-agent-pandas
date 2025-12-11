@@ -179,16 +179,24 @@ class ExecuteQuestionsUseCase:
                 request=request,
             )
 
-            if result.success:
+            if result.success and result.message:
                 question.status = QuestionStatus.COMPLETED
                 # ChatExecutorから返されたchat_idとメッセージIDを使用
                 question.chat_id = result.chat_id
-                question.message_id = result.message.id if result.message else None
+                question.message_id = result.message.id
+                question.answer = result.message.content
+                if result.message.components:
+                    bottom_line_component = next(
+                        (component for component in result.message.components if getattr(component, "bottom_line", None)),
+                        None,
+                    )
+                    if bottom_line_component:
+                        question.bottom_line = getattr(bottom_line_component, "bottom_line", None)
                 question.executed_at = datetime.now()
                 logger.info(f"Question completed: {question_id}")
             else:
                 question.status = QuestionStatus.ERROR
-                question.error_message = result.error_message
+                question.error_message = result.error_message or "Chat execution failed"
                 logger.error(f"Question failed: {question_id} - {result.error_message}")
 
         except Exception as e:

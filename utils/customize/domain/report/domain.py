@@ -58,6 +58,8 @@ class ReportQuestion(BaseModel):
     message_id: str | None = Field(default=None, description="実行時のメッセージID")
     error_message: str | None = Field(default=None, description="エラーメッセージ")
     executed_at: datetime | None = Field(default=None, description="実行完了日時")
+    answer: str | None = Field(default=None, description="チャットの回答本文")
+    bottom_line: str | None = Field(default=None, description="ビジネス向けサマリー")
 
 
 class ReportSection(BaseModel):

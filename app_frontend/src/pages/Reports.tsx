@@ -5,7 +5,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n';
-import { useReports, useReport, useCreateReport, useExecuteQuestions, useDeleteReport, useUpdateQuestion, useUpdateQuestionStatus } from '@/api/reports';
+import { useReports, useReport, useCreateReport, useExecuteQuestions, useDeleteReport, useUpdateQuestion, useUpdateQuestionStatus, useDownloadWord } from '@/api/reports';
 import { ReportStatus, QuestionStatus, Report } from '@/api/reports/types';
 import { refineQuestions } from '@/api/refiner';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import { faClock } from '@fortawesome/free-solid-svg-icons/faClock';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons/faArrowLeft';
 import { faMagicWandSparkles } from '@fortawesome/free-solid-svg-icons/faMagicWandSparkles';
 import { faCheckCircle } from '@fortawesome/free-solid-svg-icons/faCheckCircle';
+import { faDownload } from '@fortawesome/free-solid-svg-icons/faDownload';
 import loader from '@/assets/loader.svg';
 import { useAppState } from '@/state/hooks';
 
@@ -92,7 +93,7 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
       createReport({
         theme: theme.trim(),
         data_source: dataSource,
-        num_questions: 5,
+        num_questions: 1, /** 後で直す */
       });
     }
   };
@@ -179,6 +180,7 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
   });
   const { mutateAsync: updateQuestion } = useUpdateQuestion();
   const { mutateAsync: updateQuestionStatus } = useUpdateQuestionStatus();
+  const { mutate: downloadWord, isPending: isDownloadingWord } = useDownloadWord();
 
   // Refine a single question
   const refineQuestion = useCallback(async (questionId: string, direction: string) => {
@@ -328,6 +330,20 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
               {t('Execute Questions')}
             </Button>
           )}
+          {report.status === 'done' && report.word_file_path && (
+            <Button
+              variant="outline"
+              onClick={() => downloadWord(reportId)}
+              disabled={isDownloadingWord}
+            >
+              {isDownloadingWord ? (
+                <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+              ) : (
+                <FontAwesomeIcon icon={faDownload} className="mr-2" />
+              )}
+              {t('Download Word')}
+            </Button>
+          )}
           <Button
             variant="destructive"
             size="icon"
@@ -455,6 +471,7 @@ const ReportList = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, isLoading } = useReports();
+  const { mutate: downloadWord, isPending: isDownloadingWord } = useDownloadWord();
 
   if (isLoading) {
     return (
@@ -477,25 +494,40 @@ const ReportList = () => {
       <h2 className="text-xl font-semibold">{t('Your Reports')}</h2>
       <div className="grid gap-4">
         {data.reports.map((report) => (
-          <Card
-            key={report.report_id}
-            className="cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={() => navigate(`/reports/${report.report_id}`)}
-          >
+          <Card key={report.report_id} className="transition-colors">
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-4">
+                <button
+                  type="button"
+                  className="text-left flex-1"
+                  onClick={() => navigate(`/reports/${report.report_id}`)}
+                >
                   <h3 className="font-medium">{report.title}</h3>
                   <p className="text-sm text-muted-foreground">
                     {new Date(report.created_at).toLocaleDateString()}
                   </p>
-                </div>
+                </button>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">{t('Progress')}</p>
                     <p className="font-medium">{Math.round(report.progress * 100)}%</p>
                   </div>
                   <StatusBadge status={report.status} />
+                  {report.status === 'done' && report.word_file_path && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadWord(report.report_id)}
+                      disabled={isDownloadingWord}
+                    >
+                      {isDownloadingWord ? (
+                        <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                      ) : (
+                        <FontAwesomeIcon icon={faDownload} className="mr-2" />
+                      )}
+                      {t('Download Word')}
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>

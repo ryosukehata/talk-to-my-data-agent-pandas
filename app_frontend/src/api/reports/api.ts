@@ -88,6 +88,32 @@ export const generateWord = async (
   return response.data;
 };
 
+export const getReportSummary = async (
+  reportId: string
+): Promise<ReportDetailResponse> => {
+  const response = await apiClient.get(`/v1/reports/${reportId}`);
+  return response.data;
+};
+
+export const downloadWord = async (reportId: string): Promise<void> => {
+  const response = await apiClient.get(`/v1/reports/${reportId}/download`, {
+    responseType: 'blob',
+  });
+
+  if (response.status !== 200) {
+    throw new Error('Failed to download Word document');
+  }
+
+  const url = window.URL.createObjectURL(response.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `report_${reportId}.docx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
 /**
  * Delete a report
  */

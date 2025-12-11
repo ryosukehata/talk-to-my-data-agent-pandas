@@ -12,6 +12,7 @@ import {
   executeQuestions,
   generateWord,
   deleteReport,
+  downloadWord,
 } from './api';
 import {
   CreateReportRequest,
@@ -133,6 +134,15 @@ export const useGenerateWord = (
     onSuccess: (_, reportId) => {
       queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, reportId] });
     },
+    ...options,
+  });
+};
+
+export const useDownloadWord = (
+  options?: UseMutationOptions<void, Error, string>
+) => {
+  return useMutation<void, Error, string>({
+    mutationFn: downloadWord,
     ...options,
   });
 };

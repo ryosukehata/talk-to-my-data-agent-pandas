@@ -20,6 +20,9 @@ class ReportSectionData:
     heading: str
     question: str
     content: str
+    answer: str | None = None
+    bottom_line: str | None = None
+    conversation: list[str] = field(default_factory=list)
     chart_paths: list[str] = field(default_factory=list)
 
 

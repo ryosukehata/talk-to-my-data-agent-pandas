@@ -70,6 +70,7 @@
   "Clear": "クリア",
   "Are you sure you want to clear all datasets?": "すべてのデータセットをクリアしてもよろしいですか？",
   "Download dictionary as CSV": "辞書をCSVとしてダウンロード",
+  "Download Word": "Wordをダウンロード",
   "Delete dictionary": "辞書を削除",
   "Are you sure you want to delete this dictionary?": "この辞書を削除してもよろしいですか？",
   "Loading...": "ロード中…",
