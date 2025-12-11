@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
+
+# OpenTelemetryのエクスポートを無効化（テスト用）
+os.environ["OTEL_SDK_DISABLED"] = "true"
 
 from utils.customize.domain.report.domain import (
     QuestionStatus,
@@ -54,7 +61,9 @@ class InMemoryReportRepository(IReportRepository):
         self.saved_files[report_id] = key
         return key
 
-    async def get_word_file(self, report_id: str, local_path: str) -> bool:  # pragma: no cover
+    async def get_word_file(
+        self, report_id: str, local_path: str
+    ) -> bool:  # pragma: no cover
         return False
 
 
@@ -189,9 +198,7 @@ async def test_usecase_with_llm() -> None:
     )
     summary_service = DummySummaryService(summary_result)
 
-    factory_messages = [
-        {"role": "system", "content": "dummy message"}
-    ]
+    factory_messages = [{"role": "system", "content": "dummy message"}]
     summary_factory = DummySummaryFactory(factory_messages)
     prompt_builder = SummaryPromptBuilder(summary_factory)
     word_generator = DummyWordGenerator()
