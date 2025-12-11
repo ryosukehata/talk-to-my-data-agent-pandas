@@ -14,10 +14,6 @@ import {
   UpdateQuestionResponse,
   QuestionStatus,
 } from './types';
-  GenerateWordResponse,
-  UpdateQuestionRequest,
-  UpdateQuestionResponse,
-} from './types';
 
 /**
  * List all reports for the current user

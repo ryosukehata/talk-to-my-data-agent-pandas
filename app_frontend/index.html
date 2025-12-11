@@ -2,7 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <script src="./_dr_env.js" type="text/javascript"></script>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        fetch('./_dr_env.js')
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to load environment');
+            }
+            return response.text();
+          })
+          .then(envScript => {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.text = envScript;
+            document.head.appendChild(script);
+          })
+          .catch(error => {
+            console.error(error);
+          });
+      });
+    </script>
     <link rel="icon" type="image/png" href="/datarobot_favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Talk to My Data</title>

@@ -49,8 +49,6 @@ const StatusBadge = ({ status }: { status: ReportStatus | QuestionStatus }) => {
         return { variant: 'destructive' as const, icon: faExclamationTriangle, label: t('Error') };
       case 'ready':
         return { variant: 'secondary' as const, icon: faCheckCircle, label: t('Ready') };
-      case 'ready':
-        return { variant: 'secondary' as const, icon: faCheckCircle, label: t('Ready') };
       case 'pending':
       default:
         return { variant: 'outline' as const, icon: faClock, label: t('Pending') };
@@ -247,10 +245,10 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
   }, [refineQuestion, executeQuestions, reportId]);
 
   // Auto-refine: automatically start refining when there are unrefined questions
-  const autoRefineStarted = useRef(false);
+  const autoRefineStarted = useRef<string | null>(null);
   useEffect(() => {
     if (!data?.report) return;
-    if (autoRefineStarted.current) return;
+    if (autoRefineStarted.current === reportId) return;
     if (refiningQuestionIds.size > 0) return; // Already refining
     
     const report = data.report;
@@ -259,7 +257,7 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
     );
     
     if (unrefinedQuestions.length > 0 && (['pending', 'refining'].includes(report.status) || report.status === 'refining')) {
-      autoRefineStarted.current = true;
+      autoRefineStarted.current = reportId;
       // Auto-execute after refinement completes
       refineAllQuestions(report, true);
     }

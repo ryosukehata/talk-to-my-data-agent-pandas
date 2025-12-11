@@ -115,3 +115,4 @@ usecase = GenerateWordUseCase(
 3. フロントではサマリー／結論をヘッダー表示（英語文言）。
 4. `ReportSummary` に `summary`／`conclusion`／`word_file_path` を追加。
 5. FastAPI に `/reports` 系ルートを `index.html` にフォールバックする設定を追加。
+6. 2025-12-11: バックエンド側モジュール (`service_interface.py`, `section_data_retriever.py`, `report_summary_generator.py`, `generate_word.py`, `chat_executor.py`) と本ドキュメント／動作確認スクリプトを再生成。

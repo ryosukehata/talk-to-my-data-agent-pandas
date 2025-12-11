@@ -8,6 +8,7 @@ import {
   getReport,
   createReport,
   updateQuestion,
+  updateQuestionStatus,
   executeQuestions,
   generateWord,
   deleteReport,
@@ -22,7 +23,8 @@ import {
   ReportSummary,
   UpdateQuestionRequest,
   UpdateQuestionResponse,
-  QuestionStatus, from './types';
+  QuestionStatus,
+} from './types';
 
 export const REPORTS_QUERY_KEY = ['reports'];
 

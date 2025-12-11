@@ -206,7 +206,8 @@ async def get_report(
 class UpdateQuestionRequest(BaseModel):
     """質問更新リクエスト"""
 
-    refined_question: str
+    refined_question: str | None = None
+    status: QuestionStatus | None = None
 
 
 class UpdateQuestionResponse(BaseModel):
@@ -245,8 +246,12 @@ async def update_question(
     question_found = False
     for question in report.questions:
         if question.question_id == question_id:
-            question.refined_question = update_request.refined_question
-            question.status = QuestionStatus.REFINING
+            if update_request.refined_question is not None:
+                question.refined_question = update_request.refined_question
+                if update_request.status is None:
+                    question.status = QuestionStatus.READY
+            if update_request.status is not None:
+                question.status = update_request.status
             question_found = True
             break
 

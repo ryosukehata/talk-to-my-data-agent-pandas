@@ -105,7 +105,8 @@ export interface ReportDetailResponse {
  * Request to update a question
  */
 export interface UpdateQuestionRequest {
-  refined_question: string;
+  refined_question?: string;
+  status?: QuestionStatus;
   refine_status?: QuestionStatus;
 }
 

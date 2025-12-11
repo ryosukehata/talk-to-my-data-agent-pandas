@@ -605,6 +605,12 @@ for generated_question in generated_questions:
   - [x] `src/components/ui/card.tsx` - Cardコンポーネント追加
 - [ ] i18n対応（英語・日本語）- 部分対応（`t()`使用）
 
+#### 2025-02-XX フロントエンド不具合修正
+- `useUpdateQuestionStatus()` で `updateQuestionStatus` API を取り込み忘れていたためビルドが失敗していた問題を解消
+- `StatusBadge` で `ready` ケースが重複し、TypeScript警告が出ていた箇所を修正
+- `index.html` で `_dr_env.js` をESMとして解決できずビルドが停止していたため、実行時フェッチ+挿入方式に変更
+- `PATCH /reports/{report_id}/questions/{question_id}` が `status` を受け取れず422となっていたため、バックエンドで `status` の任意更新を許可（`status` 未指定で `refined_question` だけ送った場合は READY へ自動遷移）
+
 ### 既知の課題（Known Issues）
 
 - [ ] **Refine完了時の一時的な状態表示のちらつき**
