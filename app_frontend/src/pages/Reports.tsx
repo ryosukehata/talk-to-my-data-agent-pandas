@@ -5,7 +5,16 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/i18n';
-import { useReports, useReport, useCreateReport, useExecuteQuestions, useDeleteReport, useUpdateQuestion, useUpdateQuestionStatus, useDownloadWord } from '@/api/reports';
+import {
+  useReports,
+  useReport,
+  useCreateReport,
+  useExecuteQuestions,
+  useDeleteReport,
+  useUpdateQuestion,
+  useUpdateQuestionStatus,
+  useDownloadWord,
+} from '@/api/reports';
 import { ReportStatus, QuestionStatus, Report } from '@/api/reports/types';
 import { refineQuestions } from '@/api/refiner';
 import { Button } from '@/components/ui/button';
@@ -33,7 +42,7 @@ import { useAppState } from '@/state/hooks';
 // Status badge component
 const StatusBadge = ({ status }: { status: ReportStatus | QuestionStatus }) => {
   const { t } = useTranslation();
-  
+
   const getStatusConfig = () => {
     switch (status) {
       case 'completed':
@@ -60,9 +69,13 @@ const StatusBadge = ({ status }: { status: ReportStatus | QuestionStatus }) => {
 
   return (
     <Badge variant={config.variant} className="gap-1">
-      <FontAwesomeIcon 
-        icon={config.icon} 
-        className={['refining', 'chat_processing', 'running', 'generating_word'].includes(status as string) ? 'animate-spin' : ''} 
+      <FontAwesomeIcon
+        icon={config.icon}
+        className={
+          ['refining', 'chat_processing', 'running', 'generating_word'].includes(status as string)
+            ? 'animate-spin'
+            : ''
+        }
       />
       {config.label}
     </Badge>
@@ -76,7 +89,7 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
   const [theme, setTheme] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const { mutate: createReport } = useCreateReport({
-    onSuccess: (data) => {
+    onSuccess: data => {
       setTheme('');
       setIsCreating(false);
       onSuccess(data.report_id);
@@ -93,7 +106,7 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
       createReport({
         theme: theme.trim(),
         data_source: dataSource,
-        num_questions: 1, /** 後で直す */
+        num_questions: 3 /** 後で直す */,
       });
     }
   };
@@ -110,9 +123,7 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
               <p className="text-sm text-muted-foreground mt-2">
                 {t('AI is analyzing your data and creating analysis questions.')}
               </p>
-              <p className="text-sm text-muted-foreground">
-                {t('This may take a few seconds.')}
-              </p>
+              <p className="text-sm text-muted-foreground">{t('This may take a few seconds.')}</p>
             </div>
           </div>
         </CardContent>
@@ -136,7 +147,7 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
               id="theme"
               placeholder={t('e.g., Analyze sales trends and predict next month')}
               value={theme}
-              onChange={(e) => setTheme(e.target.value)}
+              onChange={e => setTheme(e.target.value)}
               disabled={isCreating}
             />
           </div>
@@ -157,14 +168,14 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
   const { dataSource } = useAppState();
   const [refiningQuestionIds, setRefiningQuestionIds] = useState<Set<string>>(new Set());
   const { data, isLoading, refetch } = useReport(reportId, {
-    refetchInterval: (query) => {
+    refetchInterval: query => {
       // Auto-refetch while processing
       const report = query.state.data?.report;
       if (!report) return false;
-      
+
       // Check if processing
       if (report.status === 'chat_processing') return 3000;
-      
+
       return false;
     },
   });
@@ -183,68 +194,76 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
   const { mutate: downloadWord, isPending: isDownloadingWord } = useDownloadWord();
 
   // Refine a single question
-  const refineQuestion = useCallback(async (questionId: string, direction: string) => {
-    setRefiningQuestionIds(prev => new Set(prev).add(questionId));
-    await updateQuestionStatus({ reportId, questionId, status: 'refining' });
-    try {
-      const result = await refineQuestions({
-        user_direction: direction,
-        data_source: dataSource,
-      });
-      
-      if (result.success && result.refined_questions.length > 0) {
-        await updateQuestion({
-          reportId,
-          questionId,
-          request: { refined_question: result.refined_questions[0].refined_question },
+  const refineQuestion = useCallback(
+    async (questionId: string, direction: string) => {
+      setRefiningQuestionIds(prev => new Set(prev).add(questionId));
+      await updateQuestionStatus({ reportId, questionId, status: 'refining' });
+      try {
+        const result = await refineQuestions({
+          user_direction: direction,
+          data_source: dataSource,
         });
-        await updateQuestionStatus({ reportId, questionId, status: 'ready' });
-        refetch();
+
+        if (result.success && result.refined_questions.length > 0) {
+          await updateQuestion({
+            reportId,
+            questionId,
+            request: { refined_question: result.refined_questions[0].refined_question },
+          });
+          await updateQuestionStatus({ reportId, questionId, status: 'ready' });
+          refetch();
+        }
+      } catch (error) {
+        console.error('Failed to refine question:', error);
+      } finally {
+        setRefiningQuestionIds(prev => {
+          const next = new Set(prev);
+          next.delete(questionId);
+          return next;
+        });
       }
-    } catch (error) {
-      console.error('Failed to refine question:', error);
-    } finally {
-      setRefiningQuestionIds(prev => {
-        const next = new Set(prev);
-        next.delete(questionId);
-        return next;
-      });
-    }
-  }, [dataSource, reportId, updateQuestion, refetch]);
+    },
+    [dataSource, reportId, updateQuestion, refetch]
+  );
 
   // Refine all unrefined questions sequentially to avoid rate limiting, then auto-execute
-  const refineAllQuestions = useCallback(async (report: Report, autoExecuteAfter: boolean = false) => {
-    const unrefinedQuestions = report.questions.filter(
-      q => !q.refined_question || q.refined_question === q.original_direction
-    );
-    
-    console.log(`🔄 Starting refine for ${unrefinedQuestions.length} questions, autoExecuteAfter=${autoExecuteAfter}`);
-    
-    // Run refinements sequentially to avoid overwhelming the LLM API
-    // (Parallel requests can cause rate limiting or timeout issues)
-    for (const question of unrefinedQuestions) {
-      try {
-        console.log(`🔄 Refining question ${question.question_id}...`);
-        await refineQuestion(question.question_id, question.original_direction);
-        console.log(`✅ Refined question ${question.question_id}`);
-      } catch (error) {
-        console.error(`❌ Failed to refine question ${question.question_id}:`, error);
-        // Continue with next question even if one fails
+  const refineAllQuestions = useCallback(
+    async (report: Report, autoExecuteAfter: boolean = false) => {
+      const unrefinedQuestions = report.questions.filter(
+        q => !q.refined_question || q.refined_question === q.original_direction
+      );
+
+      console.log(
+        `🔄 Starting refine for ${unrefinedQuestions.length} questions, autoExecuteAfter=${autoExecuteAfter}`
+      );
+
+      // Run refinements sequentially to avoid overwhelming the LLM API
+      // (Parallel requests can cause rate limiting or timeout issues)
+      for (const question of unrefinedQuestions) {
+        try {
+          console.log(`🔄 Refining question ${question.question_id}...`);
+          await refineQuestion(question.question_id, question.original_direction);
+          console.log(`✅ Refined question ${question.question_id}`);
+        } catch (error) {
+          console.error(`❌ Failed to refine question ${question.question_id}:`, error);
+          // Continue with next question even if one fails
+        }
       }
-    }
-    
-    console.log(`🏁 All refinements complete`);
-    
-    // After all refinements complete, auto-execute if requested
-    if (autoExecuteAfter) {
-      console.log(`🚀 Auto-executing questions for report ${reportId}`);
-      // Small delay to ensure state is updated
-      setTimeout(() => {
-        console.log(`🚀 Calling executeQuestions(${reportId})`);
-        executeQuestions(reportId);
-      }, 1000);
-    }
-  }, [refineQuestion, executeQuestions, reportId]);
+
+      console.log(`🏁 All refinements complete`);
+
+      // After all refinements complete, auto-execute if requested
+      if (autoExecuteAfter) {
+        console.log(`🚀 Auto-executing questions for report ${reportId}`);
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          console.log(`🚀 Calling executeQuestions(${reportId})`);
+          executeQuestions(reportId);
+        }, 1000);
+      }
+    },
+    [refineQuestion, executeQuestions, reportId]
+  );
 
   // Auto-refine: automatically start refining when there are unrefined questions
   const autoRefineStarted = useRef<string | null>(null);
@@ -252,13 +271,16 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
     if (!data?.report) return;
     if (autoRefineStarted.current === reportId) return;
     if (refiningQuestionIds.size > 0) return; // Already refining
-    
+
     const report = data.report;
     const unrefinedQuestions = report.questions.filter(
       q => !q.refined_question || q.refined_question === q.original_direction
     );
-    
-    if (unrefinedQuestions.length > 0 && (['pending', 'refining'].includes(report.status) || report.status === 'refining')) {
+
+    if (
+      unrefinedQuestions.length > 0 &&
+      (['pending', 'refining'].includes(report.status) || report.status === 'refining')
+    ) {
       autoRefineStarted.current = reportId;
       // Auto-execute after refinement completes
       refineAllQuestions(report, true);
@@ -274,21 +296,22 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
   }
 
   if (!data?.report) {
-    return (
-      <div className="text-center text-muted-foreground">
-        {t('Report not found')}
-      </div>
-    );
+    return <div className="text-center text-muted-foreground">{t('Report not found')}</div>;
   }
 
   const report = data.report;
   const hasUnrefinedQuestions = report.questions.some(
     q => !q.refined_question || q.refined_question === q.original_direction
   );
-  const canExecute = (['pending', 'refining'].includes(report.status) || report.status === 'refining') && report.questions.length > 0 && !hasUnrefinedQuestions;
-  const progress = report.questions.length > 0
-    ? (report.questions.filter(q => q.status === 'completed').length / report.questions.length) * 100
-    : 0;
+  const canExecute =
+    (['pending', 'refining'].includes(report.status) || report.status === 'refining') &&
+    report.questions.length > 0 &&
+    !hasUnrefinedQuestions;
+  const progress =
+    report.questions.length > 0
+      ? (report.questions.filter(q => q.status === 'completed').length / report.questions.length) *
+        100
+      : 0;
 
   return (
     <div className="space-y-6">
@@ -306,20 +329,21 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={report.status} />
-          {hasUnrefinedQuestions && (['pending', 'refining'].includes(report.status) || report.status === 'refining') && (
-            <Button 
-              variant="secondary"
-              onClick={() => refineAllQuestions(report, true)} 
-              disabled={refiningQuestionIds.size > 0}
-            >
-              {refiningQuestionIds.size > 0 ? (
-                <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
-              ) : (
-                <FontAwesomeIcon icon={faMagicWandSparkles} className="mr-2" />
-              )}
-              {t('Refine All')}
-            </Button>
-          )}
+          {hasUnrefinedQuestions &&
+            (['pending', 'refining'].includes(report.status) || report.status === 'refining') && (
+              <Button
+                variant="secondary"
+                onClick={() => refineAllQuestions(report, true)}
+                disabled={refiningQuestionIds.size > 0}
+              >
+                {refiningQuestionIds.size > 0 ? (
+                  <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                ) : (
+                  <FontAwesomeIcon icon={faMagicWandSparkles} className="mr-2" />
+                )}
+                {t('Refine All')}
+              </Button>
+            )}
           {canExecute && (
             <Button onClick={() => executeQuestions(reportId)} disabled={isExecuting}>
               {isExecuting ? (
@@ -354,7 +378,10 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
             }}
             disabled={isDeleting}
           >
-            <FontAwesomeIcon icon={isDeleting ? faSpinner : faTrash} className={isDeleting ? 'animate-spin' : ''} />
+            <FontAwesomeIcon
+              icon={isDeleting ? faSpinner : faTrash}
+              className={isDeleting ? 'animate-spin' : ''}
+            />
           </Button>
         </div>
       </div>
@@ -377,14 +404,18 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
       {/* Questions */}
       <Card className="flex flex-col max-h-[60vh]">
         <CardHeader className="flex-shrink-0">
-          <CardTitle>{t('Questions')} ({report.questions.length})</CardTitle>
+          <CardTitle>
+            {t('Questions')} ({report.questions.length})
+          </CardTitle>
         </CardHeader>
         <CardContent className="overflow-y-auto">
           <div className="space-y-4">
             {report.questions.map((question, index) => {
               const isRefiningThis = refiningQuestionIds.has(question.question_id);
-              const needsRefinement = !question.refined_question || question.refined_question === question.original_direction;
-              
+              const needsRefinement =
+                !question.refined_question ||
+                question.refined_question === question.original_direction;
+
               return (
                 <div key={question.question_id} className="border rounded-lg p-4">
                   <div className="flex items-start justify-between">
@@ -432,20 +463,24 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
                       )}
                     </div>
                     {/* Refine button for individual question */}
-                    {needsRefinement && (['pending', 'refining'].includes(report.status) || report.status === 'refining') && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => refineQuestion(question.question_id, question.original_direction)}
-                        disabled={isRefiningThis}
-                      >
-                        {isRefiningThis ? (
-                          <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
-                        ) : (
-                          <FontAwesomeIcon icon={faMagicWandSparkles} />
-                        )}
-                      </Button>
-                    )}
+                    {needsRefinement &&
+                      (['pending', 'refining'].includes(report.status) ||
+                        report.status === 'refining') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            refineQuestion(question.question_id, question.original_direction)
+                          }
+                          disabled={isRefiningThis}
+                        >
+                          {isRefiningThis ? (
+                            <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                          ) : (
+                            <FontAwesomeIcon icon={faMagicWandSparkles} />
+                          )}
+                        </Button>
+                      )}
                   </div>
                 </div>
               );
@@ -493,7 +528,7 @@ const ReportList = () => {
     <div className="space-y-4">
       <h2 className="text-xl font-semibold">{t('Your Reports')}</h2>
       <div className="grid gap-4">
-        {data.reports.map((report) => (
+        {data.reports.map(report => (
           <Card key={report.report_id} className="transition-colors">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between gap-4">

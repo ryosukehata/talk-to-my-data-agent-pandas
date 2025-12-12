@@ -78,8 +78,11 @@ class ExecuteQuestionsUseCase:
         try:
             # 各質問を順次実行
             for question in report.questions:
-                if question.status == QuestionStatus.PENDING and question.refined_question == question.original_direction:
-                    logger.info(f'Question not refined yet: {question.question_id}')
+                if (
+                    question.status == QuestionStatus.PENDING
+                    and question.refined_question == question.original_direction
+                ):
+                    logger.info(f"Question not refined yet: {question.question_id}")
                     continue
                 if question.status == QuestionStatus.COMPLETED:
                     logger.info(f"Question already completed: {question.question_id}")
@@ -187,11 +190,17 @@ class ExecuteQuestionsUseCase:
                 question.answer = result.message.content
                 if result.message.components:
                     bottom_line_component = next(
-                        (component for component in result.message.components if getattr(component, "bottom_line", None)),
+                        (
+                            component
+                            for component in result.message.components
+                            if getattr(component, "bottom_line", None)
+                        ),
                         None,
                     )
                     if bottom_line_component:
-                        question.bottom_line = getattr(bottom_line_component, "bottom_line", None)
+                        question.bottom_line = getattr(
+                            bottom_line_component, "bottom_line", None
+                        )
                 question.executed_at = datetime.now()
                 logger.info(f"Question completed: {question_id}")
             else:

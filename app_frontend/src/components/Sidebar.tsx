@@ -94,10 +94,11 @@ const ReportList = () => {
   const { reportId } = useParams();
   const { t } = useTranslation();
 
-  const reportMenuOptions: SidebarMenuOptionType[] = data?.reports?.map(report => ({
-    id: report.report_id,
-    name: report.title,
-  })) || [];
+  const reportMenuOptions: SidebarMenuOptionType[] =
+    data?.reports?.map(report => ({
+      id: report.report_id,
+      name: report.title,
+    })) || [];
 
   return (
     <div className="relative flex flex-col max-h-[200px]">
@@ -105,11 +106,7 @@ const ReportList = () => {
         <div>
           <p className="text-base font-semibold">{t('Reports')}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.REPORTS)}
-        >
+        <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.REPORTS)}>
           <FontAwesomeIcon icon={faFileAlt} />
         </Button>
       </div>

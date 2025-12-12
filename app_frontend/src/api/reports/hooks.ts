@@ -2,7 +2,13 @@
  * Report Builder hooks using React Query
  */
 
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  UseQueryOptions,
+  UseMutationOptions,
+} from '@tanstack/react-query';
 import {
   listReports,
   getReport,
@@ -138,9 +144,7 @@ export const useGenerateWord = (
   });
 };
 
-export const useDownloadWord = (
-  options?: UseMutationOptions<void, Error, string>
-) => {
+export const useDownloadWord = (options?: UseMutationOptions<void, Error, string>) => {
   return useMutation<void, Error, string>({
     mutationFn: downloadWord,
     ...options,
@@ -150,9 +154,7 @@ export const useDownloadWord = (
 /**
  * Hook to delete a report
  */
-export const useDeleteReport = (
-  options?: UseMutationOptions<void, Error, string>
-) => {
+export const useDeleteReport = (options?: UseMutationOptions<void, Error, string>) => {
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, string>({

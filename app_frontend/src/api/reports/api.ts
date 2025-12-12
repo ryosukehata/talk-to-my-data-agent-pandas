@@ -34,9 +34,7 @@ export const getReport = async (reportId: string): Promise<ReportDetailResponse>
 /**
  * Create a new report with auto-generated questions
  */
-export const createReport = async (
-  request: CreateReportRequest
-): Promise<CreateReportResponse> => {
+export const createReport = async (request: CreateReportRequest): Promise<CreateReportResponse> => {
   const response = await apiClient.post('/v1/reports', request);
   return response.data;
 };
@@ -61,19 +59,16 @@ export const updateQuestionStatus = async (
   questionId: string,
   status: QuestionStatus
 ): Promise<UpdateQuestionResponse> => {
-  const response = await apiClient.patch(
-    `/v1/reports/${reportId}/questions/${questionId}`,
-    { status }
-  );
+  const response = await apiClient.patch(`/v1/reports/${reportId}/questions/${questionId}`, {
+    status,
+  });
   return response.data;
 };
 
 /**
  * Execute all questions in a report (start chat generation)
  */
-export const executeQuestions = async (
-  reportId: string
-): Promise<ExecuteQuestionsResponse> => {
+export const executeQuestions = async (reportId: string): Promise<ExecuteQuestionsResponse> => {
   const response = await apiClient.post(`/v1/reports/${reportId}/execute`);
   return response.data;
 };
@@ -81,16 +76,12 @@ export const executeQuestions = async (
 /**
  * Generate Word document for a completed report
  */
-export const generateWord = async (
-  reportId: string
-): Promise<GenerateWordResponse> => {
+export const generateWord = async (reportId: string): Promise<GenerateWordResponse> => {
   const response = await apiClient.post(`/v1/reports/${reportId}/generate-word`);
   return response.data;
 };
 
-export const getReportSummary = async (
-  reportId: string
-): Promise<ReportDetailResponse> => {
+export const getReportSummary = async (reportId: string): Promise<ReportDetailResponse> => {
   const response = await apiClient.get(`/v1/reports/${reportId}`);
   return response.data;
 };

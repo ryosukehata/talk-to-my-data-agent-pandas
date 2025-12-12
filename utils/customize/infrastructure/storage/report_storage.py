@@ -124,9 +124,7 @@ class ReportStorage(IReportRepository):
                 self._metadata_key(report_id), str(local_path)
             )
         except Exception as e:
-            logger.info(
-                f"Report fetch failed for {report_id}: {type(e).__name__}: {e}"
-            )
+            logger.info(f"Report fetch failed for {report_id}: {type(e).__name__}: {e}")
 
         if not local_path.exists() or local_path.stat().st_size == 0:
             logger.info(f"Report not found or empty: {report_id}")
@@ -231,9 +229,7 @@ class ReportStorage(IReportRepository):
         index_path = self._index_path()
 
         try:
-            await self._storage.fetch_from_storage(
-                self._index_key(), str(index_path)
-            )
+            await self._storage.fetch_from_storage(self._index_key(), str(index_path))
         except Exception:
             pass
 
@@ -264,9 +260,7 @@ class ReportStorage(IReportRepository):
 
             try:
                 atomic_write_json(tmp_path, {"report_ids": current_ids})
-                await self._storage.save_to_storage(
-                    self._index_key(), tmp_path
-                )
+                await self._storage.save_to_storage(self._index_key(), tmp_path)
             finally:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)

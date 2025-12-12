@@ -17,13 +17,7 @@ export type ReportStatus =
 /**
  * Question status enum
  */
-export type QuestionStatus =
-  | 'pending'
-  | 'refining'
-  | 'ready'
-  | 'running'
-  | 'completed'
-  | 'error';
+export type QuestionStatus = 'pending' | 'refining' | 'ready' | 'running' | 'completed' | 'error';
 
 /**
  * A question in a report

@@ -124,10 +124,25 @@ class DeleteResponse(BaseModel):
 
 def get_user_id(request: Request) -> str:
     """リクエストからユーザーIDを取得"""
-    user_id = request.headers.get("x-user-id") or request.headers.get("x-user-email")
-    if not user_id:
-        user_id = "anonymous"
-    return user_id
+    user_id = request.headers.get("x-user-id")
+    if user_id:
+        return user_id
+
+    session = getattr(request.state, "session", None)
+    account_info = getattr(session, "datarobot_account_info", None)
+    if isinstance(account_info, dict):
+        uid = account_info.get("uid")
+        if uid:
+            return uid
+        email = account_info.get("email")
+        if email:
+            return email
+
+    user_id = request.headers.get("x-user-email")
+    if user_id:
+        return user_id
+
+    return "anonymous"
 
 
 def get_repository(request: Request) -> ReportStorage:

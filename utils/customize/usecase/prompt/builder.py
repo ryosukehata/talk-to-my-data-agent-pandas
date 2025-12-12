@@ -110,14 +110,14 @@ class SummaryPromptBuilder:
         )
 
         messages: list[ChatCompletionMessageParam] = [
-            ChatCompletionSystemMessageParam(
-                role="system", content=self._system_prompt
-            )
+            ChatCompletionSystemMessageParam(role="system", content=self._system_prompt)
         ]
         messages.extend(user_messages)
         return messages
 
-    def _build_default_user_message(self, report: Report) -> ChatCompletionUserMessageParam:
+    def _build_default_user_message(
+        self, report: Report
+    ) -> ChatCompletionUserMessageParam:
         theme_line = report.theme or "テーマ情報が利用できません"
         content = (
             f"# レポートタイトル\n{report.title}\n\n"
