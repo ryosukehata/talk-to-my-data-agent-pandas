@@ -39,6 +39,7 @@ async def run_evaluation(
     datasets_names = await get_datasets_names(
         data_source=input_data.data_source, analyst_db=analyst_db
     )
+    print("Datasets names:", datasets_names)
     data_info_analyst_db = RefinerDataInfoMessageFactory(
         analyst_db, dataset_names=datasets_names
     )
