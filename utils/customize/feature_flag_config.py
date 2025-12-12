@@ -24,6 +24,9 @@ def get_feature_flags() -> Dict[str, Any]:
         ),
         "refinerEnabled": _get_bool_env("VITE_ENABLE_QUESTION_REFINER", default=False),
         "refinerAutoSend": _get_bool_env("VITE_ENABLE_REFINER_AUTO_SEND", default=True),
+        "reportBuilderEnabled": _get_bool_env(
+            "VITE_ENABLE_REPORT_BUILDER", default=False
+        ),
         # Add more feature flags here as needed
     }
     return feature_flags

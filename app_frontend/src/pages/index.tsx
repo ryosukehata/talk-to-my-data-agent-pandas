@@ -6,6 +6,7 @@ import { Layout } from './Layout';
 
 const Data = lazy(() => import('./Data').then(module => ({ default: module.Data })));
 const Chats = lazy(() => import('./Chats').then(module => ({ default: module.Chats })));
+const Reports = lazy(() => import('./Reports').then(module => ({ default: module.Reports })));
 
 const Loading = () => {
   const { t } = useTranslation();
@@ -23,6 +24,8 @@ const Pages = () => {
             <Route path={ROUTES.CHATS} element={<Chats />} />
             <Route path={ROUTES.CHAT_WITH_ID} element={<Chats />} />
             <Route path={ROUTES.DATA_WITH_ID} element={<Data />} />
+            <Route path={ROUTES.REPORTS} element={<Reports />} />
+            <Route path={ROUTES.REPORT_WITH_ID} element={<Reports />} />
             <Route path="*" element={<Navigate to={ROUTES.DATA} replace />} />
           </Route>
         </Routes>

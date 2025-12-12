@@ -38,24 +38,25 @@ class LLMQuestionGenerationService(IQuestionGenerationService):
         self,
         messages: list[ChatCompletionMessageParam],
         token_tracker: TokenUsageTracker | None = None,
-    ) -> list[RefinedQuestion]:
+    ) -> RefinedQuestion:
         """データセット概要から質問を生成
 
         Args:
-            user_direction: ユーザーの質問の方向性
-            dataset_summaries: データセット概要のリスト
-            num_questions: 生成する質問の数
+            messages: LLMに送信するメッセージリスト
+            token_tracker: トークン使用量トラッカー
 
         Returns:
-            生成された質問のリスト
+            生成された洗練された質問
 
         Raises:
             Exception: 質問生成に失敗した場合
         """
-        # データセット概要をフォーマット
+        logger.info("🔄 LLMQuestionGenerationService.get() called")
+        logger.info(f"📝 Using model: {self.model}")
 
         # LLM を使って質問生成
         async with AsyncLLMClient(token_tracker=token_tracker) as client:
+            logger.info("🌐 Calling LLM API...")
             (
                 response,
                 response_org,
@@ -64,5 +65,6 @@ class LLMQuestionGenerationService(IQuestionGenerationService):
                 messages=messages,
                 response_model=RefinedQuestion,
             )
+            logger.info(f"✅ LLM response received: {response}")
 
         return response
