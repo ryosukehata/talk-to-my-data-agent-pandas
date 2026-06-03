@@ -103,6 +103,7 @@ export interface UpdateQuestionRequest {
   refined_question?: string;
   status?: QuestionStatus;
   refine_status?: QuestionStatus;
+  error_message?: string | null;
 }
 
 /**

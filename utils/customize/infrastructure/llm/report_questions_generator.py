@@ -6,7 +6,9 @@ Report Builder - Infrastructure Layer - LLM
 
 from __future__ import annotations
 
+import asyncio
 from abc import ABC, abstractmethod
+from typing import cast
 
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
@@ -14,11 +16,13 @@ from utils.constants import ALTERNATIVE_LLM_BIG
 from utils.customize.domain.report.domain import (
     ReportQuestionsGenerationResult,
 )
+from utils.customize.infrastructure.llm.timeout import get_llm_timeout_seconds
 from utils.llm_client import AsyncLLMClient
 from utils.logging_helper import get_logger
 from utils.token_tracking import TokenUsageTracker
 
 logger = get_logger(__name__)
+REPORT_BUILDER_TIMEOUT_ENV = "REPORT_BUILDER_LLM_TIMEOUT_SECONDS"
 
 
 class IReportQuestionsGenerationService(ABC):
@@ -62,13 +66,30 @@ class LLMReportQuestionsGenerationService(IReportQuestionsGenerationService):
     ) -> ReportQuestionsGenerationResult:
         """テーマから複数の質問を生成"""
         logger.info("Generating report questions via LLM...")
+        timeout_seconds = get_llm_timeout_seconds(REPORT_BUILDER_TIMEOUT_ENV)
 
         async with AsyncLLMClient(token_tracker=token_tracker) as client:
-            response, _ = await client.chat.completions.create_with_completion(
-                model=self.model,
-                messages=messages,
-                response_model=ReportQuestionsGenerationResult,
-            )
+            try:
+                response, _ = await asyncio.wait_for(
+                    client.chat.completions.create_with_completion(
+                        model=self.model,
+                        messages=messages,
+                        response_model=ReportQuestionsGenerationResult,
+                    ),
+                    timeout=timeout_seconds,
+                )
+            except asyncio.TimeoutError as exc:
+                logger.error(
+                    "Report question generation timed out after %.1f seconds",
+                    timeout_seconds,
+                )
+                raise TimeoutError(
+                    f"Report question generation timed out after {timeout_seconds:g} seconds"
+                ) from exc
 
+        if response is None:
+            raise ValueError("Report question generation returned no response")
+
+        response = cast(ReportQuestionsGenerationResult, response)
         logger.info(f"Generated {len(response.questions)} questions")
         return response

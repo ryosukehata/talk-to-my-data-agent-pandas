@@ -13,6 +13,7 @@ import loader from '@/assets/loader.svg';
 import { useGeneratedDictionaries, getDictionariesMenu } from '@/api/dictionaries';
 import { useFetchAllChats, getChatsMenu } from '@/api/chat-messages';
 import { useReports } from '@/api/reports';
+import { useFetchFeatureFlags } from '@/api/feature-flag';
 import { Button } from '@/components/ui/button';
 import { faCog } from '@fortawesome/free-solid-svg-icons/faCog';
 import { faFileAlt } from '@fortawesome/free-solid-svg-icons/faFileAlt';
@@ -156,6 +157,8 @@ export const Sidebar = () => {
   const highlightChats = !highlightDatasets && !isLoadingChats && !chats?.length;
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { data: featureFlags } = useFetchFeatureFlags();
+  const showReportBuilder = featureFlags?.reportBuilderEnabled === true;
 
   return (
     <div className="flex flex-col gap-6 p-6 pr-0 h-full overflow-y-auto">
@@ -179,8 +182,12 @@ export const Sidebar = () => {
           <DatasetList highlight={highlightDatasets} />
           <Separator className="my-6 border-t" />
           <ChatList highlight={highlightChats} />
-          <Separator className="my-6 border-t" />
-          <ReportList />
+          {showReportBuilder && (
+            <>
+              <Separator className="my-6 border-t" />
+              <ReportList />
+            </>
+          )}
           <WelcomeModal />
         </div>
         <SettingsSection />

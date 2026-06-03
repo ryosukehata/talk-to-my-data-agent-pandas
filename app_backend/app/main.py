@@ -74,6 +74,8 @@ if SERVE_STATIC_FRONTEND:
     @base_router.get(f"{SCRIPT_NAME}/data/{{dataId:path}}")
     @base_router.get(f"{SCRIPT_NAME}/chats")
     @base_router.get(f"{SCRIPT_NAME}/chats/{{chat_id:path}}")
+    @base_router.get(f"{SCRIPT_NAME}/reports")
+    @base_router.get(f"{SCRIPT_NAME}/reports/{{report_id:path}}")
     async def serve_spa() -> Response:
         return FileResponse(
             os.path.join(STATIC_DIR, "index.html"), media_type="text/html"

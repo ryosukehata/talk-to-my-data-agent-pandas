@@ -7,6 +7,7 @@ export interface FeatureFlags {
   customPromptsEnabled: boolean;
   refinerEnabled: boolean;
   refinerAutoSend: boolean;
+  reportBuilderEnabled: boolean;
   // Add more feature flags here as needed
 }
 
@@ -15,4 +16,5 @@ export interface FeatureFlagsResponse {
   customPromptsEnabled: boolean;
   refinerEnabled: boolean;
   refinerAutoSend: boolean;
+  reportBuilderEnabled: boolean;
 }

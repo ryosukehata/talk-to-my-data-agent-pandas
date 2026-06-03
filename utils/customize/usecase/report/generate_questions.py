@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
 )
@@ -67,7 +68,7 @@ class GenerateQuestionsUseCase:
 
         try:
             # 1. ユーザープロンプトを構築
-            user_messages = [
+            user_messages: list[ChatCompletionMessageParam] = [
                 ChatCompletionUserMessageParam(
                     role="user",
                     content=f"Theme: {request.theme}\nNumber of Questions: {request.num_questions}",
@@ -80,7 +81,7 @@ class GenerateQuestionsUseCase:
                 user_messages.extend(data_info_messages)
 
             # 3. システムプロンプトと合わせてメッセージ配列を作成
-            messages = [
+            messages: list[ChatCompletionMessageParam] = [
                 ChatCompletionSystemMessageParam(
                     role="system",
                     content=prompts.REPORT_QUESTIONS_GENERATOR_SYSTEM_PROMPT,
@@ -98,6 +99,9 @@ class GenerateQuestionsUseCase:
             logger.info(f"✅ Generated {len(result.questions)} questions")
             return result
 
+        except TimeoutError:
+            logger.error("Timed out while generating questions", exc_info=True)
+            raise
         except Exception as e:
             logger.error(f"Failed to generate questions: {e}", exc_info=True)
             return ReportQuestionsGenerationResult(questions=[])

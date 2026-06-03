@@ -139,6 +139,7 @@ export const useGenerateWord = (
     mutationFn: generateWord,
     onSuccess: (_, reportId) => {
       queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, reportId] });
+      queryClient.invalidateQueries({ queryKey: REPORTS_QUERY_KEY });
     },
     ...options,
   });

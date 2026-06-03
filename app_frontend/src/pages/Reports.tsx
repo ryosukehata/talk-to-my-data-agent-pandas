@@ -13,6 +13,7 @@ import {
   useDeleteReport,
   useUpdateQuestion,
   useUpdateQuestionStatus,
+  useGenerateWord,
   useDownloadWord,
 } from '@/api/reports';
 import { ReportStatus, QuestionStatus, Report } from '@/api/reports/types';
@@ -88,14 +89,17 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
   const { dataSource } = useAppState();
   const [theme, setTheme] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { mutate: createReport } = useCreateReport({
     onSuccess: data => {
       setTheme('');
       setIsCreating(false);
+      setErrorMessage(null);
       onSuccess(data.report_id);
     },
-    onError: () => {
+    onError: error => {
       setIsCreating(false);
+      setErrorMessage(error.message || t('Failed to create report'));
     },
   });
 
@@ -103,6 +107,7 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
     e.preventDefault();
     if (theme.trim()) {
       setIsCreating(true);
+      setErrorMessage(null);
       createReport({
         theme: theme.trim(),
         data_source: dataSource,
@@ -155,6 +160,7 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
             <FontAwesomeIcon icon={faPlus} className="mr-2" />
             {t('Create Report')}
           </Button>
+          {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
         </form>
       </CardContent>
     </Card>
@@ -174,7 +180,7 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
       if (!report) return false;
 
       // Check if processing
-      if (report.status === 'chat_processing') return 3000;
+      if (['chat_processing', 'generating_word'].includes(report.status)) return 3000;
 
       return false;
     },
@@ -191,11 +197,16 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
   });
   const { mutateAsync: updateQuestion } = useUpdateQuestion();
   const { mutateAsync: updateQuestionStatus } = useUpdateQuestionStatus();
+  const { mutate: generateWord, isPending: isGeneratingWord } = useGenerateWord({
+    onSuccess: () => {
+      refetch();
+    },
+  });
   const { mutate: downloadWord, isPending: isDownloadingWord } = useDownloadWord();
 
   // Refine a single question
   const refineQuestion = useCallback(
-    async (questionId: string, direction: string) => {
+    async (questionId: string, direction: string): Promise<boolean> => {
       setRefiningQuestionIds(prev => new Set(prev).add(questionId));
       await updateQuestionStatus({ reportId, questionId, status: 'refining' });
       try {
@@ -208,13 +219,27 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
           await updateQuestion({
             reportId,
             questionId,
-            request: { refined_question: result.refined_questions[0].refined_question },
+            request: {
+              refined_question: result.refined_questions[0].refined_question,
+              error_message: null,
+            },
           });
           await updateQuestionStatus({ reportId, questionId, status: 'ready' });
           refetch();
+          return true;
         }
+
+        throw new Error(result.error || t('Failed to refine question'));
       } catch (error) {
         console.error('Failed to refine question:', error);
+        const message = error instanceof Error ? error.message : t('Failed to refine question');
+        await updateQuestion({
+          reportId,
+          questionId,
+          request: { status: 'error', error_message: message },
+        });
+        refetch();
+        return false;
       } finally {
         setRefiningQuestionIds(prev => {
           const next = new Set(prev);
@@ -223,7 +248,7 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
         });
       }
     },
-    [dataSource, reportId, updateQuestion, updateQuestionStatus, refetch]
+    [dataSource, reportId, t, updateQuestion, updateQuestionStatus, refetch]
   );
 
   // Refine all unrefined questions sequentially to avoid rate limiting, then auto-execute
@@ -239,12 +264,19 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
 
       // Run refinements sequentially to avoid overwhelming the LLM API
       // (Parallel requests can cause rate limiting or timeout issues)
+      let allRefinementsSucceeded = true;
       for (const question of unrefinedQuestions) {
         try {
           console.log(`🔄 Refining question ${question.question_id}...`);
-          await refineQuestion(question.question_id, question.original_direction);
-          console.log(`✅ Refined question ${question.question_id}`);
+          const success = await refineQuestion(question.question_id, question.original_direction);
+          if (success) {
+            console.log(`✅ Refined question ${question.question_id}`);
+          } else {
+            allRefinementsSucceeded = false;
+            console.error(`❌ Failed to refine question ${question.question_id}`);
+          }
         } catch (error) {
+          allRefinementsSucceeded = false;
           console.error(`❌ Failed to refine question ${question.question_id}:`, error);
           // Continue with next question even if one fails
         }
@@ -253,7 +285,7 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
       console.log(`🏁 All refinements complete`);
 
       // After all refinements complete, auto-execute if requested
-      if (autoExecuteAfter) {
+      if (autoExecuteAfter && allRefinementsSucceeded) {
         console.log(`🚀 Auto-executing questions for report ${reportId}`);
         // Small delay to ensure state is updated
         setTimeout(() => {
@@ -307,6 +339,8 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
     (['pending', 'refining'].includes(report.status) || report.status === 'refining') &&
     report.questions.length > 0 &&
     !hasUnrefinedQuestions;
+  const canGenerateWord = report.status === 'completed' && !report.word_file_path;
+  const isWordBeingGenerated = report.status === 'generating_word' || isGeneratingWord;
   const progress =
     report.questions.length > 0
       ? (report.questions.filter(q => q.status === 'completed').length / report.questions.length) *
@@ -354,6 +388,20 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
               {t('Execute Questions')}
             </Button>
           )}
+          {(canGenerateWord || report.status === 'generating_word') && !report.word_file_path && (
+            <Button
+              variant="outline"
+              onClick={() => generateWord(reportId)}
+              disabled={isWordBeingGenerated}
+            >
+              {isWordBeingGenerated ? (
+                <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+              ) : (
+                <FontAwesomeIcon icon={faMagicWandSparkles} className="mr-2" />
+              )}
+              {isWordBeingGenerated ? t('Generating Word') : t('Generate Word')}
+            </Button>
+          )}
           {report.status === 'done' && report.word_file_path && (
             <Button
               variant="outline"
@@ -396,6 +444,17 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
                 <span>{Math.round(progress)}%</span>
               </div>
               <Progress value={progress} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {report.status === 'generating_word' && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+              <span>{t('Generating Word')}</span>
             </div>
           </CardContent>
         </Card>
@@ -506,6 +565,7 @@ const ReportList = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, isLoading } = useReports();
+  const { mutate: generateWord, isPending: isGeneratingWord } = useGenerateWord();
   const { mutate: downloadWord, isPending: isDownloadingWord } = useDownloadWord();
 
   if (isLoading) {
@@ -548,6 +608,24 @@ const ReportList = () => {
                     <p className="font-medium">{Math.round(report.progress * 100)}%</p>
                   </div>
                   <StatusBadge status={report.status} />
+                  {(report.status === 'completed' || report.status === 'generating_word') &&
+                    !report.word_file_path && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => generateWord(report.report_id)}
+                        disabled={isGeneratingWord || report.status === 'generating_word'}
+                      >
+                        {isGeneratingWord || report.status === 'generating_word' ? (
+                          <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                        ) : (
+                          <FontAwesomeIcon icon={faMagicWandSparkles} className="mr-2" />
+                        )}
+                        {isGeneratingWord || report.status === 'generating_word'
+                          ? t('Generating Word')
+                          : t('Generate Word')}
+                      </Button>
+                    )}
                   {report.status === 'done' && report.word_file_path && (
                     <Button
                       variant="outline"

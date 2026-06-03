@@ -13,6 +13,7 @@ from openai.types.chat.chat_completion_message_param import ChatCompletionMessag
 from utils.customize.domain.question_refiner.domain import (
     RefinedQuestion,
 )
+from utils.token_tracking import TokenUsageTracker
 
 
 class IQuestionGenerationService(ABC):
@@ -22,7 +23,8 @@ class IQuestionGenerationService(ABC):
     async def get(
         self,
         messages: list[ChatCompletionMessageParam],
-    ) -> list[RefinedQuestion]:
+        token_tracker: TokenUsageTracker | None = None,
+    ) -> RefinedQuestion:
         """データセット概要から質問を生成
 
         Args:
@@ -31,7 +33,7 @@ class IQuestionGenerationService(ABC):
             num_questions: 生成する質問の数
 
         Returns:
-            生成された質問のリスト
+            生成された質問
 
         Raises:
             Exception: 質問生成に失敗した場合

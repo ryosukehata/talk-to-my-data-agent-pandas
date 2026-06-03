@@ -1039,6 +1039,99 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
 
 ---
 
+## 15. dev環境手動スモーク確認（2026-06-03）
+
+対象:
+
+- dev app: `https://app.datarobot.com/custom_applications/6930f689133582194bec4bed/`
+- 既存レポート: `59899024-4377-4c68-90f7-2dc4bc2660b2`
+
+### GitHub secret / variable確認
+
+- GitHub Environmentは `main` のみ存在し、`dev` environmentは存在しない。
+- `.github/workflows/pulumi-up.yml` は `environment: main` で実行されるため、`dev` branchのPulumi updateもGitHub Environment `main` のsecret/variableを参照する。
+- repo secretに `VITE_ENABLE_REPORT_BUILDER` は存在しない。
+- `main` environment secretに `VITE_ENABLE_REPORT_BUILDER` は存在しない。
+- `main` environment variableにも `VITE_ENABLE_REPORT_BUILDER` は存在しない。
+
+### スモーク結果
+
+| 項目 | 結果 | メモ |
+|-----|------|------|
+| dev appログイン後表示 | OK | Chromeの既存DataRobotセッションでアプリ本体を表示できた。 |
+| Report Builder導線表示 | OK / 注意 | Sidebarの `Reports` と一覧画面を表示できた。ただし `reportBuilderEnabled` feature flagでは制御されていない。 |
+| Report一覧 | OK | 既存レポート `店舗の売上の要因を分析したい` が表示された。 |
+| Report詳細 | OK | 既存レポート詳細を開き、3件の質問が `Completed` と表示された。 |
+| Chat結果導線 | OK | `View Chat Result` から既存チャット結果へ遷移できた。 |
+| Chat結果表示 | OK | サマリー、結論、パネル表示を確認した。 |
+| 新規Report作成 / 質問生成 | NG | `Smoke test 2026-06-03 店舗売上要因` で作成開始後、`Generating questions...` のまま完了しなかった。キャンセル後、一覧には残らなかった。 |
+| Refine実行 | NG | チャット入力に `売上と訪問客数の関係は？` を入れて `質問を洗練` を実行したが、`洗練中...` のまま完了しなかった。 |
+| `/reports` 直接アクセス | NG | `https://app.datarobot.com/custom_applications/6930f689133582194bec4bed/reports` を直接開くと `{"detail":"Not Found"}` になる。アプリ内遷移では表示可能。 |
+| Word生成 / ダウンロード導線 | 未確認 | 現在の操作手段では詳細画面下部までスクロールできず、導線の表示確認ができなかった。 |
+| 削除導線 | 部分確認 | 既存レポート詳細に削除ボタンは表示された。既存レポートを消す操作になるため実削除は未実行。 |
+
+### main投入前の懸念
+
+1. `VITE_ENABLE_REPORT_BUILDER` がGitHub側に未設定のため、workflowで追加したenvは空値になる。
+2. Report Builder UIは現在 `reportBuilderEnabled` に接続されておらず、feature flagで表示制御されていない。
+3. `/reports` と `/reports/{reportId}` のSPA deep linkがbackend fallbackに含まれておらず、直接アクセスやリロードで404になる。
+4. dev環境でReport Builderの新規質問生成とRefinerが完了しない。LLM/API接続、タイムアウト、エラー表示の確認が必要。
+5. Word生成導線は今回未確認のため、main merge前に別途確認が必要。
+
+---
+
+## 16. dev環境スモーク懸念への修正（2026-06-03）
+
+### 対応内容
+
+- GitHub repo secret `VITE_ENABLE_REPORT_BUILDER` を `origin` repo (`ryosukehata/talk-to-my-data-agent-pandas`) に設定した。
+- BackendのSPA fallbackに `/reports` と `/reports/{reportId}` を追加し、直接アクセス / reload でもReact側へ返すようにした。
+- `reportBuilderEnabled` をfrontendのfeature flag型・MSW mock・Sidebar・route guardへ接続した。
+  - flagが `true` のときだけSidebarのReport Builder導線を表示する。
+  - flagが `false` または未取得の場合、`/reports` routeは `/data` へ戻す。
+- Report Builder / Refiner のLLM呼び出しにtimeoutを追加した。
+  - 共通: `CUSTOMIZE_LLM_TIMEOUT_SECONDS`
+  - Report Builder専用: `REPORT_BUILDER_LLM_TIMEOUT_SECONDS`
+  - Refiner専用: `QUESTION_REFINER_LLM_TIMEOUT_SECONDS`
+  - 未設定時は60秒。
+  - Python 3.10の `asyncio.wait_for` は `asyncio.TimeoutError` を送出するため、timeout捕捉をPython 3.10/3.11/3.12で同じ挙動になるよう正規化した。
+- Report detailのrefine処理で、失敗時に質問ステータスを `error` へ戻し、`error_message` を保存・表示するようにした。
+- 自動refine後のexecuteは、全質問のrefineが成功した場合のみ実行するようにした。
+- `completed` だがWord未生成のreportに `Generate Word` ボタンを表示し、`generating_word` 中はpollingするようにした。
+
+### 追加テスト
+
+- `app_backend/tests/test_main.py::test_reports_spa_routes`
+  - `/reports` と `/reports/{reportId}` が `text/html` を返すことを確認。
+- `app_backend/tests/test_llm_timeout.py`
+  - Report Builder質問生成LLMがtimeoutで戻ることを確認。
+  - Refiner LLMがtimeoutで戻ることを確認。
+  - Report Builder質問生成UseCaseがtimeout理由を空質問へ潰さず保持することを確認。
+- `app_frontend/tests/components/Sidebar.test.tsx`
+  - `reportBuilderEnabled=false` でReports導線を非表示にすることを確認。
+  - `reportBuilderEnabled=true` でReports導線を表示することを確認。
+
+### 検証結果
+
+- `uv run ruff check .`: 成功
+- `PYTHONPATH=app_backend:. DATAROBOT_API_TOKEN=test-token DATAROBOT_ENDPOINT=https://example.com OTEL_SDK_DISABLED=true uv run pytest`: 8 passed / 2 skipped
+- `PYTHONPATH=app_backend:. DATAROBOT_API_TOKEN=test-token DATAROBOT_ENDPOINT=https://example.com OTEL_SDK_DISABLED=true uv run --python 3.10 pytest app_backend/tests/test_llm_timeout.py`: 3 passed
+- `PYTHONPATH=app_backend:. uv run mypy app_backend/tests/test_llm_timeout.py utils/customize/infrastructure/llm/timeout.py utils/customize/infrastructure/llm/report_questions_generator.py utils/customize/infrastructure/llm/llm.py utils/customize/usecase/report/generate_questions.py utils/customize/domain/question_refiner/service_interface.py`: 成功
+- `uv run ruff check app_backend/tests/test_main.py app_backend/tests/test_llm_timeout.py utils/customize/infrastructure/llm/timeout.py utils/customize/infrastructure/llm/report_questions_generator.py utils/customize/infrastructure/llm/llm.py utils/customize/api_endpoints/report.py app_backend/app/main.py`: 成功
+- `PYTHONPATH=app_backend:. DATAROBOT_API_TOKEN=test-token DATAROBOT_ENDPOINT=https://example.com uv run pytest app_backend/tests/test_main.py::test_reports_spa_routes app_backend/tests/test_llm_timeout.py`: 3 passed
+- `./node_modules/.bin/vitest --run tests/components/Sidebar.test.tsx`（`app_frontend`）: 2 passed
+- `./node_modules/.bin/vitest --run`（`app_frontend`）: 103 passed
+- `./node_modules/.bin/eslint .`（`app_frontend`）: 成功
+- `./node_modules/.bin/tsc -b tsconfig.app.json && ./node_modules/.bin/vite build`（`app_frontend`）: 成功
+- `pnpm --dir app_frontend test` / `pnpm --dir app_frontend lint`: ローカルのpnpm 11.5.1が依存build script承認を要求し、`pnpm install` 段階で失敗した。追跡ファイルへのlock差分は残していない。
+
+### 残確認
+
+- この修正をdevへdeployした後、dev環境で新規Report作成・refine・execute・Word生成/ダウンロード・smoke用Report削除を再確認する。
+- 既存レポートの削除は破壊的操作のため、smoke用に新規作成したreportのみ削除確認対象にする。
+
+---
+
 ## 冗長箇所メモ
 
 - **PersistentStorageの説明**: 現状は保存方式・チェックリスト・アーキテクチャなど複数箇所で同じ内容を繰り返し記載（例: 行202, 373, 541, 671, 690）。

@@ -240,6 +240,7 @@ class UpdateQuestionRequest(BaseModel):
 
     refined_question: str | None = None
     status: QuestionStatus | None = None
+    error_message: str | None = None
 
 
 class UpdateQuestionResponse(BaseModel):
@@ -284,6 +285,8 @@ async def update_question(
                     question.status = QuestionStatus.READY
             if update_request.status is not None:
                 question.status = update_request.status
+            if "error_message" in update_request.model_fields_set:
+                question.error_message = update_request.error_message
             question_found = True
             break
 

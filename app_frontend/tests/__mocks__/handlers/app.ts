@@ -13,6 +13,7 @@ export const appHandlers = [
       refinerAutoSend: false,
       templateEditEnabled: false,
       customPromptsEnabled: false,
+      reportBuilderEnabled: false,
     });
   }),
 
