@@ -223,7 +223,7 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
         });
       }
     },
-    [dataSource, reportId, updateQuestion, refetch]
+    [dataSource, reportId, updateQuestion, updateQuestionStatus, refetch]
   );
 
   // Refine all unrefined questions sequentially to avoid rate limiting, then auto-execute
@@ -285,7 +285,7 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
       // Auto-execute after refinement completes
       refineAllQuestions(report, true);
     }
-  }, [data?.report, refiningQuestionIds.size, refineAllQuestions]);
+  }, [data?.report, refiningQuestionIds.size, refineAllQuestions, reportId]);
 
   if (isLoading) {
     return (

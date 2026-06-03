@@ -9,6 +9,14 @@ import os
 # OpenTelemetryのエクスポートを無効化（テスト用）
 os.environ["OTEL_SDK_DISABLED"] = "true"
 
+import pytest
+
+if os.environ.get("RUN_CUSTOMIZE_DOCS_E2E") != "1":
+    pytest.skip(
+        "DataRobot/LLM E2E smoke script. Set RUN_CUSTOMIZE_DOCS_E2E=1 to run.",
+        allow_module_level=True,
+    )
+
 import pandas as pd
 from fastapi.testclient import TestClient
 

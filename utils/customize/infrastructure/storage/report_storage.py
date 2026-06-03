@@ -205,7 +205,9 @@ class ReportStorage(IReportRepository):
 
         # リモート保存は非同期でスケジュール（ローカル優先）
         asyncio.create_task(
-            self._storage.save_to_storage(self._word_key(report_id), str(word_copy_path))
+            self._storage.save_to_storage(
+                self._word_key(report_id), str(word_copy_path)
+            )
         )
 
         return self._word_key(report_id)

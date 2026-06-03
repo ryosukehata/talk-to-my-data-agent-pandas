@@ -1001,6 +1001,42 @@ from utils.customize.usecase.question_refiner.refiner import RefineQuestionUseCa
 
 ---
 
+## 14. CI修正記録（2026-06-03）
+
+PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み後のCI失敗をローカル再現して修正する。
+
+### 対応内容
+
+- `utils/customize/infrastructure/storage/report_storage.py` をRuff標準フォーマットに合わせる。
+- ルート直下に誤って追跡されていた空ファイル `FETCH_HEAD` を削除する。
+- Pulumi workflowに `VITE_ENABLE_REPORT_BUILDER` を追加し、dev/main環境へfeature flagを渡せるようにする。
+- `Reports.tsx` のReact Hooks依存配列を補正し、ESLint警告を解消する。
+- ルートからの `uv run pytest` が通るよう、pytestのimport pathとテスト用DataRobot envを明示する。
+- DataRobot/LLMへ接続する `customize_docs` のE2E動作確認スクリプトは `RUN_CUSTOMIZE_DOCS_E2E=1` のときだけ実行し、通常の単体テストから外部依存を分離する。
+
+### 検証対象
+
+- `uv run ruff format --check .`
+- `uv run ruff check .`
+- `uv run pytest`
+- `npm run test`（`app_frontend`）
+- `npm run lint`（`app_frontend`）
+- `npm run build`（`app_frontend`）
+- `yamlfmt .github/workflows/pulumi-up.yml`
+
+### 検証結果
+
+- `uv run ruff format --check .`: 成功
+- `uv run ruff check .`: 成功
+- `uv run pytest`: 4 passed / 2 skipped（外部DataRobot/LLM E2E）
+- `npm run test`（`app_frontend`）: 101 passed
+- `npm run lint`（`app_frontend`）: 成功（警告なし）
+- `npm run build`（`app_frontend`）: 成功
+- Node 22.22.3でのVitest/ESLint/Vite build: 成功
+- `app_backend` CI相当の `uv run ruff format --check .` / `uv run ruff check .` / `uv run pytest`: 成功
+
+---
+
 ## 冗長箇所メモ
 
 - **PersistentStorageの説明**: 現状は保存方式・チェックリスト・アーキテクチャなど複数箇所で同じ内容を繰り返し記載（例: 行202, 373, 541, 671, 690）。

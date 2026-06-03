@@ -46,6 +46,7 @@ jobs:
           PROMPTS_TEMPLATE_PATH: ${{ secrets.PROMPTS_TEMPLATE_PATH }}
           VITE_ENABLE_QUESTION_REFINER: ${{ secrets.VITE_ENABLE_QUESTION_REFINER }}
           VITE_ENABLE_REFINER_AUTO_SEND: ${{ secrets.VITE_ENABLE_REFINER_AUTO_SEND }}
+          VITE_ENABLE_REPORT_BUILDER: ${{ secrets.VITE_ENABLE_REPORT_BUILDER }}
 
       - uses: pulumi/actions@v6
         if: github.ref == 'refs/heads/dev'
@@ -69,3 +70,4 @@ jobs:
           PROMPTS_TEMPLATE_PATH: ${{ secrets.PROMPTS_TEMPLATE_PATH }}
           VITE_ENABLE_QUESTION_REFINER: ${{ secrets.VITE_ENABLE_QUESTION_REFINER }}
           VITE_ENABLE_REFINER_AUTO_SEND: ${{ secrets.VITE_ENABLE_REFINER_AUTO_SEND }}
+          VITE_ENABLE_REPORT_BUILDER: ${{ secrets.VITE_ENABLE_REPORT_BUILDER }}

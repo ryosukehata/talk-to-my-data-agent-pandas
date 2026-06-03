@@ -15,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
 # OpenTelemetryのエクスポートを無効化（テスト用）
 os.environ["OTEL_SDK_DISABLED"] = "true"
 
+import pytest
+
 from utils.customize.domain.report.domain import (
     QuestionStatus,
     Report,
@@ -34,6 +36,8 @@ from utils.customize.infrastructure.word.word_generator import (
 )
 from utils.customize.usecase.prompt.builder import SummaryPromptBuilder
 from utils.customize.usecase.report.generate_word import GenerateWordUseCase
+
+pytestmark = pytest.mark.asyncio
 
 
 class InMemoryReportRepository(IReportRepository):
@@ -110,11 +114,10 @@ class DummySummaryFactory:
 
 
 class DummyWordGenerator(WordGenerator):
-    def __init__(self) -> None:
+    def __init__(self, output_dir: Path) -> None:
         super().__init__()
         self.generated_args: dict[str, Any] | None = None
-        self.output_path = Path("./tmp/test_report.docx")
-        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+        self.output_path = output_dir / "test_report.docx"
         self.output_path.write_bytes(b"dummy doc")
 
     def generate(
@@ -172,7 +175,7 @@ def _build_sample_report() -> Report:
     )
 
 
-async def test_usecase_with_llm() -> None:
+async def test_usecase_with_llm(tmp_path: Path) -> None:
     report = _build_sample_report()
     repo = InMemoryReportRepository(report)
 
@@ -201,7 +204,7 @@ async def test_usecase_with_llm() -> None:
     factory_messages = [{"role": "system", "content": "dummy message"}]
     summary_factory = DummySummaryFactory(factory_messages)
     prompt_builder = SummaryPromptBuilder(summary_factory)
-    word_generator = DummyWordGenerator()
+    word_generator = DummyWordGenerator(tmp_path)
 
     usecase = GenerateWordUseCase(
         repository=repo,
@@ -220,10 +223,10 @@ async def test_usecase_with_llm() -> None:
     print("Word保存先:", repo.saved_files.get(report.report_id))
 
 
-async def test_usecase_fallback() -> None:
+async def test_usecase_fallback(tmp_path: Path) -> None:
     report = _build_sample_report()
     repo = InMemoryReportRepository(report)
-    word_generator = DummyWordGenerator()
+    word_generator = DummyWordGenerator(tmp_path)
     prompt_builder = SummaryPromptBuilder()  # factoryなし
 
     usecase = GenerateWordUseCase(
