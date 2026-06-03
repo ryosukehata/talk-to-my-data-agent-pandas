@@ -1130,6 +1130,13 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
 - この修正をdevへdeployした後、dev環境で新規Report作成・refine・execute・Word生成/ダウンロード・smoke用Report削除を再確認する。
 - 既存レポートの削除は破壊的操作のため、smoke用に新規作成したreportのみ削除確認対象にする。
 
+### dev環境確認で見つかった追加修正（2026-06-04）
+
+- Chromeの認証済みセッションで `/reports` を直接開いたところ、アプリはSPAとして起動したが `/data/店舗売上予測.xlsx` にredirectされた。
+- GitHub secret `VITE_ENABLE_REPORT_BUILDER` は設定済みだったが、PulumiがDataRobot Custom Applicationへ渡す `runtime_parameter_values` のfeature flag一覧に `VITE_ENABLE_REPORT_BUILDER` が含まれていなかった。
+- `utils/customize/feature_flag_config.py` にfeature flag env一覧を集約し、backendのfeature flag endpointとPulumi runtime parameter作成で同じ一覧を使うようにした。
+- `app_backend/tests/test_feature_flag_config.py` を追加し、Report Builder flagがenvから読めることとruntime parameter対象一覧に含まれることを確認する。
+
 ---
 
 ## 冗長箇所メモ

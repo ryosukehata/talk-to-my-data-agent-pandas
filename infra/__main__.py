@@ -52,6 +52,7 @@ from utils.customize.csv_validator import (
     validate_prompt_template_csv,
     validate_schema_table_description_csv,
 )
+from utils.customize.feature_flag_config import FEATURE_FLAG_ENV_VARS
 from utils.i18n import LocaleSettings
 from utils.resources import (
     app_env_name,
@@ -336,12 +337,7 @@ if os.environ.get("PROMPTS_TEMPLATE_PATH", None):
             f"Could not create dataset from {os.environ.get('DATASET_DESCRIPTION_PATH')}: {e}"
         )
 
-for env_var in [
-    "VITE_ENABLE_TEMPLATE_EDIT",
-    "VITE_ENABLE_CUSTOM_PROMPTS",
-    "VITE_ENABLE_QUESTION_REFINER",
-    "VITE_ENABLE_REFINER_AUTO_SEND",
-]:
+for env_var in FEATURE_FLAG_ENV_VARS.values():
     if os.environ.get(env_var):
         app_runtime_parameters.append(
             datarobot.ApplicationSourceRuntimeParameterValueArgs(
