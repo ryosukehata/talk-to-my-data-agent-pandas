@@ -18,6 +18,7 @@ from openai.types.chat.chat_completion_user_message_param import (
 
 from utils.customize import prompts
 from utils.customize.domain.report.domain import (
+    GeneratedQuestion,
     ReportQuestionsGenerationRequest,
     ReportQuestionsGenerationResult,
 )
@@ -31,6 +32,20 @@ if TYPE_CHECKING:
     pass
 
 logger = get_logger("GenerateQuestionsUseCase")
+
+
+FALLBACK_QUESTION_TEMPLATES = (
+    "What are the most important trends related to {theme}?",
+    "Which factors appear to contribute most to {theme}?",
+    "Which segments show the largest differences in {theme}?",
+    "Are there notable anomalies or outliers related to {theme}?",
+    "What actions should decision makers consider based on {theme}?",
+)
+
+FALLBACK_REASONING = (
+    "Generated from a deterministic fallback because LLM question generation "
+    "did not return usable questions."
+)
 
 
 class GenerateQuestionsUseCase:
@@ -96,6 +111,12 @@ class GenerateQuestionsUseCase:
             # 4. LLMで質問を生成
             result = await self._questions_generation_service.generate(messages)
 
+            if not result.questions:
+                logger.warning(
+                    "Question generation returned no questions; using fallback questions"
+                )
+                return self._build_fallback_questions(request)
+
             logger.info(f"✅ Generated {len(result.questions)} questions")
             return result
 
@@ -104,4 +125,33 @@ class GenerateQuestionsUseCase:
             raise
         except Exception as e:
             logger.error(f"Failed to generate questions: {e}", exc_info=True)
-            return ReportQuestionsGenerationResult(questions=[])
+            return self._build_fallback_questions(request)
+
+    def _build_fallback_questions(
+        self,
+        request: ReportQuestionsGenerationRequest,
+    ) -> ReportQuestionsGenerationResult:
+        theme = request.theme.strip() or "the selected dataset"
+        questions = [
+            GeneratedQuestion(
+                question=template.format(theme=theme),
+                reasoning=FALLBACK_REASONING,
+                relevant_columns=[],
+            )
+            for template in FALLBACK_QUESTION_TEMPLATES[: request.num_questions]
+        ]
+
+        while len(questions) < request.num_questions:
+            index = len(questions) + 1
+            questions.append(
+                GeneratedQuestion(
+                    question=(
+                        f"What additional insight #{index} should be reviewed "
+                        f"for {theme}?"
+                    ),
+                    reasoning=FALLBACK_REASONING,
+                    relevant_columns=[],
+                )
+            )
+
+        return ReportQuestionsGenerationResult(questions=questions)

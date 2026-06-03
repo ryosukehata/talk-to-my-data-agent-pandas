@@ -522,7 +522,7 @@ for generated_question in generated_questions:
   - [x] `PATCH /reports/{id}/questions/{qid}` で洗練結果を保存
   - [x] `InitReportUseCase` は方向性レベルの質問生成のみに責務を限定
 - [x] エラーハンドリング
-  - [x] 質問生成失敗時: エラーを返す（フォールバックなし）
+  - [x] 質問生成失敗時: Timeoutはエラーを返し、LLM例外/空結果はフォールバック質問でReport作成を継続
   - [x] 質問洗練失敗時: フロントエンドで処理
 
 ### Phase 1.6: バックエンドAPI - レポート操作
@@ -1136,6 +1136,27 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
 - GitHub secret `VITE_ENABLE_REPORT_BUILDER` は設定済みだったが、PulumiがDataRobot Custom Applicationへ渡す `runtime_parameter_values` のfeature flag一覧に `VITE_ENABLE_REPORT_BUILDER` が含まれていなかった。
 - `utils/customize/feature_flag_config.py` にfeature flag env一覧を集約し、backendのfeature flag endpointとPulumi runtime parameter作成で同じ一覧を使うようにした。
 - `app_backend/tests/test_feature_flag_config.py` を追加し、Report Builder flagがenvから読めることとruntime parameter対象一覧に含まれることを確認する。
+
+### dev環境スモーク継続で見つかった追加修正（2026-06-04）
+
+- `VITE_ENABLE_REPORT_BUILDER` のruntime parameter修正後、Chromeの認証済みセッションで `/reports` direct link、SidebarのReports導線、既存Report一覧、`Generate Word` ボタン表示を確認した。
+- 新規Report作成は `Generating questions...` から一定時間後に戻ったが、`Request failed with status code 500` で失敗した。
+- 原因候補はReport Builder flag secretではなく、質問生成LLMが例外または空結果を返し、`GenerateQuestionsUseCase` が空質問を返した後に `InitReportUseCase` が `Failed to generate questions from theme` を投げる経路。
+- `GenerateQuestionsUseCase` でTimeoutは従来通り上位へ伝播し、それ以外のLLM例外または空結果は決定的なフォールバック質問へ置き換えるようにした。
+- `POST /v1/reports` はTimeoutを `504 Gateway Timeout` として返し、その他の失敗はスタックトレース付きでログへ出すようにした。
+- FrontendのReport作成/Refine失敗表示は、Axiosの汎用文言ではなくFastAPIの `detail` を優先して表示するようにした。
+
+#### 追加テスト・検証
+
+- `app_backend/tests/test_llm_timeout.py`
+  - LLM質問生成が例外を投げた場合に、指定件数のフォールバック質問を返すことを確認。
+  - LLM質問生成が空結果を返した場合に、指定件数のフォールバック質問を返すことを確認。
+- `uv run ruff check .`: 成功
+- `PYTHONPATH=app_backend:. DATAROBOT_API_TOKEN=test-token DATAROBOT_ENDPOINT=https://example.com OTEL_SDK_DISABLED=true uv run pytest`: 12 passed / 2 skipped
+- `npm run lint`（`app_frontend`）: 成功
+- `npm run test`（`app_frontend`）: 103 passed
+- `npm run build`（`app_frontend`）: 成功
+- `pnpm --dir app_frontend lint` はローカルpnpm 11.5.1が `pnpm install` 段階でbuild script承認を要求して失敗した。CIは `.github/workflows` 上 `npm install` / `npm run test` / `npm run lint` / `npm run build` 構成のため、npm scriptで確認した。
 
 ---
 

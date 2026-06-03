@@ -132,10 +132,10 @@ def get_user_id(request: Request) -> str:
     account_info = getattr(session, "datarobot_account_info", None)
     if isinstance(account_info, dict):
         uid = account_info.get("uid")
-        if uid:
+        if isinstance(uid, str) and uid:
             return uid
         email = account_info.get("email")
-        if email:
+        if isinstance(email, str) and email:
             return email
 
     user_id = request.headers.get("x-user-email")
@@ -356,8 +356,14 @@ async def create_report(
             report_id=report.report_id,
             message=f"Report created with {len(report.questions)} direction-level questions. Please use /refiner to refine each question.",
         )
+    except TimeoutError as e:
+        logger.exception("Timed out while creating report")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=str(e),
+        )
     except Exception as e:
-        logger.error(f"Failed to create report: {e}")
+        logger.exception("Failed to create report")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

@@ -62,6 +62,26 @@ class _TimeoutQuestionsService(
         raise TimeoutError("timed out")
 
 
+class _FailingQuestionsService(
+    report_questions_generator.IReportQuestionsGenerationService
+):
+    async def generate(
+        self,
+        messages: list[ChatCompletionMessageParam],
+        token_tracker: TokenUsageTracker | None = None,
+    ) -> ReportQuestionsGenerationResult:
+        raise RuntimeError("LLM request failed")
+
+
+class _EmptyQuestionsService(report_questions_generator.IReportQuestionsGenerationService):
+    async def generate(
+        self,
+        messages: list[ChatCompletionMessageParam],
+        token_tracker: TokenUsageTracker | None = None,
+    ) -> ReportQuestionsGenerationResult:
+        return ReportQuestionsGenerationResult(questions=[])
+
+
 def test_report_question_generation_times_out(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -104,3 +124,43 @@ def test_generate_questions_usecase_preserves_timeout() -> None:
                 )
             )
         )
+
+
+def test_generate_questions_usecase_returns_fallback_questions_on_llm_error() -> None:
+    usecase = GenerateQuestionsUseCase(
+        data_info_factory=_EmptyDataInfoFactory(),
+        questions_generation_service=_FailingQuestionsService(),
+    )
+
+    result = asyncio.run(
+        usecase.run(
+            ReportQuestionsGenerationRequest(
+                theme="sales analysis",
+                data_source="file",
+                num_questions=3,
+            )
+        )
+    )
+
+    assert len(result.questions) == 3
+    assert all("sales analysis" in question.question for question in result.questions)
+    assert all(question.reasoning for question in result.questions)
+
+
+def test_generate_questions_usecase_returns_fallback_questions_on_empty_result() -> None:
+    usecase = GenerateQuestionsUseCase(
+        data_info_factory=_EmptyDataInfoFactory(),
+        questions_generation_service=_EmptyQuestionsService(),
+    )
+
+    result = asyncio.run(
+        usecase.run(
+            ReportQuestionsGenerationRequest(
+                theme="sales analysis",
+                data_source="file",
+                num_questions=2,
+            )
+        )
+    )
+
+    assert len(result.questions) == 2

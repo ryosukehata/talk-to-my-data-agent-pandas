@@ -4,6 +4,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import { useTranslation } from '@/i18n';
 import {
   useReports,
@@ -39,6 +40,31 @@ import { faCheckCircle } from '@fortawesome/free-solid-svg-icons/faCheckCircle';
 import { faDownload } from '@fortawesome/free-solid-svg-icons/faDownload';
 import loader from '@/assets/loader.svg';
 import { useAppState } from '@/state/hooks';
+
+type ApiErrorResponse = {
+  detail?: unknown;
+};
+
+const getReportErrorMessage = (error: unknown, fallback: string): string => {
+  if (isAxiosError<ApiErrorResponse>(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail;
+    }
+    if (detail && typeof detail === 'object' && 'message' in detail) {
+      const message = (detail as { message?: unknown }).message;
+      if (typeof message === 'string' && message.trim()) {
+        return message;
+      }
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+};
 
 // Status badge component
 const StatusBadge = ({ status }: { status: ReportStatus | QuestionStatus }) => {
@@ -99,7 +125,7 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
     },
     onError: error => {
       setIsCreating(false);
-      setErrorMessage(error.message || t('Failed to create report'));
+      setErrorMessage(getReportErrorMessage(error, t('Failed to create report')));
     },
   });
 
@@ -232,7 +258,7 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
         throw new Error(result.error || t('Failed to refine question'));
       } catch (error) {
         console.error('Failed to refine question:', error);
-        const message = error instanceof Error ? error.message : t('Failed to refine question');
+        const message = getReportErrorMessage(error, t('Failed to refine question'));
         await updateQuestion({
           reportId,
           questionId,
