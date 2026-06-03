@@ -1158,6 +1158,13 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
 - `npm run build`（`app_frontend`）: 成功
 - `pnpm --dir app_frontend lint` はローカルpnpm 11.5.1が `pnpm install` 段階でbuild script承認を要求して失敗した。CIは `.github/workflows` 上 `npm install` / `npm run test` / `npm run lint` / `npm run build` 構成のため、npm scriptで確認した。
 
+### Refiner実行で見つかったLLM互換修正（2026-06-04）
+
+- 新規Report作成後の自動Refineで、DataRobot LLM互換エンドポイントから `Unsupported parameter: max_tokens is not supported with this model. Use max_completion_tokens instead.` が返った。
+- アプリ側のRefiner実装では `max_tokens` を直接指定していなかったため、`instructor` / OpenAI互換クライアント層で付与される `max_tokens` を吸収する必要があった。
+- `utils/llm_client.py` に `CompletionTokenCompatibilityProxy` を追加し、LLM呼び出し直前に `max_tokens` を削除して `max_completion_tokens` へ変換するようにした。
+- `app_backend/tests/test_llm_client.py` を追加し、通常のcompletion proxyとOpenAI client直下の互換proxyの両方で `max_tokens` が下流に残らないことを確認する。
+
 ---
 
 ## 冗長箇所メモ

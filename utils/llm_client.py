@@ -22,6 +22,31 @@ from openai import AsyncOpenAI
 from utils.token_tracking import TokenUsageTracker
 
 
+def _normalize_completion_token_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    normalized_kwargs = dict(kwargs)
+    max_tokens = normalized_kwargs.pop("max_tokens", None)
+    if max_tokens is not None and "max_completion_tokens" not in normalized_kwargs:
+        normalized_kwargs["max_completion_tokens"] = max_tokens
+    return normalized_kwargs
+
+
+class CompletionTokenCompatibilityProxy:
+    """Proxy that normalizes deprecated completion token parameters."""
+
+    def __init__(self, completions: Any):
+        self._completions = completions
+
+    async def create(self, *args: Any, **kwargs: Any) -> Any:
+        return await self._completions.create(
+            *args,
+            **_normalize_completion_token_kwargs(kwargs),
+        )
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate other attributes to underlying completions object."""
+        return getattr(self._completions, name)
+
+
 class TokenTrackingProxy:
     """
     Proxy that intercepts instructor client calls and tracks tokens.
@@ -67,6 +92,7 @@ class CompletionsProxy:
 
     async def create(self, *args: Any, **kwargs: Any) -> Any:
         """Intercept create calls to track tokens."""
+        kwargs = _normalize_completion_token_kwargs(kwargs)
         messages = kwargs.get("messages", [])
         model = kwargs.get("model", "unknown")
 
@@ -81,6 +107,7 @@ class CompletionsProxy:
 
     async def create_with_completion(self, *args: Any, **kwargs: Any) -> Any:
         """Intercept create calls to track tokens."""
+        kwargs = _normalize_completion_token_kwargs(kwargs)
         messages = kwargs.get("messages", [])
         model = kwargs.get("model", "unknown")
 
@@ -152,6 +179,11 @@ class AsyncLLMClient:
             base_url=self._deployment_base_url,
             timeout=180,
             max_retries=2,
+        )
+        setattr(
+            self._openai_client.chat,
+            "completions",
+            CompletionTokenCompatibilityProxy(self._openai_client.chat.completions),
         )
 
         # Create instructor client
