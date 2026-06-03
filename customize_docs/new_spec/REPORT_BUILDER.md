@@ -1011,6 +1011,7 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
 - ルート直下に誤って追跡されていた空ファイル `FETCH_HEAD` を削除する。
 - Pulumi workflowに `VITE_ENABLE_REPORT_BUILDER` を追加し、dev/main環境へfeature flagを渡せるようにする。
 - `Reports.tsx` のReact Hooks依存配列を補正し、ESLint警告を解消する。
+- `app_frontend/package-lock.json` が追跡されていないため、CIのfresh `npm install` でPrettier判定が変わらないよう `prettier` を `3.6.2` に固定する。
 - ルートからの `uv run pytest` が通るよう、pytestのimport pathとテスト用DataRobot envを明示する。
 - DataRobot/LLMへ接続する `customize_docs` のE2E動作確認スクリプトは `RUN_CUSTOMIZE_DOCS_E2E=1` のときだけ実行し、通常の単体テストから外部依存を分離する。
 
@@ -1032,6 +1033,7 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
 - `npm run test`（`app_frontend`）: 101 passed
 - `npm run lint`（`app_frontend`）: 成功（警告なし）
 - `npm run build`（`app_frontend`）: 成功
+- lockfileなし一時コピーでの `npm install` + `npm run lint`（`app_frontend`）: 成功
 - Node 22.22.3でのVitest/ESLint/Vite build: 成功
 - `app_backend` CI相当の `uv run ruff format --check .` / `uv run ruff check .` / `uv run pytest`: 成功
 
