@@ -1164,6 +1164,9 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
 - アプリ側のRefiner実装では `max_tokens` を直接指定していなかったため、`instructor` / OpenAI互換クライアント層で付与される `max_tokens` を吸収する必要があった。
 - `utils/llm_client.py` に `CompletionTokenCompatibilityProxy` を追加し、LLM呼び出し直前に `max_tokens` を削除して `max_completion_tokens` へ変換するようにした。
 - `app_backend/tests/test_llm_client.py` を追加し、通常のcompletion proxyとOpenAI client直下の互換proxyの両方で `max_tokens` が下流に残らないことを確認する。
+- dev環境で再確認したところ、DataRobot LLM Blueprint側の `max_completion_length=2048` もOpenAI向けに legacy `max_tokens` として送られている可能性が高かった。
+- OpenAI reasoning系モデルでは `max_tokens` ではなく `max_completion_tokens` / Responses APIの `max_output_tokens` を使う必要があるため、`infra/settings_generative.py` の `LLMSettings.max_completion_length` は未指定にした。
+- `app_backend/tests/test_infra_llm_settings.py` を追加し、LLM Blueprint設定で `max_completion_length` を再度固定しないことをASTベースで確認する。importによるDataRobot SDK初期化を避けるため、設定ファイルを直接parseしている。
 
 ---
 
