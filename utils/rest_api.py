@@ -21,10 +21,9 @@ import os
 import sys
 import tempfile
 import uuid
-from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Generator, Iterable, List, Union, cast
+from typing import Any, Iterable, List, Union, cast
 
 import datarobot as dr
 import pandas as pd
@@ -51,19 +50,39 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils.dataframe import dataframe_to_rows
 from starlette.background import BackgroundTask
 
-from utils.analyst_db import AnalystDB, DatasetMetadata, DataSourceType
-from utils.database_helpers import get_external_database
+from utils.analyst_db import (
+    AnalystDB,
+    DatasetMetadata,
+    DataSourceType,
+    ExternalDataStoreNameDataSourceType,
+    InternalDataSourceType,
+    get_data_source_type,
+)
+from utils.api_exceptions import ExceptionBody
+from utils.chat_dataset_helper import cleanup_message_datasets
+from utils.data_analyst_telemetry import telemetry
+from utils.database_helpers import NoDatabaseOperator, get_external_database
+from utils.datarobot_client import use_user_token
+from utils.datarobot_dataset_handler import DatasetSparkRecipe, DataSourceRecipe
 from utils.logging_helper import get_logger
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 from utils.api import (
     AnalysisGenerationError,
-    download_registry_datasets,
     list_registry_datasets,
+    load_registry_datasets,
     log_memory,
     process_data_and_update_state,
+    register_remote_registry_datasets,
     run_complete_analysis,
+    summarize_conversation,
+    sync_data_sources_and_datasets,
+)
+from utils.constants import (
+    ALTERNATIVE_LLM_BIG,
+    CONTEXT_WARNING_THRESHOLD,
+    MODEL_CONTEXT_WINDOW,
 )
 from utils.schema import (
     AnalystChatMessage,
@@ -78,11 +97,21 @@ from utils.schema import (
     DataRegistryDataset,
     DatasetCleansedResponse,
     DictionaryCellUpdate,
+    EmptyResponse,
+    ExternalDataSourcesSelection,
+    ExternalDataStore,
     FileUploadResponse,
     GetBusinessAnalysisResult,
     LoadDatabaseRequest,
     RunAnalysisResult,
     RunChartsResult,
+    RunDatabaseAnalysisResult,
+    SupportedDataSourceTypes,
+)
+from utils.token_tracking import (
+    TiktokenCountingStrategy,
+    TokenUsageTracker,
+    count_messages_tokens,
 )
 
 logger = get_logger()
@@ -158,6 +187,8 @@ async def get_database(user_id: str) -> AnalystDB:
         db_path=Path("/tmp"),
         dataset_db_name="datasets.db",
         chat_db_name="chat.db",
+        data_source_db_name="datasources.db",
+        user_recipe_db_name="recipe.db",
         use_persistent_storage=bool(os.environ.get("APPLICATION_ID")),
     )
     return analyst_db
@@ -277,32 +308,6 @@ session_store: dict[str, SessionState] = {}
 session_lock = asyncio.Lock()
 
 
-@contextmanager
-def use_user_token(request: Request) -> Generator[None, None, None]:
-    """Context manager to temporarily use the user's DataRobot token."""
-    if request.state.session.datarobot_api_token:
-        with dr.Client(
-            token=request.state.session.datarobot_api_token,
-            endpoint=request.state.session.datarobot_endpoint,
-        ):
-            yield
-    elif request.state.session.datarobot_api_skoped_token:
-        with dr.Client(
-            token=request.state.session.datarobot_api_skoped_token,
-            endpoint=request.state.session.datarobot_endpoint,
-        ):
-            yield
-    elif not os.environ.get(
-        "DR_CUSTOM_APP_EXTERNAL_URL"
-    ):  # indicates that it's a local environment
-        yield
-    else:
-        raise HTTPException(
-            status_code=401,
-            detail="API token required. Please authenticate with DataRobot.",
-        )
-
-
 @app.middleware("http")
 async def add_session_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
     request_methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
@@ -355,6 +360,8 @@ async def add_session_middleware(request: Request, call_next):  # type: ignore[n
     return response
 
 
+@telemetry.trace
+@telemetry.meter
 async def _initialize_session(
     request: Request,
 ) -> tuple[
@@ -412,7 +419,7 @@ async def _initialize_session(
 
 
 async def _initialize_database(request: Request, user_id: str) -> None:
-    """Initialize the database in the session if not already initialized."""
+    """Initialize per-user database in the session if not already initialized."""
     if (
         not hasattr(request.state.session, "analyst_db")
         or request.state.session.analyst_db is None
@@ -435,19 +442,34 @@ def _set_session_cookie(
         response.set_cookie(key="session_fastapi", value=session_id, httponly=True)
 
 
+# Make this sync as the DR requests are synchronous, if async this would block.
 @router.get("/registry/datasets")
-async def get_registry_datasets(
-    request: Request, limit: int = 100
+def get_registry_datasets(
+    request: Request, remote: bool = False, limit: int = 100
 ) -> list[DataRegistryDataset]:
+    """Return all registry datasets
+
+    Args:
+        request (Request): _description_
+        filter_downloadable (bool, optional): _description_. Defaults to False.
+        limit (int, optional): _description_. Defaults to 100.
+
+    Returns:
+        list[DataRegistryDataset]: _description_
+    """
     with use_user_token(request):
-        return list_registry_datasets(limit)
+        return list_registry_datasets(remote=remote, limit=limit)
 
 
-# =============================================================================
+@router.get("/database/tables")
+async def get_database_tables() -> list[str]:
+    return await get_external_database().get_tables()
 
 
 async def process_and_update(
-    dataset_names: List[str], analyst_db: AnalystDB, datasource_type: DataSourceType
+    dataset_names: List[str],
+    analyst_db: AnalystDB,
+    datasource_type: DataSourceType,
 ) -> None:
     async for _ in process_data_and_update_state(
         dataset_names, analyst_db, datasource_type
@@ -459,12 +481,18 @@ async def process_and_update(
 async def upload_files(
     request: Request,
     background_tasks: BackgroundTasks,
+    data_source: str | InternalDataSourceType | None = None,
     analyst_db: AnalystDB = Depends(get_initialized_db),
     files: List[UploadFile] | None = None,
     registry_ids: str | None = Form(None),
 ) -> list[FileUploadResponse]:
-    logger.info(f"Received upload request: files={files}")
-    print(f"Received upload request: files={files}")
+    normalized_data_source: InternalDataSourceType = (
+        InternalDataSourceType.FILE
+        if data_source is None
+        else InternalDataSourceType(data_source)
+        if isinstance(data_source, str)
+        else data_source
+    )
     dataset_names = []
     response: list[FileUploadResponse] = []
     if files:
@@ -491,7 +519,7 @@ async def upload_files(
 
                     # Register dataset with the database
                     reg_result = await analyst_db.register_dataset(
-                        dataset, DataSourceType.FILE, file_size=file_size
+                        dataset, InternalDataSourceType.FILE, file_size=file_size
                     )
                     if not reg_result["success"]:
                         error_response: FileUploadResponse = {
@@ -526,7 +554,9 @@ async def upload_files(
                             dataset_name = f"{base_name}_{sheet_name}"
                             dataset = AnalystDataset(name=dataset_name, data=data)
                             reg_result = await analyst_db.register_dataset(
-                                dataset, DataSourceType.FILE, file_size=file_size
+                                dataset,
+                                InternalDataSourceType.FILE,
+                                file_size=file_size,
                             )
                             if not reg_result["success"]:
                                 error_response: FileUploadResponse = {
@@ -549,7 +579,7 @@ async def upload_files(
                         dataset_name = base_name
                         dataset = AnalystDataset(name=dataset_name, data=excel_dataset)
                         reg_result = await analyst_db.register_dataset(
-                            dataset, DataSourceType.FILE, file_size=file_size
+                            dataset, InternalDataSourceType.FILE, file_size=file_size
                         )
                         if not reg_result["success"]:
                             error_response: FileUploadResponse = {
@@ -584,14 +614,22 @@ async def upload_files(
     # Process the data in the background (cleansing and dictionary generation)
     if dataset_names:
         background_tasks.add_task(
-            process_and_update, dataset_names, analyst_db, DataSourceType.FILE
+            process_and_update, dataset_names, analyst_db, InternalDataSourceType.FILE
         )
 
     if registry_ids:
         id_list: list[str] = json.loads(registry_ids)
         if id_list:
             with use_user_token(request):
-                dataframes = await download_registry_datasets(id_list, analyst_db)
+                if normalized_data_source == InternalDataSourceType.REMOTE_REGISTRY:
+                    dataframes, tasks = await register_remote_registry_datasets(
+                        request, id_list, analyst_db
+                    )
+                else:
+                    dataframes = await load_registry_datasets(id_list, analyst_db)
+                    tasks = []
+                for func, args, kwargs in tasks:
+                    background_tasks.add_task(func, *args, **kwargs)
                 dataset_names = [
                     dataset.name for dataset in dataframes if not dataset.error
                 ]
@@ -599,7 +637,9 @@ async def upload_files(
                     process_and_update,
                     dataset_names,
                     analyst_db,
-                    DataSourceType.REGISTRY,
+                    InternalDataSourceType.REMOTE_REGISTRY
+                    if normalized_data_source == InternalDataSourceType.REMOTE_REGISTRY
+                    else InternalDataSourceType.REGISTRY,
                 )
                 for dts in dataframes:
                     dts_response: FileUploadResponse = {
@@ -630,7 +670,10 @@ async def load_from_database(
     # Process the data in the background (cleansing and dictionary generation)
     if dataset_names:
         background_tasks.add_task(
-            process_and_update, dataset_names, analyst_db, DataSourceType.DATABASE
+            process_and_update,
+            dataset_names,
+            analyst_db,
+            InternalDataSourceType.DATABASE,
         )
 
     return dataset_names
@@ -657,6 +700,117 @@ async def get_dictionaries(
             )
 
     return dictionaries if dictionaries else []
+
+
+@router.get("/datasets/{dataset_id}")
+async def get_dataset_by_id(
+    dataset_id: str,
+    skip: int = 0,
+    limit: int = 1000,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+) -> DatasetCleansedResponse:
+    """
+    Get a dataset by its ID with pagination support.
+
+    Args:
+        dataset_id: The unique identifier of the dataset
+        skip: Number of records to skip (for pagination)
+        limit: Maximum number of records to return (for pagination)
+
+    Returns:
+        A response containing the dataset (similar to cleansed dataset format)
+
+    Raises:
+        HTTPException: If the dataset doesn't exist or cannot be retrieved
+    """
+    try:
+        from utils.analyst_db import DatasetType
+
+        df = await analyst_db.dataset_handler.get_dataframe(
+            dataset_id,
+            expected_type=DatasetType.ANALYST_RESULT_DATASET,
+            max_rows=None,
+        )
+
+        if skip > 0 or limit > 0:
+            df = df.iloc[skip : skip + limit]
+
+        metadata = await analyst_db.dataset_handler.get_dataset_metadata(dataset_id)
+
+        dataset = AnalystDataset(
+            name=metadata.original_name,
+            data=df,
+        )
+
+        # Return in the same format as cleansed dataset
+        return DatasetCleansedResponse(
+            dataset_name=metadata.original_name,
+            cleaning_report=None,  # No cleaning report for analyst datasets
+            dataset=dataset,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404, detail=f"Dataset '{dataset_id}' not found: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving dataset '{dataset_id}': {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error retrieving dataset: {str(e)}"
+        )
+
+
+@router.get("/datasets/{dataset_id}/download")
+async def download_dataset(
+    dataset_id: str,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+    bom: bool = False,
+) -> Response:
+    """
+    Download a dataset by ID as a CSV file.
+
+    Args:
+        dataset_id: The unique identifier of the dataset to download
+        bom: Whether to include UTF-8 BOM for Excel compatibility (default: False)
+
+    Returns:
+        CSV file attachment
+
+    Raises:
+        HTTPException: If the dataset doesn't exist or cannot be retrieved
+    """
+    try:
+        from utils.analyst_db import DatasetType
+
+        df = await analyst_db.dataset_handler.get_dataframe(
+            dataset_id,
+            expected_type=DatasetType.ANALYST_RESULT_DATASET,
+            max_rows=None,
+        )
+
+        csv_content = io.StringIO()
+        df.write_csv(csv_content)
+
+        csv_text = csv_content.getvalue()
+        if bom:
+            csv_text = "\ufeff" + csv_text
+
+        response = Response(content=csv_text)
+        response.headers["Content-Type"] = "text/csv; charset=utf-8"
+
+        filename = f"analysis_result_dataset_{dataset_id[:8]}.csv"
+        response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        return response
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404, detail=f"Dataset '{dataset_id}' not found: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error downloading dataset '{dataset_id}': {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error downloading dataset: {str(e)}"
+        )
 
 
 @router.get("/datasets/{name}/metadata")
@@ -782,6 +936,7 @@ async def get_cleansed_dataset(
 
 @router.delete("/datasets", status_code=200)
 async def delete_datasets(
+    request: Request,
     analyst_db: AnalystDB = Depends(get_initialized_db),
 ) -> None:
     await analyst_db.delete_all_tables()
@@ -860,8 +1015,7 @@ async def update_dictionary_cell(
             detail=f"Field '{update.field}' not found in dictionary row",
         )
 
-    await analyst_db.delete_dictionary(dictionary.name)
-    await analyst_db.register_data_dictionary(dictionary)
+    await analyst_db.register_data_dictionary(dictionary, clobber=True)
 
     return dictionary
 
@@ -942,6 +1096,13 @@ async def delete_chat(
     chat_id: str, analyst_db: AnalystDB = Depends(get_initialized_db)
 ) -> dict[str, str]:
     """Delete a chat"""
+    # Get all messages to clean up datasets
+    messages = await analyst_db.get_chat_messages(chat_id=chat_id)
+
+    # Clean up datasets for all messages
+    for message in messages:
+        await cleanup_message_datasets(analyst_db, message)
+
     # Delete the chat
     await analyst_db.delete_chat(chat_id=chat_id)
 
@@ -974,6 +1135,9 @@ async def delete_chat_message(
                 status_code=404, detail=f"Message with ID {message_id} not found"
             )
         else:
+            # Clean up associated datasets before deleting the message
+            await cleanup_message_datasets(analyst_db, message)
+
             await analyst_db.delete_chat_message(message_id=message_id)
             messages = await analyst_db.get_chat_messages(
                 chat_id=message.chat_id,
@@ -1053,6 +1217,8 @@ async def create_new_chat_message(
     chat_request = ChatRequest(messages=valid_messages)
 
     # Run the analysis in the background
+    # Running the sync version whill get run in a different thread as the async version,
+    # despite the name, blocks for significant period. (When that gets fixed, we can change this.)
     background_tasks.add_task(
         run_complete_analysis_task,
         chat_request,
@@ -1094,19 +1260,27 @@ async def create_chat_message(
 
     # Check if cancelled
     if not in_progress:
-        # Create the user message
-        user_message = AnalystChatMessage(
-            role="user", content=payload.message, components=[]
-        )
+        # Check if there's an existing summary (find last system message)
+        last_summary_idx = None
+        for i in range(len(messages) - 1, -1, -1):  # Iterate backwards through indices
+            if messages[i].role == "system":
+                last_summary_idx = i
+                break
 
-        message_id = await analyst_db.add_chat_message(
-            chat_id=chat_id,
-            message=user_message,
-        )
+        # Build context: if summary exists, use [summary] + messages_after, else all messages
+        if last_summary_idx is not None:
+            context_messages = messages[last_summary_idx:]
+            logger.info(
+                f"[chat_id={chat_id}] Using summary + {len(context_messages) - 1} messages after"
+            )
+        else:
+            context_messages = messages
 
         # Create valid messages for the chat request
         valid_messages: list[ChatCompletionMessageParam] = [
-            msg.to_openai_message_param() for msg in messages if msg.content.strip()
+            msg.to_openai_message_param()
+            for msg in context_messages
+            if msg.content.strip()
         ]
 
         # Add the current message
@@ -1114,10 +1288,111 @@ async def create_chat_message(
             ChatCompletionUserMessageParam(role="user", content=payload.message)
         )
 
+        # Check context usage
+        tokens_used = count_messages_tokens(valid_messages, ALTERNATIVE_LLM_BIG)
+        usage_pct = (tokens_used / MODEL_CONTEXT_WINDOW) * 100
+
+        logger.info(
+            f"[chat_id={chat_id}] Context: {tokens_used:,}/{MODEL_CONTEXT_WINDOW:,} tokens ({usage_pct:.1f}%)"
+        )
+
+        # Create and store the user message first (before summarization)
+        user_message = AnalystChatMessage(
+            role="user", content=payload.message, components=[]
+        )
+        message_id = await analyst_db.add_chat_message(
+            chat_id=chat_id, message=user_message
+        )
+        user_message.id = message_id
+
+        # Trigger summarization if over threshold
+        if tokens_used >= CONTEXT_WARNING_THRESHOLD:
+            logger.warning(
+                f"[chat_id={chat_id}] ⚠️  Context at {usage_pct:.1f}% - creating summary"
+            )
+
+            # Create new system message with in_progress=True
+            summary_message = AnalystChatMessage(
+                role="system",
+                content="Summarizing conversation...",
+                components=[],
+                in_progress=True,
+            )
+            summary_message.id = await analyst_db.add_chat_message(
+                chat_id=chat_id, message=summary_message
+            )
+
+            # Determine what to summarize: from last system message (if exists) to now, or all messages
+            if last_summary_idx is not None:
+                # Summarize from last system message onwards
+                messages_to_summarize = [
+                    msg.to_openai_message_param()
+                    for msg in messages[last_summary_idx:]
+                    if msg.content.strip()
+                ]
+            else:
+                # Summarize all messages
+                messages_to_summarize = [
+                    msg.to_openai_message_param()
+                    for msg in messages
+                    if msg.content.strip()
+                ]
+
+            # Create token tracker for summarization
+            summarization_tracker = TokenUsageTracker(
+                strategy=TiktokenCountingStrategy()
+            )
+
+            try:
+                summary_text = await summarize_conversation(
+                    messages_to_summarize, token_tracker=summarization_tracker
+                )
+
+                logger.info(
+                    f"[chat_id={chat_id}] Summarization token usage: "
+                    f"{summarization_tracker.prompt_tokens} prompt + "
+                    f"{summarization_tracker.completion_tokens} completion = "
+                    f"{summarization_tracker.total_tokens} total tokens"
+                )
+
+                # Update the summary message with actual content
+                summary_message.content = summary_text
+                summary_message.in_progress = False
+
+                await analyst_db.update_chat_message(
+                    message_id=summary_message.id,
+                    message=summary_message,
+                )
+
+                logger.info(
+                    f"[chat_id={chat_id}] Summary stored ({len(summary_text)} chars)"
+                )
+
+                # Rebuild context using the new summary
+                summary_param = summary_message.to_openai_message_param()
+                valid_messages = [
+                    summary_param,
+                    valid_messages[-1],
+                ]  # summary + current message
+
+            except Exception as e:
+                logger.error(f"[chat_id={chat_id}] Failed to create summary: {e}")
+                # Mark summary as failed
+                summary_message.content = "Failed to create summary"
+                summary_message.in_progress = False
+                summary_message.error = str(e)
+                await analyst_db.update_chat_message(
+                    message_id=summary_message.id,
+                    message=summary_message,
+                )
+                # Continue without summary
+
         # Create the chat request
         chat_request = ChatRequest(messages=valid_messages)
 
         # Run the analysis in the background
+        # Running the sync version whill get run in a different thread as the async version,
+        # despite the name, blocks for significant period. (When that gets fixed, we can change this.)
         background_tasks.add_task(
             run_complete_analysis_task,
             chat_request,
@@ -1166,11 +1441,20 @@ async def save_chat_messages(
         idx = next((i for i, m in enumerate(chat_messages) if m.id == message_id), None)
         if idx is None or chat_messages[idx].role != "user":
             raise HTTPException(detail="User message not found", status_code=404)
-        # Ensure there is a following assistant message
-        if idx == len(chat_messages) - 1 or chat_messages[idx + 1].role != "assistant":
-            filtered_messages = [chat_messages[idx]]
+
+        # Find the following assistant message
+        assistant_message = None
+        for i in range(idx + 1, len(chat_messages)):
+            if chat_messages[i].role == "assistant":
+                assistant_message = chat_messages[i]
+                break
+
+        # Include user message and assistant response if found
+        if assistant_message:
+            filtered_messages = [chat_messages[idx], assistant_message]
         else:
-            filtered_messages = [chat_messages[idx], chat_messages[idx + 1]]
+            filtered_messages = [chat_messages[idx]]
+
         chat_messages = filtered_messages
     if not chat_messages:
         # Create an empty workbook with basic structure for empty chats
@@ -1205,6 +1489,10 @@ async def save_chat_messages(
     analysis_workbook.remove(analysis_workbook.active)
 
     for i, chat_message in enumerate(chat_messages):
+        # Skip system messages (summarization messages)
+        if chat_message.role == "system":
+            continue
+
         if chat_message.role == "assistant":
             # Handle Analysis Report sheet
             report_sheets_count += 1
@@ -1215,12 +1503,12 @@ async def save_chat_messages(
 
             report_sheet["A1"] = "Analysis Report"
 
-            # Since messages alternate user/assistant, the previous message is always the user question
-            user_question = (
-                chat_messages[i - 1].content
-                if i > 0 and chat_messages[i - 1].role == "user"
-                else "No question found"
-            )
+            # Find the previous user message by searching backwards
+            user_question = "No question found"
+            for j in range(i - 1, -1, -1):
+                if chat_messages[j].role == "user":
+                    user_question = chat_messages[j].content
+                    break
 
             report_sheet["A3"] = "Question"
             report_sheet["A4"] = user_question
@@ -1251,14 +1539,39 @@ async def save_chat_messages(
                     ).value = followup_question
 
             # Handle Data sheets
-            run_analysis_components: List[RunAnalysisResult] = [
+            run_analysis_components: List[
+                RunAnalysisResult | RunDatabaseAnalysisResult
+            ] = [
                 component
                 for component in chat_message.components
-                if isinstance(component, RunAnalysisResult)
+                if isinstance(component, (RunAnalysisResult, RunDatabaseAnalysisResult))
             ]
             for run_analysis_component in run_analysis_components:
-                if not run_analysis_component.dataset:
+                # Load dataset from storage (dataset field is excluded from serialization)
+                if not run_analysis_component.dataset_id:
                     continue
+
+                try:
+                    from utils.analyst_db import DatasetType
+
+                    df = await analyst_db.dataset_handler.get_dataframe(
+                        run_analysis_component.dataset_id,
+                        expected_type=DatasetType.ANALYST_RESULT_DATASET,
+                        max_rows=None,
+                    )
+                    metadata = await analyst_db.dataset_handler.get_dataset_metadata(
+                        run_analysis_component.dataset_id
+                    )
+                    dataset_to_export = AnalystDataset(
+                        name=metadata.original_name,
+                        data=df,
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to load dataset {run_analysis_component.dataset_id}: {e}"
+                    )
+                    continue
+
                 data_sheets_count += 1
                 data_sheet_name = (
                     "Data" if data_sheets_count == 1 else f"Data {data_sheets_count}"
@@ -1266,7 +1579,7 @@ async def save_chat_messages(
                 data_sheet = analysis_workbook.create_sheet(data_sheet_name)
 
                 try:
-                    dataset: pd.DataFrame = run_analysis_component.dataset.data.df
+                    dataset: pd.DataFrame = dataset_to_export.data.df
                     # Convert to pandas with error handling for large datasets
                     pandas_df = dataset
 
@@ -1375,14 +1688,25 @@ async def run_complete_analysis_task(
     request: Request,
 ) -> None:
     """Run the complete analysis pipeline"""
-    source = DataSourceType(data_source)
-    datasets_names = []
-    if source == DataSourceType.DATABASE:
-        datasets_names = await analyst_db.list_analyst_datasets(source)
+    source = get_data_source_type(data_source)
+    logger.debug(
+        "Running analysis for user.",
+        extra={
+            "data_source": data_source,
+            "user_id": analyst_db.user_id,
+        },
+    )
+    dataset_metadata = []
+    if source in [InternalDataSourceType.REGISTRY, InternalDataSourceType.FILE]:
+        dataset_metadata = (
+            await analyst_db.list_analyst_dataset_metadata(
+                InternalDataSourceType.REGISTRY
+            )
+        ) + (
+            await analyst_db.list_analyst_dataset_metadata(InternalDataSourceType.FILE)
+        )
     else:
-        datasets_names = (
-            await analyst_db.list_analyst_datasets(DataSourceType.REGISTRY)
-        ) + (await analyst_db.list_analyst_datasets(DataSourceType.FILE))
+        dataset_metadata = await analyst_db.list_analyst_dataset_metadata(source)
 
     user_email = request.headers.get("x-user-email")
     logger.info(f"Sending request on behalf of {user_email}")
@@ -1393,13 +1717,14 @@ async def run_complete_analysis_task(
     run_analysis_iterator = run_complete_analysis(
         chat_request=chat_request,
         data_source=source,
-        datasets_names=datasets_names,
+        dataset_metadata=dataset_metadata,
         analyst_db=analyst_db,
         chat_id=chat_id,
         message_id=message_id,
         enable_chart_generation=enable_chart_generation,
         enable_business_insights=enable_business_insights,
         telemetry_json=telemetry_json,
+        request=request,
     )
 
     async for message in run_analysis_iterator:
@@ -1407,6 +1732,145 @@ async def run_complete_analysis_task(
             break
         else:
             pass
+
+
+# Sync as this is a long blocking request
+@router.get("/available-external-data-stores")
+def get_available_external_data_stores(
+    request: Request, analyst_db: AnalystDB = Depends(get_initialized_db)
+) -> list[ExternalDataStore]:
+    """List all available datastores. (An available datastore
+    (a) has datasources configured and (b) has a supported driver.)
+
+    Args:
+        request (Request): HTTP request.
+        limit (int): Maximum entries to retrieve.
+        offset (int): Number of entries to skip.
+
+    Returns:
+        list[ExternalDataStore]: The given page of datastores.
+    """
+    with use_user_token(request):
+        return asyncio.run(
+            DataSourceRecipe.list_available_datastores(analyst_db.user_id)
+        )
+
+
+@router.put(
+    "/external-data-stores/{external_data_store_id}/external-data-sources/",
+    responses={404: {"model": ExceptionBody}},
+)
+def register_external_data_sources(
+    request: Request,
+    selected_datasource_ids: ExternalDataSourcesSelection,
+    external_data_store_id: str,
+    background_tasks: BackgroundTasks,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+) -> EmptyResponse:
+    """
+    Add data sources for a datastore, registering them as datasets in the app.
+
+    Args:
+        request (Request): The request
+        selected_datasource_ids (ExternalDataSourcesSelection): Select data sources for a datasource
+        external_data_store_id (str): Select the data store
+        background_tasks (BackgroundTasks): Background tasks
+        analyst_db (AnalystDB, optional): The database. Defaults to Depends(get_initialized_db).
+
+    Returns:
+        ExternalDataStore: The updated data store
+    """
+    return asyncio.run(
+        _register_external_data_sources_async(
+            request,
+            selected_datasource_ids,
+            external_data_store_id,
+            background_tasks,
+            analyst_db,
+        )
+    )
+
+
+async def _register_external_data_sources_async(
+    request: Request,
+    selected_datasource_ids: ExternalDataSourcesSelection,
+    external_data_store_id: str,
+    background_tasks: BackgroundTasks,
+    analyst_db: AnalystDB,
+) -> EmptyResponse:
+    logger.debug(
+        "PUT /external-data-stores/%s/external-data-sources/", external_data_store_id
+    )
+    with use_user_token(request):
+        name = DataSourceRecipe.get_canonical_name_for_datastore_id(
+            external_data_store_id
+        )
+        if not name:
+            raise HTTPException(
+                404, f"DataStore {external_data_store_id} does not exist."
+            )
+
+        background_tasks.add_task(
+            update_data_sources_for_data_store,
+            request,
+            selected_datasource_ids,
+            external_data_store_id,
+            analyst_db,
+        )
+
+        logger.debug(
+            "Registering data sources for data store %s (%s).",
+            name,
+            external_data_store_id,
+        )
+        _, tasks = await sync_data_sources_and_datasets(
+            request=request,
+            canonical_name=name,
+            analyst_db=analyst_db,
+            data_store_id=external_data_store_id,
+            selected_datasource_ids=selected_datasource_ids,
+        )
+
+        logger.debug(
+            "Adding background tasks for data store %s.", external_data_store_id
+        )
+        for f, arg, kwargs in tasks:
+            background_tasks.add_task(f, *arg, **kwargs)
+        background_tasks.add_task(
+            process_and_update,
+            [d.path for d in selected_datasource_ids.selected_data_sources],
+            analyst_db,
+            ExternalDataStoreNameDataSourceType.from_name(name),
+        )
+    return EmptyResponse()
+
+
+async def update_data_sources_for_data_store(
+    request: Request,
+    selected_datasource_ids: ExternalDataSourcesSelection,
+    external_data_store_id: str,
+    analyst_db: AnalystDB,
+) -> None:
+    with use_user_token(request):
+        logger.debug("Loading recipe for datasources %s.")
+        recipe = await DataSourceRecipe.load_or_create(
+            analyst_db, external_data_store_id
+        )
+        logger.debug("Updating recipe with data sources for %s", external_data_store_id)
+        await recipe.select_data_sources(selected_datasource_ids.selected_data_sources)
+
+
+@router.get("/supported-data-source-types")
+async def get_supported_datasource_types(request: Request) -> SupportedDataSourceTypes:
+    types: list[InternalDataSourceType] = [
+        InternalDataSourceType.FILE,
+        InternalDataSourceType.REGISTRY,
+    ]
+    if not isinstance(get_external_database(), NoDatabaseOperator):
+        types.append(InternalDataSourceType.DATABASE)
+    if DatasetSparkRecipe.should_use_spark_recipe():
+        types.append(InternalDataSourceType.REMOTE_REGISTRY)
+    return SupportedDataSourceTypes(supported_types=[t.value for t in types])
 
 
 @router.get("/user/datarobot-account")

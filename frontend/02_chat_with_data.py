@@ -13,32 +13,30 @@
 # limitations under the License.
 
 import asyncio
-import os
-import sys
+import logging
 import time
 import uuid
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, Optional, cast
 
+import nest_asyncio
+import opentelemetry
 import streamlit as st
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-from openai.types.chat.chat_completion_user_message_param import (
-    ChatCompletionUserMessageParam,
-)
-from streamlit.delta_generator import DeltaGenerator
-
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-# Import FastAPI functions directly
 from app_settings import (
     apply_custom_css,
     display_page_logo,
 )
 from datarobot_connect import DataRobotTokenManager
 from helpers import log_error_details, state_init
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+from openai.types.chat.chat_completion_user_message_param import (
+    ChatCompletionUserMessageParam,
+)
+from streamlit.delta_generator import DeltaGenerator
 
-from utils.analyst_db import AnalystDB, DataSourceType
+from utils.analyst_db import AnalystDB, InternalDataSourceType
 from utils.api import (
     AnalysisGenerationError,
     run_complete_analysis,
@@ -57,9 +55,38 @@ from utils.schema import (
     RunDatabaseAnalysisResult,
 )
 
+# Apply nest_asyncio to allow asyncio.run() in Streamlit's event loop
+nest_asyncio.apply()
+
 warnings.filterwarnings("ignore")
 logger = get_logger("DataAnalystFrontend")
 app_infra = load_app_infra()
+
+# Initialize telemetry for chat page
+chat_logger: Optional[logging.Logger] = None
+chat_tracer: Optional[opentelemetry.trace.Tracer] = None
+chat_meter: Optional[opentelemetry.metrics.Meter] = None
+
+try:
+    from utils.data_analyst_telemetry import DataAnalystTelemetry
+
+    # Initialize telemetry
+    telemetry = DataAnalystTelemetry()
+
+    # Get basic telemetry components
+    chat_logger = telemetry.get_logger("data_analyst.chat_with_data")
+    chat_tracer = telemetry.get_tracer("data_analyst.chat_with_data")
+    chat_meter = telemetry.get_meter("data_analyst.chat_with_data")
+
+    # Log page visit
+    chat_logger.info("User navigated to chat_with_data page")
+
+except Exception as e:
+    # Don't fail if telemetry fails
+    logger.warning(f"Warning: Chat page telemetry initialization failed: {e}")
+    chat_logger = None
+    chat_tracer = None
+    chat_meter = None
 
 # Custom CSS
 apply_custom_css()
@@ -318,19 +345,29 @@ async def run_complete_analysis_st(
         renderer.set_containers(containers)
 
         try:
-            selected_datasets = [
-                dataset_name
-                for dataset_name in st.session_state.datasets_names
-                if st.session_state[f"dataset_{dataset_name}"]
-            ]
             telemetry_json = {
                 "user_email": st.session_state.user_email,
                 "user_msg": chat_request.messages[-1]["content"],
             }
+            # Get selected dataset names first
+            selected_dataset_names = [
+                dataset_name
+                for dataset_name in st.session_state.datasets_names
+                if st.session_state[f"dataset_{dataset_name}"]
+            ]
+
+            # Await all dataset metadata calls
+            selected_datasets = []
+            for dataset_name in selected_dataset_names:
+                metadata = await st.session_state.analyst_db.get_dataset_metadata(
+                    dataset_name
+                )
+                selected_datasets.append(metadata)
             run_analysis_iterator = run_complete_analysis(
+                request=None,
                 chat_request=chat_request,
                 data_source=st.session_state.data_source,
-                datasets_names=selected_datasets,
+                dataset_metadata=selected_datasets,
                 analyst_db=st.session_state.analyst_db,
                 chat_id=st.session_state.current_chat_id,
                 message_id=st.session_state.chat_messages[-1].id,
@@ -386,6 +423,7 @@ async def main() -> None:
     await state_init()
     # Main page content (Chat Interface)
     display_page_logo()
+
     if "analyst_db" not in st.session_state:
         st.session_state.retries += 1
         if st.session_state.retries >= 5:
@@ -402,14 +440,16 @@ async def main() -> None:
     all_chats = await analyst_db.get_chat_list()
     if not st.session_state.data_source:
         all_datasets = []
-    elif st.session_state.data_source == DataSourceType.DATABASE:
+    elif st.session_state.data_source == InternalDataSourceType.DATABASE:
         all_datasets = await analyst_db.list_analyst_datasets(
-            data_source=DataSourceType(st.session_state.data_source)
+            data_source=InternalDataSourceType(st.session_state.data_source)
         )
     else:
         all_datasets = await analyst_db.list_analyst_datasets(
-            data_source=DataSourceType.FILE
-        ) + await analyst_db.list_analyst_datasets(data_source=DataSourceType.REGISTRY)
+            data_source=InternalDataSourceType.FILE
+        ) + await analyst_db.list_analyst_datasets(
+            data_source=InternalDataSourceType.REGISTRY
+        )
 
     st.session_state.datasets_names = all_datasets
     if (
@@ -433,9 +473,9 @@ async def main() -> None:
 
             def set_database_mode() -> None:
                 if st.session_state.database_mode == "Local":
-                    st.session_state.data_source = DataSourceType.FILE
+                    st.session_state.data_source = InternalDataSourceType.FILE
                 else:
-                    st.session_state.data_source = DataSourceType.DATABASE
+                    st.session_state.data_source = InternalDataSourceType.DATABASE
 
             st.radio(
                 "Database Mode",
@@ -444,7 +484,7 @@ async def main() -> None:
                 horizontal=True,
                 on_change=set_database_mode,
                 index=1
-                if st.session_state.data_source == DataSourceType.DATABASE
+                if st.session_state.data_source == InternalDataSourceType.DATABASE
                 else 0,
             )
 
@@ -600,6 +640,19 @@ async def main() -> None:
         if question := st.chat_input(
             gettext("Ask a question about your data"),
         ):
+            # Log chat interaction
+            if chat_logger:
+                try:
+                    chat_logger.info(
+                        "User submitted chat question",
+                        extra={
+                            "question_length": len(question),
+                            "chat_id": st.session_state.get("current_chat_id") or "new",
+                        },
+                    )
+                except Exception as e:
+                    print(f"Warning: Failed to log chat interaction: {e}")
+
             # Create and add user message
             user_message = AnalystChatMessage(
                 role="user", content=question, components=[]

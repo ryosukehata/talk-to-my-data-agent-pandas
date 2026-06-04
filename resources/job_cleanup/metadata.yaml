@@ -1,5 +1,6 @@
+---
 name: runtime-params
 
 runtimeParameterDefinitions:
-- fieldName: DATAROBOT_APPLICATION_ID
-  type: string
+  - fieldName: DATAROBOT_APPLICATION_ID
+    type: string

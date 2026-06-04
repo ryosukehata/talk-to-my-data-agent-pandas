@@ -85,7 +85,7 @@ def update_dataset(
         )
     logger.debug(response.json())
     assert response.status_code // 100 == 2
-    version_id = response.json()["catalogVersionId"]
+    version_id = str(response.json()["catalogVersionId"])
     logger.info(f"{dataset_id}: adding version: {version_id}")
     if wait_for_completion:
         _poll_dataset_version_status(dataset_id, version_id)

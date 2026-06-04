@@ -131,8 +131,8 @@ def get_app_files(
         if f.is_file()
     ]
     utils_files += [
-        (str(PROJECT_ROOT / f"utils/customize/{f.name}"), f"utils/customize/{f.name}")
-        for f in (PROJECT_ROOT / "utils/customize").glob("*.py")
+        (str(f), f"utils/customize/{f.relative_to(PROJECT_ROOT / 'utils/customize')}")
+        for f in (PROJECT_ROOT / "utils/customize").glob("**/*.py")
         if f.is_file()
     ]
 
@@ -152,7 +152,17 @@ def get_app_files(
                     (str(snowflake_file), credentials.snowflake_key_path)
                 )
 
-    EXCLUDE_PATTERNS = [re.compile(pattern) for pattern in [r".*\.pyc"]]
+    EXCLUDE_PATTERNS = [
+        re.compile(pattern)
+        for pattern in [
+            r".*\.pyc",
+            r".*\.so",
+            r".*\.dylib",
+            r"\.venv/.*",
+            r"__pycache__/.*",
+            r"\.DS_Store",
+        ]
+    ]
     source_files = [
         (file_path, file_name)
         for file_path, file_name in source_files

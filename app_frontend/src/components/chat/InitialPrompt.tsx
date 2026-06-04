@@ -6,6 +6,7 @@ import { useTranslation } from '@/i18n';
 import { useAppState } from '@/state/hooks';
 import { DATA_SOURCES } from '@/constants/dataSources';
 import { TemplateButton } from '@/components/template';
+import { RefinerButton } from '@/components/refiner';
 import type { IChat } from '@/api/chat-messages/types';
 import type { PromptTemplate } from '@/api/templates/types';
 
@@ -55,6 +56,22 @@ export const InitialPrompt = ({
     setSelectedTemplateText('');
   };
 
+  const handleRefineComplete = (refinedMessage: string) => {
+    setSelectedTemplateText(refinedMessage);
+    // Focus the input after refining
+    setTimeout(() => {
+      promptInputRef.current?.focus();
+    }, 100);
+  };
+
+  const handleAutoSend = (message: string) => {
+    handleSend(message);
+    // Clear the input field after auto-send
+    if (promptInputRef.current) {
+      promptInputRef.current.value = '';
+    }
+  };
+
   // Focus the input when template is selected
   useEffect(() => {
     if (selectedTemplateText && promptInputRef.current) {
@@ -75,14 +92,14 @@ export const InitialPrompt = ({
               {t('Type a question about your dataset')}
             </strong>
           </h4>
-          <p className="text-center mb-6">
+          <p className="text-center mb-10">
             {t(
               "Ask specific questions about your datasets to get insights, generate visualizations, and discover patterns. Include column names and the kind of analysis you're looking for to get more accurate results."
             )}
           </p>
 
           {/* Template selection area */}
-          <div className="w-full flex justify-center items-center mb-4">
+          <div className="w-full flex justify-center items-center gap-2 mb-4">
             <TemplateButton
               onSelectTemplate={handleTemplateSelect}
               onSendDirectly={handleSend}
@@ -92,17 +109,34 @@ export const InitialPrompt = ({
               disabled={isDisabled}
               testId="initial-template-button"
             />
+            <RefinerButton
+              inputRef={promptInputRef}
+              dataSource={chatDataSource}
+              onRefineComplete={handleRefineComplete}
+              onAutoSend={handleAutoSend}
+              disabled={isDisabled}
+              testId="initial-refiner-button"
+            />
           </div>
 
           <PromptInput
             key={selectedTemplateText ? 'with-template' : 'empty'}
             ref={promptInputRef}
             sendButtonArrangement="append"
-            onSend={handleSend}
+            onSend={(message: string) =>
+              sendMessage({
+                message,
+                chatId,
+                enableChartGeneration,
+                enableBusinessInsights,
+                dataSource: chatDataSource,
+              })
+            }
             initialValue={selectedTemplateText}
             isDisabled={isDisabled}
             testId="initial-prompt-input"
             placeholder={t('Ask another question about your datasets.')}
+            autoFocus
           />
         </div>
       </div>

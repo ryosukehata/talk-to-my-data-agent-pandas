@@ -5,6 +5,139 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.19.1] - 2025-12-09
+
+### Added
+
+- Question Refiner feature: AI-powered question refinement to improve analysis quality.
+  - New RefinerButton component next to template selection.
+  - Backend API endpoint (`POST /api/v1/refiner`) for question refinement.
+  - Two feature flags: `VITE_ENABLE_QUESTION_REFINER` and `VITE_ENABLE_REFINER_AUTO_SEND`.
+  - i18n support for English and Japanese.
+- MSW test handlers for feature-flags, templates, and template categories endpoints.
+
+### Changed
+
+- Improved light mode theme consistency:
+  - Fixed text colors from cyan to proper foreground colors across components.
+  - Updated `SuggestedPrompt`, `HeaderSection`, `SuggestedQuestionsSection`, `AddDataModal`, and `Sidebar` components.
+  - Changed suggested prompt background to use `bg-muted` for better visual consistency.
+- Updated infrastructure to include all files under `utils/customize/` directory recursively.
+
+### Fixed
+
+- Added `node_modules/` to yamlfmt exclude list to prevent linting errors from third-party packages.
+
+## [0.3.19] - 2025-11-11
+
+### Added
+
+- Gracefully handle Context Window Limit of a chat on the UI.
+- Direct download functionality for analysis datasets.
+- Copy-to-clipboard button for code snippets in chat responses. Improved code snippet selection.
+- Improved error treatment for user messages.
+
+## [0.3.18] - 2025-10-30
+
+### Fixed
+
+- Add Data sheet back to exported chat conversations in Excel format.
+
+## [0.3.17] - 2025-10-29
+
+### Fixed
+
+- Disabled telemetry in local development mode.
+- Fixed issue where chat sometimes does not show the AI response properly.
+
+## [0.3.16] - 2025-10-23
+
+### Fix
+
+- Fixed a critical storage bug.
+
+## [0.3.15] - 2025-10-03
+
+### Added
+
+- Token usage estimate tracking for LLM calls.
+- Refactored message storage (analyst dataset) to prevent oversized chat API responses and failures.
+- Integration with DataRobot Python client 3.9.1 `CustomApplication` and `CustomApplicationSource` entities.
+- Dynamic resource fetching from CustomApplicationSource when creating CustomApplications.
+- Fixed `RuntimeError: asyncio.run() cannot be called from a running event loop` in Streamlit frontend by applying `nest_asyncio` patch.
+
+### Improvements
+
+- Performance improvements in app's database.
+  - Replace expensive + blocking check for updates with separate read/write connections.
+  - Replaced synchronous persistence methods with asynchronous methods.
+
+## Documentation
+
+- Updated README to describe connecting to DataRobot data stores.
+
+## [0.3.14] - 2025-10-03
+
+### Fixes
+
+- Reset logging level to INFO (accidentally set to DEBUG in prior release).
+- Filled out previous changelog entry.
+
+## [0.3.13] - 2025-10-03
+
+### Features
+
+- Add connection to DataRobot data stores (currently Postgres and Redshift).
+
+### Improvements
+
+- Move some expensive calls into background thread to avoid blocking main event loop.
+- Updated chat UX to progressively load components of chat response.
+- Only show warning when both TEXTGEN_REGISTERED_MODEL_ID and TEXTGEN_DEPLOYMENT_ID are set when using a deployed LLM.
+
+## [0.3.12] - 2025-09-25
+
+### Improvements
+
+- Dataset search UX improvements. Search term highlighting, updated texts, reset when switching views
+- Bump pulumi-datarobot to version 0.10.20
+
+## [0.3.11] - 2025-09-24
+
+### Improvements
+
+- Add setup prerequisites to README
+- Update localization assets
+
+### Bug Fixes
+
+- Fix streamlit local dev path issues, add new `make run-local-streamlit` helper
+- Fix issues while reloading app in browser
+- Fix streamlit e2e tests
+- Restore e2e test cleanup
+- Fixes and improvements for spark recipes
+
+
+## [0.3.10] - 2025-09-24
+
+### Fixes
+
+- Register remote datasets before data is fetched so they appear in UI in loading.
+- Fixed an issue with spark recipes being created with invalid datasets.
+- Corrected API version needed for spark recipes.
+- Remove the remote data registry UI in cases where the DR version is too old.
+
+
+## [0.3.9] - 2025-09-22
+
+### Features
+
+- Add functionality to analyze large datasets with DataRobot's data wrangling platform.
+
+### Improvements
+
+- Filter Data Registry download to datasets eligible to be downloaded.
+
 ## [0.3.8.2] - 2025-10-17
 
 ### Features

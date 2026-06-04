@@ -5,6 +5,22 @@ Configuration helper for reading environment variables and feature flags
 import os
 from typing import Any, Dict
 
+FEATURE_FLAG_ENV_VARS = {
+    "templateEditEnabled": "VITE_ENABLE_TEMPLATE_EDIT",
+    "customPromptsEnabled": "VITE_ENABLE_CUSTOM_PROMPTS",
+    "refinerEnabled": "VITE_ENABLE_QUESTION_REFINER",
+    "refinerAutoSend": "VITE_ENABLE_REFINER_AUTO_SEND",
+    "reportBuilderEnabled": "VITE_ENABLE_REPORT_BUILDER",
+}
+
+FEATURE_FLAG_DEFAULTS = {
+    "templateEditEnabled": False,
+    "customPromptsEnabled": False,
+    "refinerEnabled": False,
+    "refinerAutoSend": True,
+    "reportBuilderEnabled": False,
+}
+
 
 def get_feature_flags() -> Dict[str, Any]:
     """
@@ -15,16 +31,13 @@ def get_feature_flags() -> Dict[str, Any]:
     """
     print("🚀 Loading feature flags from environment variables...")
 
-    feature_flags = {
-        "templateEditEnabled": _get_bool_env(
-            "VITE_ENABLE_TEMPLATE_EDIT", default=False
-        ),
-        "customPromptsEnabled": _get_bool_env(
-            "VITE_ENABLE_CUSTOM_PROMPTS", default=True
-        ),
-        # Add more feature flags here as needed
+    return {
+        flag_name: _get_bool_env(
+            env_name,
+            default=FEATURE_FLAG_DEFAULTS[flag_name],
+        )
+        for flag_name, env_name in FEATURE_FLAG_ENV_VARS.items()
     }
-    return feature_flags
 
 
 def _get_bool_env(env_name: str, default: bool = False) -> bool:

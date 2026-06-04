@@ -23,6 +23,20 @@ from utils.database_helpers import get_external_database
 router = APIRouter()
 
 
+# 循環インポートを避けるため、ルーター統合を遅延実行
+def _include_custom_routers():
+    """カスタムエンドポイントのルーターを統合（遅延初期化）"""
+    from utils.customize.api_endpoints.question_refiner import refiner_router
+    from utils.customize.api_endpoints.report import report_router
+
+    router.include_router(refiner_router)
+    router.include_router(report_router)
+
+
+# ルーターを即座に統合
+_include_custom_routers()
+
+
 # =============================================================================
 # Pydantic Models for Custom Prompts
 # =============================================================================

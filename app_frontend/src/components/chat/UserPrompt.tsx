@@ -6,6 +6,7 @@ import { useAppState } from '@/state';
 import { useTranslation } from '@/i18n';
 import { DATA_SOURCES } from '@/constants/dataSources';
 import { TemplateButton } from '@/components/template';
+import { RefinerButton } from '@/components/refiner';
 import type { IChat } from '@/api/chat-messages/types';
 import type { PromptTemplate } from '@/api/templates/types';
 
@@ -66,6 +67,22 @@ export const UserPrompt = ({
     promptInputRef.current?.focus();
   };
 
+  const handleRefineComplete = (refinedMessage: string) => {
+    setSelectedTemplateText(refinedMessage);
+    // Focus the input after refining
+    setTimeout(() => {
+      promptInputRef.current?.focus();
+    }, 100);
+  };
+
+  const handleAutoSend = (message: string) => {
+    handleSend(message);
+    // Clear the input field after auto-send
+    if (promptInputRef.current) {
+      promptInputRef.current.value = '';
+    }
+  };
+
   // Update the input value when template is selected
   useEffect(() => {
     if (selectedTemplateText && promptInputRef.current) {
@@ -80,15 +97,25 @@ export const UserPrompt = ({
     <div className="w-full max-w-3xl">
       {/* Template selection area */}
       <div className="w-full flex justify-between items-center mb-4">
-        <TemplateButton
-          onSelectTemplate={handleTemplateSelect}
-          onSendDirectly={handleSend}
-          mode="send"
-          variant="outline"
-          size="sm"
-          disabled={isDataUploadRequired || hasInProgressMessages}
-          testId="user-prompt-template-button"
-        />
+        <div className="flex gap-2">
+          <TemplateButton
+            onSelectTemplate={handleTemplateSelect}
+            onSendDirectly={handleSend}
+            mode="send"
+            variant="outline"
+            size="sm"
+            disabled={isDataUploadRequired || hasInProgressMessages}
+            testId="user-prompt-template-button"
+          />
+          <RefinerButton
+            inputRef={promptInputRef}
+            dataSource={chatDataSource}
+            onRefineComplete={handleRefineComplete}
+            onAutoSend={handleAutoSend}
+            disabled={isDataUploadRequired || hasInProgressMessages}
+            testId="user-prompt-refiner-button"
+          />
+        </div>
         {selectedTemplateText && (
           <Button
             variant="ghost"

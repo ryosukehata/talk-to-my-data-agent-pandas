@@ -38,7 +38,7 @@ DATASET_TRACE_ID = config.DATASET_TRACE_ID
 
 
 # --- Trace Update Workflow ---
-def run_update_flow(new_trace_filepath: str) -> Optional[str]:
+def run_update_flow(new_trace_filepath: str) -> str | None:
     """
     Downloads the existing trace dataset, concatenates it with new trace data,
     cleans the combined data, and uploads it as a new version.
@@ -88,7 +88,7 @@ def run_update_flow(new_trace_filepath: str) -> Optional[str]:
         logger.info(
             f"Uploading processed data as new version for dataset: {DATASET_TRACE_ID}"
         )
-        version_id = update_dataset(
+        version_id: str = update_dataset(
             dataset_id=DATASET_TRACE_ID,
             filepath=processed_temp_filepath,
             wait_for_completion=True,
@@ -114,7 +114,7 @@ def run_export_flow(
     end_date: str = config.DEFAULT_EXPORT_END_DATE,
     output_filename: Optional[str] = None,
     cleanup: bool = True,
-) -> Optional[str]:
+) -> str | None:
     """
     Runs the complete prediction data export and download workflow.
 
@@ -178,7 +178,7 @@ def run_export_flow(
 
         # Step 6: Download Data
         logger.info("Downloading exported data...")
-        saved_filepath = download_exported_data(dataset_id, output_filename)
+        saved_filepath: str = download_exported_data(dataset_id, output_filename)
         logger.info(f"Data successfully downloaded to: {saved_filepath}")
 
         # Step 7: Cleanup
@@ -194,7 +194,9 @@ def run_export_flow(
         return None
 
 
-def run_trace_update_workflow(deployment_id=config.LLM_DEPLOYMENT_ID) -> str:
+def run_trace_update_workflow(
+    deployment_id: str = config.LLM_DEPLOYMENT_ID,
+) -> str | None:
     """
     Run the complete workflow: export data and update trace dataset.
     This function orchestrates both the export and update workflows.

@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 from domain.item_manager import IItemManager
@@ -13,7 +13,7 @@ class DataRobotItemManager(IItemManager):
         self.endpoint = endpoint
         self.headers = {"Authorization": f"Bearer {token}"}
 
-    async def fetch_items(self, app_id: str) -> Optional[List[Dict]]:
+    async def fetch_items(self, app_id: str) -> Optional[List[Dict[str, Any]]]:
         url = (
             f"{self.endpoint}/keyValues/?entityType=customApplication&entityId={app_id}"
         )

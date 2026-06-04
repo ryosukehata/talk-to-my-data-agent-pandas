@@ -20,35 +20,32 @@ import inspect
 import json
 import logging
 import os
-import re
 import sys
 import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
-from io import StringIO
-from types import ModuleType, TracebackType
+from types import ModuleType
 from typing import (
     Any,
     AsyncGenerator,
-    Type,
+    Callable,
     TypeVar,
     cast,
 )
 
 import datarobot as dr
-import instructor
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import psutil
-import requests
 import scipy
 import sklearn
 import statsmodels as sm
 from datarobot.client import RESTClientObject
+from datarobot.models.dataset import Dataset
+from fastapi import Request
 from joblib import Memory
-from openai import AsyncOpenAI
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
@@ -57,22 +54,59 @@ from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
 from plotly.subplots import make_subplots
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
+
+from utils.api_exceptions import ApplicationUsageException, UsageExceptionType
+from utils.chat_dataset_helper import extract_and_store_datasets
+from utils.constants import (
+    ALTERNATIVE_LLM_BIG,
+    ALTERNATIVE_LLM_SMALL,
+    DICTIONARY_BATCH_SIZE,
+    DICTIONARY_PARALLEL_BATCH_SIZE,
+    DICTIONARY_TIMEOUT,
+    DISK_CACHE_LIMIT_BYTES,
+    MAX_CSV_TOKENS,
+    MAX_REGISTRY_DATASET_SIZE,
+    REGISTRY_DATASET_SIZE_CUTOFF,
+    VALUE_ERROR_MESSAGE,
+)
+from utils.datarobot_client import use_user_token
+from utils.datarobot_dataset_handler import (
+    BaseRecipe,
+    DatasetSparkRecipe,
+    DataSourceRecipe,
+    load_or_create_spark_recipe,
+)
+from utils.llm_client import AsyncLLMClient
+from utils.token_tracking import (
+    TiktokenCountingStrategy,
+    TokenUsageTracker,
+    count_messages_tokens,
+    estimate_csv_rows_for_token_limit,
+)
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from utils import prompts, tools
-from utils.analyst_db import AnalystDB, DataSourceType
+from utils.analyst_db import (
+    AnalystDB,
+    DatasetMetadata,
+    DataSourceType,
+    ExternalDataStoreNameDataSourceType,
+    InternalDataSourceType,
+    get_data_source_type,
+)
 from utils.code_execution import (
     InvalidGeneratedCode,
     MaxReflectionAttempts,
     execute_python,
     reflect_code_generation_errors,
 )
+from utils.data_analyst_telemetry import telemetry
 from utils.data_cleansing_helpers import (
     add_summary_statistics,
     process_column,
 )
-from utils.database_helpers import get_external_database
+from utils.database_helpers import DatabaseOperator, get_external_database
 from utils.dr_helper import async_submit_actuals_to_datarobot
 from utils.i18n import gettext
 from utils.logging_helper import get_logger, log_api_call
@@ -94,10 +128,11 @@ from utils.schema import (
     DictionaryGeneration,
     DownloadedRegistryDataset,
     EnhancedQuestionGeneration,
+    ExternalDataSource,
+    ExternalDataSourcesSelection,
     GetBusinessAnalysisMetadata,
     GetBusinessAnalysisRequest,
     GetBusinessAnalysisResult,
-    QuestionListGeneration,
     RunAnalysisRequest,
     RunAnalysisResult,
     RunAnalysisResultMetadata,
@@ -106,17 +141,14 @@ from utils.schema import (
     RunDatabaseAnalysisRequest,
     RunDatabaseAnalysisResult,
     RunDatabaseAnalysisResultMetadata,
+    TokenUsageInfo,
     Tool,
-    ValidatedQuestion,
+    UsageInfoComponent,
 )
 
 logger = get_logger()
 logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("openai.http_client").setLevel(logging.WARNING)
-
-VALUE_ERROR_MESSAGE = "Input data cannot be empty (no dataset provided)"
-DEFAULT_LLM_GATEWAY_MODEL = "azure/gpt-4o"
-DEFAULT_LLM_GATEWAY_MODEL_SMALL = "azure/gpt-4o-mini"
 
 
 def log_memory() -> None:
@@ -151,38 +183,6 @@ def initialize_deployment() -> tuple[RESTClientObject, str]:
             "If running in DataRobot, verify your runtime parameters have been set correctly."
         ) from e
 
-
-class AsyncLLMClient:
-    async def __aenter__(self) -> instructor.AsyncInstructor:
-        dr_client, deployment_base_url = initialize_deployment()
-        self.openai_client = AsyncOpenAI(
-            api_key=dr_client.token,
-            base_url=deployment_base_url,
-            timeout=90,
-            max_retries=2,
-        )
-        self.client = instructor.from_openai(
-            self.openai_client, mode=instructor.Mode.MD_JSON
-        )
-        logger.info(f"Initialized witn deployment url: {deployment_base_url}")
-        return self.client
-
-    async def __aexit__(
-        self,
-        exc_type: Type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        await self.openai_client.close()  # Properly close the client
-
-
-ALTERNATIVE_LLM_BIG = "datarobot-deployed-llm"
-ALTERNATIVE_LLM_SMALL = "datarobot-deployed-llm"
-DICTIONARY_BATCH_SIZE = 10
-MAX_REGISTRY_DATASET_SIZE = 400e6  # aligns to 400MB set in streamlit config.toml
-DISK_CACHE_LIMIT_BYTES = 512e6
-DICTIONARY_PARALLEL_BATCH_SIZE = 2
-DICTIONARY_TIMEOUT = 45.0
 
 _memory = Memory(tempfile.gettempdir(), verbose=0)
 _memory.clear(warn=False)  # clear cache on startup
@@ -229,157 +229,306 @@ def get_user_email() -> str:
 
 
 # This can be large as we are not storing the actual datasets in memory, just metadata
-def list_registry_datasets(limit: int = 100) -> list[DataRegistryDataset]:
-    """
-    Fetch datasets from Data Registry with specified limit
+@telemetry.meter_and_trace
+def list_registry_datasets(
+    remote: bool = False, limit: int = 100
+) -> list[DataRegistryDataset]:
+    """Fetch datasets from Data Registry with specified limit
 
     Args:
-        limit: int
-        Datasets to retrieve. Max value: 100
+        filter_downloadable (bool, optional): Include only downloadable datasets. Defaults to False.
+        limit (int, optional): _description_. Defaults to 100.
+
+    Returns:
+        list[DataRegistryDataset]: _description_
     """
     logger.info(f"Acting as user: {get_user_email()}")
-    url = f"{dr.client.get_client().endpoint}/datasets?limit={limit}"
-    headers = {
-        "Authorization": f"Bearer {dr.client.get_client().token}",
-        "Content-Type": "application/json",
-    }
 
-    # Get all datasets and manually limit the results
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    datasets = response.json()["data"]
+    datasets = list(Dataset.iterate(limit=limit, filter_failed=True))
 
     return [
         DataRegistryDataset(
-            id=ds["datasetId"],
-            name=ds["name"],
-            created=(
-                ds["creationDate"][:10] if "creationDate" in ds else "N/A"  # %Y-%m-%d
-            ),
-            size=(
-                f"{ds['datasetSize'] / (1024 * 1024):.1f} MB"
-                if "datasetSize" in ds
-                else "N/A"
-            ),
+            id=ds.id,
+            name=ds.name,
+            created=(_year_month_day(ds.created_at) if ds.created_at else "N/A"),
+            size=(f"{ds.size / (1024 * 1024):.1f} MB" if ds.size else "N/A"),
         )
         for ds in datasets
+        if (remote and ds.is_data_engine_eligible and ds.is_snapshot)
+        or (
+            not remote
+            and ds.size
+            and ds.size <= REGISTRY_DATASET_SIZE_CUTOFF
+            and ds.is_snapshot
+        )
     ]
 
 
-def get_registry_dataset_info(dataset_id: str) -> tuple[str, int]:
-    """
-    Fetch a dataset's name and size from DataRobot API using requests.
+def _year_month_day(date: datetime | str) -> str:
+    if isinstance(date, str):
+        date = datetime.fromisoformat(date)
+    return date.strftime("%Y-%m-%d")
+
+
+@telemetry.trace
+async def register_remote_registry_datasets(
+    request: Request, dataset_ids: list[str], analyst_db: AnalystDB
+) -> tuple[
+    list[DownloadedRegistryDataset],
+    list[tuple[Callable[..., Any], list[Any], dict[str, Any]]],
+]:
+    """Load selected datasets into the application, downloading the entire datasets.
 
     Args:
-        dataset_id: The ID of the dataset to fetch.
-        token: The DataRobot API token.
+        dataset_ids (list[str]): The list of dataset IDs to load.
+        analyst_db (AnalystDB): The database to register into
+
     Returns:
-        Tuple of (name, size in bytes)
+        tuple[list[AnalystDataset], list[tuple[Callable, list, dict]]: A tuple of
+            1. a dictionary of dataset names and data and
+            2. a list of callbacks + arguments to that callback to be run in the background
+               to pull datasets.
+
     Raises:
-        Exception if the request fails or the response is invalid.
-    """
-    base_url = dr.client.get_client().endpoint
-    url = f"{base_url}/datasets/{dataset_id}"
-    headers = {
-        "Authorization": f"Bearer {dr.client.get_client().token}",
-        "Content-Type": "application/json",
-    }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    data = response.json()
-    name = data.get("name", "")
-    size = data.get("datasetSize", 0)
-    return name, size
+        ValueError: If the loading cannot be performed. This can be either (a) the small datasets exceed
+                    our size threshold, or (b) a remote dataset is invalid (e.g. it is not snapshotted)."""
+    if not DatasetSparkRecipe.should_use_spark_recipe():
+        logger.warning(
+            "Attempted to register remote datasets in an unsupported feature (should be unreachable through UI)."
+        )
+        raise ApplicationUsageException(
+            UsageExceptionType.FEATURE_NOT_SUPPORTED,
+            "Cannot use remote datasets with an unsupported DataRobot API version.",
+        )
+    datasets = [Dataset.get(d_id) for d_id in dataset_ids]
 
+    # Dynamic datasets cannot be used with data wrangling.
+    invalid_remote_datasets = [ds for ds in datasets if not ds.is_data_engine_eligible]
 
-def download_registry_dataset_as_dataframe(dataset_id: str) -> pd.DataFrame:
-    """
-    Download a dataset from DataRobot as a pandas DataFrame using requests.
+    if invalid_remote_datasets:
+        raise ApplicationUsageException(
+            UsageExceptionType.DATASETS_INVALID,
+            f"Cannot register remote, dynamic datasets: {[ds.name for ds in invalid_remote_datasets]}.",
+        )
 
-    Args:
-        token: The DataRobot API token.
-        dataset_id: The ID of the dataset to download.
-    Returns:
-        DataFrame containing the dataset.
-    Raises:
-        Exception if the request fails or the response is invalid.
-    """
-    base_url = dr.client.get_client().endpoint
-    url = f"{base_url}/datasets/{dataset_id}/file/"
-    headers = {
-        "Authorization": f"Bearer {dr.client.get_client().token}",
-        "accept": "*/*",
-    }
-    response = requests.get(url, headers=headers, stream=True)
-    response.raise_for_status()
-    csv_content = response.content.decode("utf-8")
-    df = pd.read_csv(StringIO(csv_content))
-    return df
+    existing_dataset_names = await find_existing_dataset_names(analyst_db, datasets)
 
+    if existing_dataset_names:
+        raise ApplicationUsageException(
+            UsageExceptionType.DATASET_ALREADY_USED,
+            f"Cannot register already registered datasets: {existing_dataset_names}.",
+        )
 
-async def download_registry_datasets(
-    dataset_ids: list[str], analyst_db: AnalystDB
-) -> list[DownloadedRegistryDataset]:
-    """Load selected datasets as pandas DataFrames
+    background_tasks: list[tuple[Callable[..., Any], list[Any], dict[str, Any]]] = []
 
-    Args:
-        *args: list of dataset IDs to download
-
-    Returns:
-        list[AnalystDataset]: Dictionary of dataset names and data
-    """
-    logger.info(f"Acting as user: {get_user_email()}")
     downloaded_datasets = []
 
-    # Use requests to get dataset info instead of dr.Dataset
-    total_size = 0
-    dataset_infos = []
-    for id_ in dataset_ids:
-        try:
-            name, size = get_registry_dataset_info(id_)
-            total_size += size if size is not None else 0
-            dataset_infos.append((id_, name, size))
-        except Exception as e:
-            logger.error(f"Failed to fetch dataset info for {id_}: {str(e)}")
-            downloaded_datasets.append(
-                DownloadedRegistryDataset(name=id_, error=str(e))
+    if dataset_ids:
+        with use_user_token(request):
+            recipe = await load_or_create_spark_recipe(analyst_db, dataset_ids)
+
+            await recipe.refresh()  # Clear out any removed datasets.
+
+        await recipe.add_datasets([ds.id for ds in datasets])
+
+        for ds in datasets:
+            await analyst_db.register_dataset(
+                AnalystDataset(name=ds.name),
+                InternalDataSourceType.REMOTE_REGISTRY,
+                file_size=0,
+                external_id=ds.id,
+                clobber=False,
             )
-    if total_size > MAX_REGISTRY_DATASET_SIZE:
-        raise ValueError(
-            f"The requested Data Registry datasets must total <= {int(MAX_REGISTRY_DATASET_SIZE)} bytes"
+
+        background_tasks.append(
+            (register_remote_datasets, [request, recipe, analyst_db, datasets], {})
         )
 
-    result_datasets: list[AnalystDataset] = []
-    for id_, name, size in dataset_infos:
-        try:
-            # Use requests to download the dataset as DataFrame
-            df = download_registry_dataset_as_dataframe(id_)
-            df_records = cast(
-                list[dict[str, Any]],
-                df.to_dict(orient="records"),
+        for ds in datasets:
+            downloaded_datasets.append(DownloadedRegistryDataset(name=ds.name))
+
+    return downloaded_datasets, background_tasks
+
+
+async def find_existing_dataset_names(
+    analyst_db: AnalystDB, datasets: list[Dataset]
+) -> list[str]:
+    dataset_names = {ds.name for ds in datasets}
+    existing_names = set(await analyst_db.list_analyst_datasets())
+    return list(dataset_names & existing_names)
+
+
+@telemetry.trace
+async def register_remote_datasets(
+    request: Request,
+    recipe: DatasetSparkRecipe,
+    analyst_db: AnalystDB,
+    datasets: list[Dataset],
+) -> None:
+    for dataset in datasets:
+        with use_user_token(request):
+            preview = await recipe.preview_dataset(dataset)
+        analyst_dataset = AnalystDataset(name=dataset.name, data=preview)
+
+        await analyst_db.register_dataset(
+            analyst_dataset,
+            InternalDataSourceType.REMOTE_REGISTRY,
+            file_size=0,
+            external_id=dataset.id,
+            clobber=True,
+        )
+
+
+@telemetry.trace
+async def sync_data_sources_and_datasets(
+    request: Request,
+    canonical_name: str,
+    analyst_db: AnalystDB,
+    data_store_id: str,
+    selected_datasource_ids: ExternalDataSourcesSelection,
+) -> tuple[
+    list[DownloadedRegistryDataset],
+    list[tuple[Callable[..., Any], list[Any], dict[str, Any]]],
+]:
+    """
+    Register any data sets for data sources *not already present*.
+
+    Args:
+        analyst_db (str): The database.
+        data_source_id (str): The data source in question.
+
+    Returns:
+        tuple[list[AnalystDataset], list[tuple[Callable, list, dict]]: A tuple of
+            1. a dictionary of dataset names and data and
+            2. a list of callbacks + arguments to that callback to be run in the background
+               to pull datasets.
+    """
+    logger.debug(
+        "Syncing data sources and detaset.",
+        extra={"data_store_id": data_store_id, "canonical_name": canonical_name},
+    )
+    datasets = await analyst_db.list_analyst_dataset_metadata(
+        data_source=ExternalDataStoreNameDataSourceType.from_name(canonical_name)
+    )
+
+    already_registered_paths = {ds.name for ds in datasets}
+
+    new_datasources = [
+        ds
+        for ds in selected_datasource_ids.selected_data_sources
+        if ds.path not in already_registered_paths
+    ]
+
+    downloaded = []
+    background_tasks: list[tuple[Callable[..., Any], list[Any], dict[str, Any]]] = []
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "Initially registering data sources.",
+            extra={
+                "data_store_id": data_store_id,
+                "canonical_name": canonical_name,
+                "paths": [ds.path for ds in new_datasources],
+            },
+        )
+
+    for ds in new_datasources:
+        await analyst_db.register_dataset(
+            AnalystDataset(name=ds.path),
+            ExternalDataStoreNameDataSourceType.from_name(name=canonical_name),
+            file_size=0,
+            external_id=None,
+            clobber=False,
+        )
+        downloaded.append(DownloadedRegistryDataset(name=ds.path))
+
+    background_tasks.append(
+        (register_datasource, [request, analyst_db, data_store_id, new_datasources], {})
+    )
+
+    return downloaded, background_tasks
+
+
+@telemetry.meter_and_trace
+async def register_datasource(
+    request: Request,
+    analyst_db: AnalystDB,
+    data_store_id: str,
+    datasources: list[ExternalDataSource],
+) -> None:
+    with use_user_token(request):
+        recipe = await DataSourceRecipe.load_or_create(analyst_db, data_store_id)
+        for ds in datasources:
+            preview = await recipe.preview_datasource(ds)
+            analyst_dataset = AnalystDataset(name=ds.path, data=preview)
+
+            await analyst_db.register_dataset(
+                analyst_dataset,
+                ExternalDataStoreNameDataSourceType.from_name(
+                    recipe.data_store.canonical_name
+                ),
+                file_size=0,
+                external_id=None,
+                clobber=True,
             )
-            result_datasets.append(AnalystDataset(name=name, data=df_records))
-            logger.info(f"Successfully downloaded {name}")
+
+
+@telemetry.meter_and_trace
+async def load_registry_datasets(
+    dataset_ids: list[str],
+    analyst_db: AnalystDB,
+) -> list[DownloadedRegistryDataset]:
+    """Load selected datasets into the application, downloading the entire datasets.
+
+    Args:
+        dataset_ids (list[str]): The list of dataset IDs to load.
+        analyst_db (AnalystDB): The database to register into
+
+    Returns:
+        list[DownloadedRegistryDataset]: A list of dictionary of dataset names and data.
+
+    Raises:
+        ApplicationUsageException: If the loading cannot be performed. This can be either (a) the small datasets exceed
+                                   our size threshold, or (b) a remote dataset is invalid (e.g. it is not snapshotted)
+    """
+
+    downloaded_datasets = []
+    datasets = [Dataset.get(id_) for id_ in dataset_ids]
+
+    if (
+        sum([ds.size for ds in datasets if ds.size is not None])
+        > MAX_REGISTRY_DATASET_SIZE
+    ):
+        raise ApplicationUsageException(
+            UsageExceptionType.DATASETS_TOO_LARGE,
+            f"The requested Data Registry datasets must total <= {int(MAX_REGISTRY_DATASET_SIZE)} bytes",
+        )
+
+    existing_datasets = await find_existing_dataset_names(analyst_db, datasets)
+
+    if existing_datasets:
+        raise ApplicationUsageException(
+            UsageExceptionType.DATASET_ALREADY_USED,
+            f"Some requested datasets are already present {existing_datasets}.",
+        )
+
+    for dataset in datasets:
+        try:
+            df = dataset.get_as_dataframe()
+            result_dataset = AnalystDataset(name=dataset.name, data=df)
+            logger.info(f"Successfully downloaded {dataset.name}")
         except Exception as e:
-            logger.error(f"Failed to read dataset {name}: {str(e)}")
+            logger.error(f"Failed to read dataset {dataset.name}: {str(e)}")
             downloaded_datasets.append(
-                DownloadedRegistryDataset(name=name, error=str(e))
+                DownloadedRegistryDataset(name=dataset.name, error=str(e))
             )
             continue
-    for result_dataset in result_datasets:
-        reg_result = await analyst_db.register_dataset(
-            result_dataset, DataSourceType.REGISTRY, size or 0
+
+        await analyst_db.register_dataset(
+            result_dataset, InternalDataSourceType.REGISTRY, dataset.size or 0
         )
-        if not reg_result["success"]:
-            downloaded_datasets.append(
-                DownloadedRegistryDataset(
-                    name=result_dataset.name, error=reg_result["msg"]
-                )
-            )
-        else:
-            downloaded_datasets.append(
-                DownloadedRegistryDataset(name=result_dataset.name)
-            )
+        downloaded_datasets.append(DownloadedRegistryDataset(name=result_dataset.name))
+
     return downloaded_datasets
 
 
@@ -388,6 +537,7 @@ async def _get_dictionary_batch(
     df: pd.DataFrame,
     batch_size: int = 5,
     telemetry_json: dict[str, Any] | None = None,
+    token_tracker: TokenUsageTracker | None = None,
 ) -> list[DataDictionaryColumn]:
     """Process a batch of columns to get their descriptions"""
 
@@ -475,15 +625,18 @@ async def _get_dictionary_batch(
             f"total_characters: {len(''.join([str(msg) for msg in messages]))}"
         )
         # Get descriptions from OpenAI
-        async with AsyncLLMClient() as client:
-            (
-                completion,
-                completion_org,
-            ) = await client.chat.completions.create_with_completion(
-                response_model=DictionaryGeneration,
-                model=ALTERNATIVE_LLM_SMALL,
-                messages=messages,
-            )
+        async with AsyncLLMClient(token_tracker=token_tracker) as client:
+            with telemetry.time(
+                f"{_get_dictionary_batch.__module__}.{_get_dictionary_batch.__qualname__}.llm_call"
+            ):
+                (
+                    completion,
+                    completion_org,
+                ) = await client.chat.completions.create_with_completion(
+                    response_model=DictionaryGeneration,
+                    model=ALTERNATIVE_LLM_SMALL,
+                    messages=messages,
+                )
 
         # Convert to dictionary format
         descriptions = completion.to_dict()
@@ -522,6 +675,7 @@ async def _get_dictionary_batch(
 
 
 @log_api_call
+@telemetry.meter_and_trace
 async def get_dictionary(
     dataset: AnalystDataset, telemetry_json: dict[str, Any] | None = None
 ) -> DataDictionary:
@@ -620,132 +774,6 @@ async def get_dictionary(
         )
 
 
-def _validate_question_feasibility(
-    question: str, available_columns: list[str]
-) -> ValidatedQuestion | None:
-    """Validate if a question can be answered with available data
-
-    Checks if common data elements mentioned in the question exist in columns
-    """
-    # Convert question and columns to lowercase for matching
-    question_lower = question.lower()
-    columns_lower = [col.lower() for col in available_columns]
-
-    # Extract potential column references from question
-    words = set(re.findall(r"\b\w+\b", question_lower))
-
-    # Find matches and missing terms
-    found_columns = [col for col in columns_lower if any(word in col for word in words)]
-
-    is_valid = len(found_columns) > 0
-    if is_valid:
-        return ValidatedQuestion(
-            question=question,
-        )
-    return None
-
-
-@log_api_call
-async def suggest_questions(
-    datasets: list[AnalystDataset],
-    max_columns: int = 40,
-    telemetry_json: dict[str, Any] | None = None,
-) -> list[ValidatedQuestion]:
-    """Generate and validate suggested analysis questions
-
-    Args:
-        dictionary: DataFrame containing data dictionary
-        max_columns: Maximum number of columns to include in prompt
-
-    Returns:
-        Dict containing:
-            - questions: list of validated question objects
-            - metadata: Dictionary of processing information
-    """
-    if telemetry_json is not None:
-        telemetry_send = deepcopy(telemetry_json)
-        telemetry_send["startTimestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    else:
-        telemetry_send = None
-    # Validate input
-    dictionary = sum(
-        [
-            DataDictionary.from_analyst_df(
-                ds.to_df(),
-                column_descriptions=f"Column from dataset {ds.name}",
-            ).column_descriptions
-            for ds in datasets
-        ],
-        [],
-    )
-
-    if len(dictionary) < 1:
-        raise ValueError("Dictionary DataFrame cannot be empty")
-
-    # Limit columns for OpenAI prompt
-    total_columns = len(dictionary)
-    if total_columns > max_columns:
-        # Take first and last 20 columns
-        half_max = max_columns // 2
-        first_half = dictionary[:half_max]
-        last_half = dictionary[-half_max:]
-
-        # Remove any duplicates
-        dictionary = first_half + last_half
-
-        # deduplicate
-        dictionary = list({item.column: item for item in dictionary}.values())
-
-    # Convert dictionary to format expected by OpenAI
-    dict_data = {
-        "columns": [d.column for d in dictionary],
-        "descriptions": [d.description for d in dictionary],
-        "data_types": [d.data_type for d in dictionary],
-    }
-
-    # Create OpenAI messages
-    messages: list[ChatCompletionMessageParam] = [
-        ChatCompletionSystemMessageParam(
-            role="system", content=prompts.SYSTEM_PROMPT_SUGGEST_A_QUESTION
-        ),
-        ChatCompletionUserMessageParam(
-            role="user",
-            content=f"Data Dictionary:\n{json.dumps(dict_data, ensure_ascii=False)}",
-        ),
-    ]
-    async with AsyncLLMClient() as client:
-        (
-            completion,
-            completion_org,
-        ) = await client.chat.completions.create_with_completion(
-            response_model=QuestionListGeneration,
-            model=ALTERNATIVE_LLM_SMALL,
-            messages=messages,
-        )
-
-    available_columns = dict_data["columns"]
-    validated_questions: list[ValidatedQuestion] = []
-
-    for question in completion.questions:
-        validated_question = _validate_question_feasibility(question, available_columns)
-        if validated_question is not None:
-            validated_questions.append(validated_question)
-
-    association_id = completion_org.datarobot_moderations["association_id"]
-    logger.info(f"Association ID: {association_id}")
-
-    if telemetry_send is not None:
-        # add query type to telemetry
-        telemetry_send["query_type"] = "01_generate_suggested_questions"
-        # submit telemetry
-        asyncio.create_task(
-            async_submit_actuals_to_datarobot(
-                association_id=association_id, telemetry_json=telemetry_send
-            )
-        )
-    return validated_questions
-
-
 def find_imports(module: ModuleType) -> list[str]:
     """
     Get top-level third-party imports from a Python module.
@@ -789,6 +817,7 @@ def find_imports(module: ModuleType) -> list[str]:
         return []
 
 
+@telemetry.trace
 def get_tools() -> list[Tool]:
     try:
         # find all functions defined in the tools module
@@ -813,9 +842,11 @@ def get_tools() -> list[Tool]:
         return []
 
 
+@telemetry.trace
 async def _generate_run_charts_python_code(
     request: RunChartsRequest,
     validation_error: InvalidGeneratedCode | None = None,
+    token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
 ) -> str:
     if telemetry_json is not None:
@@ -863,13 +894,19 @@ async def _generate_run_charts_python_code(
         )
 
     # Get response based on model mode
-    async with AsyncLLMClient() as client:
-        response, response_org = await client.chat.completions.create_with_completion(
-            response_model=CodeGeneration,
-            model=ALTERNATIVE_LLM_BIG,
-            temperature=0,
-            messages=messages,
-        )
+    async with AsyncLLMClient(token_tracker=token_tracker) as client:
+        with telemetry.time(
+            f"{_generate_run_charts_python_code.__module__}.{_generate_run_charts_python_code.__qualname__}.llm_call"
+        ):
+            (
+                response,
+                response_org,
+            ) = await client.chat.completions.create_with_completion(
+                response_model=CodeGeneration,
+                model=ALTERNATIVE_LLM_BIG,
+                temperature=0,
+                messages=messages,
+            )
     association_id = response_org.datarobot_moderations["association_id"]
     logger.info(f"Association ID: {association_id}")
     if telemetry_send is not None:
@@ -884,11 +921,13 @@ async def _generate_run_charts_python_code(
     return response.code
 
 
+@telemetry.trace
 async def _generate_run_analysis_python_code(
     request: RunAnalysisRequest,
     analyst_db: AnalystDB,
     validation_error: InvalidGeneratedCode | None = None,
     attempt: int = 0,
+    token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
 ) -> str:
     """
@@ -1010,17 +1049,20 @@ async def _generate_run_analysis_python_code(
             )
     logger.info("Running Code Gen")
     logger.debug(messages)
-    async with AsyncLLMClient() as client:
-        (
-            completion,
-            completion_org,
-        ) = await client.chat.completions.create_with_completion(
-            response_model=CodeGeneration,
-            model=ALTERNATIVE_LLM_BIG,
-            temperature=0.1,
-            messages=messages,
-            max_retries=10,
-        )
+    async with AsyncLLMClient(token_tracker=token_tracker) as client:
+        with telemetry.time(
+            f"{_generate_run_analysis_python_code.__module__}.{_generate_run_analysis_python_code.__qualname__}.llm_call"
+        ):
+            (
+                completion,
+                completion_org,
+            ) = await client.chat.completions.create_with_completion(
+                response_model=CodeGeneration,
+                model=ALTERNATIVE_LLM_BIG,
+                temperature=0.1,
+                messages=messages,
+                max_retries=10,
+            )
     association_id = completion_org.datarobot_moderations["association_id"]
     logger.info(f"Association ID: {association_id}")
 
@@ -1037,6 +1079,7 @@ async def _generate_run_analysis_python_code(
     return completion.code
 
 
+@telemetry.meter_and_trace
 async def cleanse_dataframe(dataset: AnalystDataset) -> CleansedDataset:
     """Clean and standardize multiple pandas DataFrames in parallel.
 
@@ -1080,13 +1123,87 @@ async def cleanse_dataframe(dataset: AnalystDataset) -> CleansedDataset:
 
 
 @log_api_call
+@telemetry.meter_and_trace
+async def summarize_conversation(
+    messages: list[ChatCompletionMessageParam],
+    token_tracker: TokenUsageTracker | None = None,
+    telemetry_json: dict[str, Any] | None = None,
+) -> str:
+    """Summarize a conversation history, when getting close to model's context window limit.
+
+    Args:
+        messages: list of message dictionaries with 'role' and 'content' fields
+        token_tracker: Optional token usage tracker
+
+    Returns:
+        str: Summary of the conversation
+
+    Raises:
+        Exception: If summarization fails (network, LLM, parsing errors)
+    """
+
+    if telemetry_json is not None:
+        telemetry_send = deepcopy(telemetry_json)
+        telemetry_send["startTimestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        telemetry_send = None
+
+    class ConversationSummary(BaseModel):
+        summary: str
+
+    try:
+        messages_str = "\n".join(
+            [f"{msg['role']}: {msg['content']}" for msg in messages]
+        )
+
+        token_count = count_messages_tokens(messages, ALTERNATIVE_LLM_SMALL)
+        logger.info(
+            f"Summarizing conversation: {token_count} tokens, {len(messages)} messages"
+        )
+
+        prompt_messages: list[ChatCompletionMessageParam] = [
+            ChatCompletionSystemMessageParam(
+                content=prompts.SYSTEM_PROMPT_SUMMARIZE_CONVERSATION,
+                role="system",
+            ),
+            ChatCompletionUserMessageParam(
+                content=f"Conversation History:\n{messages_str}",
+                role="user",
+            ),
+        ]
+
+        async with AsyncLLMClient(token_tracker=token_tracker) as client:
+            with telemetry.time(
+                f"{summarize_conversation.__module__}.{summarize_conversation.__qualname__}.llm_call"
+            ):
+                completion: ConversationSummary = (
+                    await client.chat.completions.create_with_completion(
+                        response_model=ConversationSummary,
+                        model=ALTERNATIVE_LLM_SMALL,
+                        messages=prompt_messages,
+                    )
+                )
+
+        logger.info(f"Summary created: {len(completion.summary)} characters")
+        return completion.summary
+
+    except Exception as e:
+        logger.error(f"Error preparing messages for summarization: {str(e)}")
+        raise
+
+
+@log_api_call
+@telemetry.meter_and_trace
 async def rephrase_message(
-    messages: ChatRequest, telemetry_json: dict[str, Any] | None = None
+    messages: ChatRequest,
+    token_tracker: TokenUsageTracker | None = None,
+    telemetry_json: dict[str, Any] | None = None,
 ) -> str:
     """Process chat messages history and return a new question
 
     Args:
         messages: list of message dictionaries with 'role' and 'content' fields
+        token_tracker: Optional token usage tracker
 
     Returns:
         Dict[str, str]: Dictionary containing response content
@@ -1097,30 +1214,36 @@ async def rephrase_message(
     else:
         telemetry_send = None
 
-    # Convert messages to string format for prompt
-    messages_str = "\n".join(
-        [f"{msg['role']}: {msg['content']}" for msg in messages.messages]
+    # Debug logging
+    token_count = count_messages_tokens(messages.messages, ALTERNATIVE_LLM_BIG)
+
+    logger.info(
+        f"DEBUG rephrase_message: {token_count} tokens, {len(messages.messages)} messages"
     )
 
+    # Build prompt: system message + actual conversation history
     prompt_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
             content=prompts.SYSTEM_PROMPT_REPHRASE_MESSAGE,
             role="system",
-        ),
-        ChatCompletionUserMessageParam(
-            content=f"Message History:\n{messages_str}",
-            role="user",
-        ),
-    ]
-    async with AsyncLLMClient() as client:
-        (
-            completion,
-            completion_org,
-        ) = await client.chat.completions.create_with_completion(
-            response_model=EnhancedQuestionGeneration,
-            model=ALTERNATIVE_LLM_BIG,
-            messages=prompt_messages,
         )
+    ]
+
+    # Add the actual conversation messages (already includes summary if present)
+    prompt_messages.extend(messages.messages)
+
+    async with AsyncLLMClient(token_tracker=token_tracker) as client:
+        with telemetry.time(
+            f"{rephrase_message.__module__}.{rephrase_message.__qualname__}.llm_call"
+        ):
+            (
+                completion,
+                completion_org,
+            ) = await client.chat.completions.create_with_completion(
+                response_model=EnhancedQuestionGeneration,
+                model=ALTERNATIVE_LLM_BIG,
+                messages=prompt_messages,
+            )
 
     association_id = completion_org.datarobot_moderations["association_id"]
     logger.info(f"Association ID: {association_id}")
@@ -1138,9 +1261,11 @@ async def rephrase_message(
 
 
 @reflect_code_generation_errors(max_attempts=7)
+@telemetry.trace
 async def _run_charts(
     request: RunChartsRequest,
     exception_history: list[InvalidGeneratedCode] | None = None,
+    token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
 ) -> RunChartsResult:
     """Generate and validate chart code with retry logic"""
@@ -1157,6 +1282,7 @@ async def _run_charts(
     code = await _generate_run_charts_python_code(
         request,
         next(iter(exception_history[::-1]), None),
+        token_tracker,
         telemetry_json=telemetry_json,
     )
     try:
@@ -1202,12 +1328,17 @@ async def _run_charts(
 
 
 @log_api_call
+@telemetry.meter_and_trace
 async def run_charts(
-    request: RunChartsRequest, telemetry_json: dict[str, Any] | None = None
+    request: RunChartsRequest,
+    token_tracker: TokenUsageTracker | None = None,
+    telemetry_json: dict[str, Any] | None = None,
 ) -> RunChartsResult:
     """Execute analysis workflow on datasets."""
     try:
-        chart_result = await _run_charts(request, telemetry_json=telemetry_json)
+        chart_result = await _run_charts(
+            request, token_tracker=token_tracker, telemetry_json=telemetry_json
+        )
         return chart_result
     except ValidationError:
         return RunChartsResult(
@@ -1225,8 +1356,10 @@ async def run_charts(
 
 
 @log_api_call
+@telemetry.meter_and_trace
 async def get_business_analysis(
     request: GetBusinessAnalysisRequest,
+    token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
 ) -> GetBusinessAnalysisResult:
     """
@@ -1250,8 +1383,11 @@ async def get_business_analysis(
             telemetry_send = None
         df = request.dataset.to_df()
 
-        # Get first 1000 rows as CSV with quoted values for context
-        df_csv = df.head(750).to_csv(index=False, quoting=1)
+        initial_rows = 750
+
+        df_csv, _ = estimate_csv_rows_for_token_limit(
+            df, MAX_CSV_TOKENS, initial_rows, ALTERNATIVE_LLM_BIG
+        )
 
         # Create messages for OpenAI
         messages: list[ChatCompletionMessageParam] = [
@@ -1270,16 +1406,19 @@ async def get_business_analysis(
                 content=f"Data Dictionary:\n{request.dictionary.model_dump_json()}",
             ),
         ]
-        async with AsyncLLMClient() as client:
-            (
-                completion,
-                completion_org,
-            ) = await client.chat.completions.create_with_completion(
-                response_model=BusinessAnalysisGeneration,
-                model=ALTERNATIVE_LLM_BIG,
-                temperature=0.1,
-                messages=messages,
-            )
+        async with AsyncLLMClient(token_tracker=token_tracker) as client:
+            with telemetry.time(
+                f"{get_business_analysis.__module__}.{get_business_analysis.__qualname__}.llm_call"
+            ):
+                (
+                    completion,
+                    completion_org,
+                ) = await client.chat.completions.create_with_completion(
+                    response_model=BusinessAnalysisGeneration,
+                    model=ALTERNATIVE_LLM_BIG,
+                    temperature=0.1,
+                    messages=messages,
+                )
         association_id = completion_org.datarobot_moderations["association_id"]
         logger.info(f"Association ID: {association_id}")
 
@@ -1320,10 +1459,12 @@ async def get_business_analysis(
 
 
 @reflect_code_generation_errors(max_attempts=7)
+@telemetry.trace
 async def _run_analysis(
     request: RunAnalysisRequest,
     analyst_db: AnalystDB,
     exception_history: list[InvalidGeneratedCode] | None = None,
+    token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
 ) -> RunAnalysisResult:
     start_time = datetime.now()
@@ -1339,6 +1480,7 @@ async def _run_analysis(
         analyst_db,
         next(iter(exception_history[::-1]), None),
         attempt=len(exception_history),
+        token_tracker=token_tracker,
         telemetry_json=telemetry_json,
     )
     logger.info("Code generated, preparing execution")
@@ -1411,14 +1553,18 @@ async def _run_analysis(
 async def run_analysis(
     request: RunAnalysisRequest,
     analyst_db: AnalystDB,
-    telemetry_json: dict[str, Any],
+    token_tracker: TokenUsageTracker | None = None,
+    telemetry_json: dict[str, Any] | None = None,
 ) -> RunAnalysisResult:
     """Execute analysis workflow on datasets."""
     logger.debug("Entering run_analysis")
     log_memory()
     try:
         return await _run_analysis(
-            request, analyst_db=analyst_db, telemetry_json=telemetry_json
+            request,
+            analyst_db=analyst_db,
+            token_tracker=token_tracker,
+            telemetry_json=telemetry_json,
         )
     except MaxReflectionAttempts as e:
         return RunAnalysisResult(
@@ -1441,9 +1587,11 @@ async def run_analysis(
 
 
 async def _generate_database_analysis_code(
+    database: DatabaseOperator[Any],
     request: RunDatabaseAnalysisRequest,
     analyst_db: AnalystDB,
     validation_error: InvalidGeneratedCode | None = None,
+    token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
 ) -> str:
     """
@@ -1465,6 +1613,9 @@ async def _generate_database_analysis_code(
     dictionaries = [
         await analyst_db.get_data_dictionary(name) for name in request.dataset_names
     ]
+    for dictionary in dictionaries:
+        if dictionary:
+            dictionary.name = database.query_friendly_name(dictionary.name)
     all_tables_info = [d.model_dump(mode="json") for d in dictionaries if d is not None]
 
     # Get sample data for all tables
@@ -1474,6 +1625,8 @@ async def _generate_database_analysis_code(
         df = (await analyst_db.get_dataset(table)).to_df()
         schema_str, table_str = table.split(".")
 
+        # friendly_name = database.query_friendly_name(table)
+
         sample_str = (
             f"Schema: {schema_str}, Table: {table_str}\n{df.head(10).to_string()}"
         )
@@ -1481,7 +1634,7 @@ async def _generate_database_analysis_code(
 
     # Create messages for OpenAI
     messages: list[ChatCompletionMessageParam] = [
-        get_external_database().get_system_prompt(),
+        database.get_system_prompt(),
         ChatCompletionUserMessageParam(
             content=f"Business Question: {request.question}",
             role="user",
@@ -1514,16 +1667,19 @@ async def _generate_database_analysis_code(
         )
 
     # Get response from OpenAI
-    async with AsyncLLMClient() as client:
-        (
-            completion,
-            completion_org,
-        ) = await client.chat.completions.create_with_completion(
-            response_model=DatabaseAnalysisCodeGeneration,
-            model=ALTERNATIVE_LLM_BIG,
-            temperature=0.1,
-            messages=messages,
-        )
+    async with AsyncLLMClient(token_tracker=token_tracker) as client:
+        with telemetry.time(
+            f"{_generate_database_analysis_code.__module__}.{_generate_database_analysis_code.__qualname__}.llm_call"
+        ):
+            (
+                completion,
+                completion_org,
+            ) = await client.chat.completions.create_with_completion(
+                response_model=DatabaseAnalysisCodeGeneration,
+                model=ALTERNATIVE_LLM_BIG,
+                temperature=0.1,
+                messages=messages,
+            )
     association_id = completion_org.datarobot_moderations["association_id"]
     logger.info(f"Association ID: {association_id}")
 
@@ -1536,14 +1692,17 @@ async def _generate_database_analysis_code(
                 association_id=association_id, telemetry_json=telemetry_send
             )
         )
-    return completion.code
+    return str(completion.code)
 
 
 @reflect_code_generation_errors(max_attempts=7)
+@telemetry.trace
 async def _run_database_analysis(
     request: RunDatabaseAnalysisRequest,
     analyst_db: AnalystDB,
+    database_override: DatabaseOperator[Any] | None = None,
     exception_history: list[InvalidGeneratedCode] | None = None,
+    token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
 ) -> RunDatabaseAnalysisResult:
     start_time = datetime.now()
@@ -1553,14 +1712,21 @@ async def _run_database_analysis(
     if exception_history is None:
         exception_history = []
 
+    database = (
+        get_external_database() if database_override is None else database_override
+    )
+
     sql_code = await _generate_database_analysis_code(
+        database,
+        database,
         request,
         analyst_db,
         next(iter(exception_history[::-1]), None),
+        token_tracker,
         telemetry_json=telemetry_json,
     )
     try:
-        results = get_external_database().execute_query(query=sql_code)
+        results = await database.execute_query(query=sql_code)
         results = cast(list[dict[str, Any]], results)
         duration = datetime.now() - start_time
 
@@ -1584,15 +1750,22 @@ async def _run_database_analysis(
 
 
 @log_api_call
+@telemetry.meter_and_trace
 async def run_database_analysis(
     request: RunDatabaseAnalysisRequest,
     analyst_db: AnalystDB,
-    telemetry_json: dict[str, Any],
+    database_override: DatabaseOperator[Any] | None = None,
+    token_tracker: TokenUsageTracker | None = None,
+    telemetry_json: dict[str, Any] = None,
 ) -> RunDatabaseAnalysisResult:
     """Execute analysis workflow on datasets."""
     try:
         return await _run_database_analysis(
-            request, analyst_db, telemetry_json=telemetry_json
+            request,
+            analyst_db,
+            database_override=database_override,
+            token_tracker=token_tracker,
+            telemetry_json=telemetry_json,
         )
     except MaxReflectionAttempts as e:
         return RunDatabaseAnalysisResult(
@@ -1624,6 +1797,7 @@ class AnalysisGenerationError:
 async def execute_business_analysis_and_charts(
     analysis_result: RunAnalysisResult | RunDatabaseAnalysisResult,
     enhanced_message: str,
+    token_tracker: TokenUsageTracker | None = None,
     enable_chart_generation: bool = True,
     enable_business_insights: bool = True,
     telemetry_json: dict[str, Any] | None = None,
@@ -1647,33 +1821,41 @@ async def execute_business_analysis_and_charts(
     if enable_chart_generation and enable_business_insights:
         # Run both analyses concurrently
         result = await asyncio.gather(
-            run_charts(chart_request, telemetry_json=telemetry_json),
-            get_business_analysis(business_request, telemetry_json=telemetry_json),
+            run_charts(chart_request, token_tracker, telemetry_json=telemetry_json),
+            get_business_analysis(
+                business_request, token_tracker, telemetry_json=telemetry_json
+            ),
             return_exceptions=True,
         )
 
         return (result[0], result[1])
     elif enable_chart_generation:
-        charts_result = await run_charts(chart_request, telemetry_json=telemetry_json)
+        charts_result = await run_charts(
+            chart_request, token_tracker, telemetry_json=telemetry_json
+        )
         return charts_result, None
     else:
         business_result = await get_business_analysis(
-            business_request, telemetry_json=telemetry_json
+            business_request, token_tracker, telemetry_json=telemetry_json
         )
         return None, business_result
 
 
+@telemetry.meter_and_trace
 async def run_complete_analysis(
     chat_request: ChatRequest,
     data_source: DataSourceType,
-    datasets_names: list[str],
+    dataset_metadata: list[DatasetMetadata],
     analyst_db: AnalystDB,
     chat_id: str,
     message_id: str,
+    request: Request | None,
     enable_chart_generation: bool = True,
     enable_business_insights: bool = True,
     telemetry_json: dict[str, Any] | None = None,
 ) -> AsyncGenerator[Component | AnalysisGenerationError, None]:
+    datasets_names = [ds.name for ds in dataset_metadata]
+
     user_message = await analyst_db.get_chat_message(message_id=message_id)
     if user_message is None or user_message.role != "user":
         yield AnalysisGenerationError("Message not found")
@@ -1688,14 +1870,19 @@ async def run_complete_analysis(
         telemetry_json["enable_chart_generation"] = enable_chart_generation
         telemetry_json["enable_business_insights"] = enable_business_insights
     try:
+        token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
+
         logger.info("Getting rephrased question...")
-        enhanced_message = await rephrase_message(chat_request, telemetry_json)
+        enhanced_message = await rephrase_message(
+            chat_request, token_tracker=token_tracker, telemetry_json=telemetry_json
+        )
         logger.info("Getting rephrased question done")
 
         yield enhanced_message
 
-    except ValidationError:
-        user_message.error = "LLM Error, please retry"
+    except Exception as e:
+        logger.error(f"Error rephrasing message: {e}", exc_info=True)
+        user_message.error = f"Failed to process your question: {str(e)}"
         user_message.in_progress = False
         await analyst_db.update_chat_message(
             message_id=message_id,
@@ -1709,41 +1896,144 @@ async def run_complete_analysis(
         role="assistant",
         content=enhanced_message,
         components=[EnhancedQuestionGeneration(enhanced_user_message=enhanced_message)],
+        in_progress=True,
     )
+
+    await analyst_db.add_chat_message(chat_id=chat_id, message=assistant_message)
 
     user_message.in_progress = False
     await analyst_db.update_chat_message(
         message_id=message_id,
         message=user_message,
     )
-    await analyst_db.add_chat_message(chat_id=chat_id, message=assistant_message)
     # Run main analysis
     logger.info("Start main analysis")
     try:
-        is_database = data_source == DataSourceType.DATABASE
+        is_database = data_source == InternalDataSourceType.DATABASE
         logger.info("Getting analysis result...")
         log_memory()
 
+        analysis_result: RunAnalysisResult | RunDatabaseAnalysisResult
+
+        recipe: BaseRecipe
+
         if is_database:
-            analysis_result: (
-                RunAnalysisResult | RunDatabaseAnalysisResult
-            ) = await run_database_analysis(
+            logger.info("Running database analysis")
+            analysis_result = await run_database_analysis(
                 RunDatabaseAnalysisRequest(
                     dataset_names=datasets_names,
                     question=enhanced_message,
                 ),
                 analyst_db,
+                token_tracker=token_tracker,
                 telemetry_json=telemetry_json,
             )
-        else:
-            analysis_result = await run_analysis(
-                RunAnalysisRequest(
+        elif isinstance(data_source, ExternalDataStoreNameDataSourceType):
+            logger.info("Running DataStore DataWrangling analysis")
+            data_store_id = DataSourceRecipe.get_id_for_data_store_canonical_name(
+                data_source.friendly_name
+            )
+            if not data_store_id:
+                assistant_message.in_progress = False
+                assistant_message.error = "A remote dataset was deleted and can no longer be used for analysis. Please refresh."
+                await analyst_db.update_chat_message(
+                    assistant_message.id, assistant_message
+                )
+
+                yield AnalysisGenerationError(assistant_message.error)
+                return
+
+            if request:
+                with use_user_token(request):
+                    recipe = await DataSourceRecipe.load_or_create(
+                        analyst_db, data_store_id
+                    )
+                    result = await recipe.refresh()
+            else:
+                recipe = await DataSourceRecipe.load_or_create(
+                    analyst_db, data_store_id
+                )
+                result = await recipe.refresh()
+            if result:
+                assistant_message.in_progress = False
+                assistant_message.error = "A remote dataset was deleted and can no longer be used for analysis. Please refresh."
+                await analyst_db.update_chat_message(
+                    assistant_message.id, assistant_message
+                )
+
+                yield AnalysisGenerationError(assistant_message.error)
+                return
+
+            logger.debug(
+                "Running DataStore data wrangling analysis with args",
+                extra={
+                    "dataset_names": datasets_names,
+                    "question": enhanced_message,
+                },
+            )
+
+            analysis_result = await run_database_analysis(
+                RunDatabaseAnalysisRequest(
                     dataset_names=datasets_names,
                     question=enhanced_message,
                 ),
                 analyst_db,
-                telemetry_json=telemetry_json,
+                database_override=recipe.as_database_operator(),
+                token_tracker=token_tracker,
             )
+
+        else:
+            if all(m.external_id is not None for m in dataset_metadata):
+                if not DatasetSparkRecipe.should_use_spark_recipe():
+                    raise RuntimeError(
+                        "Should be unreachable. Ended up with remote datasets while remote datasets is disallowed."
+                    )
+                logging.info("Running DataWrangling analysis")
+
+                if request:
+                    with use_user_token(request):
+                        recipe = await load_or_create_spark_recipe(
+                            analyst_db=analyst_db
+                        )
+                        refresh = await recipe.refresh()
+                else:
+                    recipe = await load_or_create_spark_recipe(analyst_db=analyst_db)
+                    refresh = await recipe.refresh()
+
+                if refresh:
+                    assistant_message.in_progress = False
+                    assistant_message.error = "A remote dataset was deleted and can no longer be used for analysis. Please refresh."
+                    await analyst_db.update_chat_message(
+                        assistant_message.id, assistant_message
+                    )
+
+                    yield AnalysisGenerationError(assistant_message.error)
+
+                    return
+
+                analysis_result = await run_database_analysis(
+                    RunDatabaseAnalysisRequest(
+                        dataset_names=datasets_names,
+                        question=enhanced_message,
+                    ),
+                    analyst_db,
+                    database_override=recipe.as_database_operator(),
+                    token_tracker=token_tracker,
+                )
+            elif all(m.external_id is None for m in dataset_metadata):
+                logging.info("Running local analysis")
+                analysis_result = await run_analysis(
+                    RunAnalysisRequest(
+                        dataset_names=datasets_names,
+                        question=enhanced_message,
+                    ),
+                    analyst_db,
+                    token_tracker,
+                )
+            else:
+                raise ValueError(
+                    "Cannot run analysis on a mix of local and remote datasets."
+                )
 
         log_memory()
         logger.info("Getting analysis result done")
@@ -1763,6 +2053,11 @@ async def run_complete_analysis(
         yield analysis_result
 
         assistant_message.components.append(analysis_result)
+
+        assistant_message = await extract_and_store_datasets(
+            analyst_db, assistant_message
+        )
+
         await analyst_db.update_chat_message(
             message_id=assistant_message.id, message=assistant_message
         )
@@ -1796,6 +2091,7 @@ async def run_complete_analysis(
         charts_result, business_result = await execute_business_analysis_and_charts(
             analysis_result,
             enhanced_message,
+            token_tracker,
             enable_business_insights=enable_business_insights,
             enable_chart_generation=enable_chart_generation,
             telemetry_json=telemetry_json,
@@ -1831,13 +2127,17 @@ async def run_complete_analysis(
 
         elif business_result is not None:
             assistant_message.components.append(business_result)
-            assistant_message.in_progress = False
-
             await analyst_db.update_chat_message(
                 message_id=assistant_message.id, message=assistant_message
             )
 
             yield business_result
+
+        assistant_message.in_progress = False
+        await analyst_db.update_chat_message(
+            message_id=assistant_message.id, message=assistant_message
+        )
+        yield business_result
 
     except Exception as e:
         error_message = f"Error setting up additional analysis: {str(e)}"
@@ -1849,6 +2149,21 @@ async def run_complete_analysis(
 
         yield AnalysisGenerationError(error_message)
 
+    finally:
+        # Generate token usage component
+        if token_tracker.call_count > 0:
+            final_usage_component = UsageInfoComponent(
+                usage=TokenUsageInfo(**token_tracker.to_dict())
+            )
+
+            assistant_message.components.append(final_usage_component)
+
+            await analyst_db.update_chat_message(
+                message_id=assistant_message.id, message=assistant_message
+            )
+
+            yield final_usage_component
+
 
 async def process_data_and_update_state(
     new_dataset_names: list[str],
@@ -1858,7 +2173,10 @@ async def process_data_and_update_state(
 ) -> AsyncGenerator[str, None]:
     """Process datasets and yield progress updates asynchronously."""
     # Start processing and yield initial message
-    logger.info("Starting data processing")
+    logger.info(
+        "Starting data processing",
+        extra={"new_dataset_names": new_dataset_names, "data_source": data_source},
+    )
     log_memory()
     yield gettext("Starting data processing")
 
@@ -1866,20 +2184,29 @@ async def process_data_and_update_state(
     # Convert string data_source to DataSourceType if needed
     data_source_type = (
         data_source
-        if isinstance(data_source, DataSourceType)
-        else DataSourceType(data_source)
+        if isinstance(data_source, InternalDataSourceType)
+        or isinstance(data_source, ExternalDataStoreNameDataSourceType)
+        else get_data_source_type(data_source)
     )
-    if data_source_type != DataSourceType.DATABASE:
+    if data_source_type != InternalDataSourceType.DATABASE and not isinstance(
+        data_source_type, ExternalDataStoreNameDataSourceType
+    ):
         try:
             logger.info("Cleansing datasets")
             yield gettext("Cleansing datasets")
             for analysis_dataset_name in new_dataset_names:
+                metadata = await analyst_db.get_dataset_metadata(analysis_dataset_name)
+                if metadata.data_source == InternalDataSourceType.REMOTE_REGISTRY:
+                    # Skip remote datasets.
+                    continue
+
                 analysis_dataset = await analyst_db.get_dataset(
                     analysis_dataset_name, max_rows=None
                 )
+
                 cleansed_dataset = await cleanse_dataframe(analysis_dataset)
                 reg_result = await analyst_db.register_dataset(
-                    cleansed_dataset, data_source=DataSourceType.GENERATED
+                    cleansed_dataset, data_source=InternalDataSourceType.GENERATED
                 )
                 if not reg_result["success"]:
                     logger.error(
@@ -1939,7 +2266,7 @@ async def process_data_and_update_state(
             new_dictionary = await get_dictionary(analysis_dataset, telemetry_json)
             logger.info(new_dictionary.to_application_df())
             del analysis_dataset
-            await analyst_db.register_data_dictionary(new_dictionary)
+            await analyst_db.register_data_dictionary(new_dictionary, clobber=True)
             logger.info(f"Registered dictionary for dataset: {analysis_dataset_name}")
             yield gettext("Registered data dictionary: {analysis_dataset_name}").format(
                 analysis_dataset_name=analysis_dataset_name

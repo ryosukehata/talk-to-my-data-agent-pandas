@@ -70,6 +70,7 @@
   "Clear": "クリア",
   "Are you sure you want to clear all datasets?": "すべてのデータセットをクリアしてもよろしいですか？",
   "Download dictionary as CSV": "辞書をCSVとしてダウンロード",
+  "Download Word": "Wordをダウンロード",
   "Delete dictionary": "辞書を削除",
   "Are you sure you want to delete this dictionary?": "この辞書を削除してもよろしいですか？",
   "Loading...": "ロード中…",
@@ -191,5 +192,10 @@
   "Custom prompt saved successfully": "カスタムプロンプトを保存しました",
   "Failed to save custom prompt": "カスタムプロンプトの保存に失敗しました",
   "Custom prompt update in progress, please wait...": "カスタムプロンプトの更新を反映中です。しばらくお待ちください...",
-  "Loading custom prompts...": "カスタムプロンプトを読み込み中..."
+  "Loading custom prompts...": "カスタムプロンプトを読み込み中...",
+  "Refine Question": "質問を洗練",
+  "Refining...": "洗練中...",
+  "Question": "質問",
+  "Reasoning": "理由",
+  "Relevant Columns": "関連カラム"
 }

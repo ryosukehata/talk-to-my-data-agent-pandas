@@ -6,14 +6,17 @@ import drLogo from '@/assets/DataRobot_white.svg';
 import { SidebarMenu, SidebarMenuOptionType } from '@/components/ui-custom/sidebar-menu';
 import { WelcomeModal } from './WelcomeModal';
 import { AddDataModal } from './AddDataModal';
-import { ROUTES, generateChatRoute, generateDataRoute } from '@/pages/routes';
+import { ROUTES, generateChatRoute, generateDataRoute, generateReportRoute } from '@/pages/routes';
 import { Separator } from '@radix-ui/react-separator';
 import { NewChatModal } from './NewChatModal';
 import loader from '@/assets/loader.svg';
 import { useGeneratedDictionaries, getDictionariesMenu } from '@/api/dictionaries';
 import { useFetchAllChats, getChatsMenu } from '@/api/chat-messages';
+import { useReports } from '@/api/reports';
+import { useFetchFeatureFlags } from '@/api/feature-flag';
 import { Button } from '@/components/ui/button';
 import { faCog } from '@fortawesome/free-solid-svg-icons/faCog';
+import { faFileAlt } from '@fortawesome/free-solid-svg-icons/faFileAlt';
 import { SettingsModal } from '@/components/SettingsModal';
 
 const DatasetList = ({ highlight }: { highlight: boolean }) => {
@@ -55,11 +58,10 @@ const ChatList = ({ highlight }: { highlight: boolean }) => {
   const { data, isLoading } = useFetchAllChats<SidebarMenuOptionType[]>({ select: getChatsMenu });
   const navigate = useNavigate();
   const { chatId } = useParams();
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const { t } = useTranslation();
 
   return (
-    <div className="relative flex flex-col h-full min-h-[300px]">
+    <div className="relative flex flex-col max-h-[300px]">
       <div className="flex justify-between items-center pb-3">
         <div>
           <p className="text-base font-semibold">{t('Chats')}</p>
@@ -83,18 +85,67 @@ const ChatList = ({ highlight }: { highlight: boolean }) => {
           <p className="text-muted-foreground">{t('Start your first chart here')}</p>
         )}
       </div>
-      <SettingsModal isOpen={settingsModalOpen} onOpenChange={setSettingsModalOpen} />
-      <div className="mt-4 flex justify-center">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full flex items-center justify-center gap-2"
-          onClick={() => setSettingsModalOpen(true)}
-        >
-          <FontAwesomeIcon icon={faCog} />
-          <span>{t('Settings')}</span>
+    </div>
+  );
+};
+
+const ReportList = () => {
+  const { data, isLoading } = useReports();
+  const navigate = useNavigate();
+  const { reportId } = useParams();
+  const { t } = useTranslation();
+
+  const reportMenuOptions: SidebarMenuOptionType[] =
+    data?.reports?.map(report => ({
+      id: report.report_id,
+      name: report.title,
+    })) || [];
+
+  return (
+    <div className="relative flex flex-col max-h-[200px]">
+      <div className="flex justify-between items-center pb-3">
+        <div>
+          <p className="text-base font-semibold">{t('Reports')}</p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.REPORTS)}>
+          <FontAwesomeIcon icon={faFileAlt} />
         </Button>
       </div>
+      <div className="flex-1 overflow-y-auto">
+        <SidebarMenu
+          options={reportMenuOptions}
+          activeKey={reportId}
+          onClick={({ id }) => navigate(generateReportRoute(id))}
+        />
+        {isLoading && (
+          <div className="mt-4 flex justify-center">
+            <img src={loader} alt={t('Loading')} className="w-4 h-4 animate-spin" />
+          </div>
+        )}
+        {!isLoading && !reportMenuOptions.length && (
+          <p className="text-muted-foreground text-sm">{t('No reports yet')}</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const SettingsSection = () => {
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const { t } = useTranslation();
+
+  return (
+    <div className="pr-6 py-4 border-t mt-auto">
+      <SettingsModal isOpen={settingsModalOpen} onOpenChange={setSettingsModalOpen} />
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full flex items-center justify-center gap-2"
+        onClick={() => setSettingsModalOpen(true)}
+      >
+        <FontAwesomeIcon icon={faCog} />
+        <span>{t('Settings')}</span>
+      </Button>
     </div>
   );
 };
@@ -106,6 +157,8 @@ export const Sidebar = () => {
   const highlightChats = !highlightDatasets && !isLoadingChats && !chats?.length;
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { data: featureFlags } = useFetchFeatureFlags();
+  const showReportBuilder = featureFlags?.reportBuilderEnabled === true;
 
   return (
     <div className="flex flex-col gap-6 p-6 pr-0 h-full overflow-y-auto">
@@ -129,8 +182,15 @@ export const Sidebar = () => {
           <DatasetList highlight={highlightDatasets} />
           <Separator className="my-6 border-t" />
           <ChatList highlight={highlightChats} />
+          {showReportBuilder && (
+            <>
+              <Separator className="my-6 border-t" />
+              <ReportList />
+            </>
+          )}
           <WelcomeModal />
         </div>
+        <SettingsSection />
       </div>
     </div>
   );

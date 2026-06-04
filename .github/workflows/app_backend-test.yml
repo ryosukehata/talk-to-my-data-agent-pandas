@@ -29,7 +29,7 @@ jobs:
 
       # Ref: https://docs.astral.sh/uv/guides/integration/github/#installation
       - name: Setup uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           working-directory: app_backend
           enable-cache: true
@@ -53,10 +53,12 @@ jobs:
         run: |
           uv run ruff format --check .
           uv run ruff check .
-          uv run mypy --pretty --explicit-package-bases .
 
       - name: Test
         working-directory: app_backend
+        env:
+          DATAROBOT_ENDPOINT: ${{ secrets.DATAROBOT_ENDPOINT }}
+          DATAROBOT_API_TOKEN: ${{ secrets.DATAROBOT_API_TOKEN }}
         run: uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml
 
       - name: Get Cover

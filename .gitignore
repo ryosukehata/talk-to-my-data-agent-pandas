@@ -159,6 +159,9 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# Report storage local cache
+utils/customize/infrastructure/storage/data/
+
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
@@ -211,10 +214,9 @@ dist-ssr
 package-lock.json
 bun.lockb
 .vite/
-frontend_react/react_src/coverage
-frontend_react/deploy/metadata.yaml
-frontend_react/deploy/app_infra.json
-!frontend_react/deploy/dist
+app_backend/metadata.yaml
+app_backend/app_infra.json
+!app_backend/deploy/dist
 
 !frontend_react/react_src/src/lib
 **/*.csv

@@ -20,7 +20,7 @@ from typing import Dict, Tuple
 
 import pandas as pd
 
-from utils.api import download_registry_dataset_as_dataframe
+from utils.customize.api import download_registry_dataset_as_dataframe
 from utils.resources import DatabaseDescription
 
 

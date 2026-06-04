@@ -7,9 +7,9 @@ import { useTranslation } from '@/i18n';
 import { cn } from '~/lib/utils';
 import { Button } from '@/components/ui/button';
 
-export type SendButtonArrangement = 'prepend' | 'append';
+type SendButtonArrangement = 'prepend' | 'append';
 
-export type PromptInputProps = Omit<
+type PromptInputProps = Omit<
   React.TextareaHTMLAttributes<HTMLTextAreaElement>,
   'onChange' | 'value' | 'onSend'
 > & {
@@ -101,6 +101,7 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
             className
           )}
           rows={1}
+          autoFocus={props.autoFocus}
           onCompositionStart={() => setIsComposing(true)}
           onCompositionEnd={() => setIsComposing(false)}
           onKeyDown={event => {

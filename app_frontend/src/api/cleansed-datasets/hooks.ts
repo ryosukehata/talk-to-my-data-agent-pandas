@@ -2,9 +2,14 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { cleansedDatasetKeys, datasetMetadataKeys } from './keys';
 import { getCleansedDataset, getDatasetMetadata } from './api-requests';
 
-export const useInfiniteCleansedDataset = (name: string, limit = 100, search?: string) => {
+export const useInfiniteCleansedDataset = (
+  name: string,
+  limit = 100,
+  search?: string,
+  enabled = true
+) => {
   return useInfiniteQuery({
-    queryKey: cleansedDatasetKeys.detail(name, search),
+    queryKey: cleansedDatasetKeys.detail(name, { search, limit }),
     initialPageParam: 0,
     queryFn: ({ pageParam = 0, signal }) =>
       getCleansedDataset({
@@ -14,6 +19,7 @@ export const useInfiniteCleansedDataset = (name: string, limit = 100, search?: s
         search,
         signal,
       }),
+    enabled: enabled && !!name,
     getNextPageParam: (lastPage, allPages) => {
       const totalFetched = allPages.length * limit;
       // If we received fewer rows than the limit, we've reached the end

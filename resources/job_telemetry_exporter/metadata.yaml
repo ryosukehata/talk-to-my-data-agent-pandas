@@ -1,14 +1,15 @@
+---
 name: runtime-params
 
 runtimeParameterDefinitions:
-- fieldName: LLM_DEPLOYMENT_ID
-  type: string
+  - fieldName: LLM_DEPLOYMENT_ID
+    type: string
 
-- fieldName: DATAROBOT_APPLICATION_ID
-  type: string
+  - fieldName: DATAROBOT_APPLICATION_ID
+    type: string
 
-- fieldName: DATASET_TRACE_ID
-  type: string
+  - fieldName: DATASET_TRACE_ID
+    type: string
 
-- fieldName: DATASET_ACCESS_LOG_ID
-  type: string
+  - fieldName: DATASET_ACCESS_LOG_ID
+    type: string

@@ -14,7 +14,7 @@ import {
   useExport,
   usePollInProgressMessage,
 } from '@/api/chat-messages/hooks';
-import { InitialPrompt, UserPrompt, UserMessage } from '@/components/chat';
+import { InitialPrompt, UserPrompt, UserMessage, SystemMessage } from '@/components/chat';
 import { ROUTES } from './routes';
 import { Loading } from '@/components/ui-custom/loading';
 import { RenameChatModal } from '@/components/RenameChatModal';
@@ -22,7 +22,7 @@ import { DataSourceToggle } from '@/components/DataSourceToggle';
 
 import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
 import { useMultipleDatasetMetadata } from '@/api/cleansed-datasets/hooks';
-import { DATA_SOURCES } from '@/constants/dataSources';
+import { DATA_SOURCES, EXTERNAL_DATA_STORE_PREFIX } from '@/constants/dataSources';
 
 import { ConfirmDialog } from '@/components/ui-custom/confirm-dialog';
 
@@ -93,14 +93,17 @@ export const Chats: React.FC = () => {
         dataSourcesSet.add(DATA_SOURCES.FILE);
       } else if (data_source === DATA_SOURCES.DATABASE) {
         dataSourcesSet.add(DATA_SOURCES.DATABASE);
+      } else if (data_source === DATA_SOURCES.REMOTE_CATALOG) {
+        dataSourcesSet.add(DATA_SOURCES.REMOTE_CATALOG);
+      } else if (data_source.startsWith(EXTERNAL_DATA_STORE_PREFIX)) {
+        dataSourcesSet.add(data_source);
       }
     });
 
     return {
       // Users can only select data sources that are present in the metadata
       allowedDataSources: Array.from(dataSourcesSet),
-      hasMixedSources:
-        dataSourcesSet.has(DATA_SOURCES.FILE) && dataSourcesSet.has(DATA_SOURCES.DATABASE),
+      hasMixedSources: dataSourcesSet.size > 1,
     };
   }, [multipleMetadata]);
 
@@ -142,7 +145,14 @@ export const Chats: React.FC = () => {
           <strong>{activeChat.name || t('New Chat')}</strong>
           <RenameChatModal chatId={activeChat.id} currentName={activeChat.name} />
         </h2>
-        <div>{hasMixedSources && <DataSourceToggle multipleMetadata={multipleMetadata} />}</div>
+        <div>
+          {hasMixedSources && (
+            <DataSourceToggle
+              multipleMetadata={multipleMetadata}
+              allowedDataSources={allowedDataSources}
+            />
+          )}
+        </div>
         <Button
           variant="ghost"
           onClick={() => exportChat({ chatId: activeChat.id })}
@@ -176,6 +186,7 @@ export const Chats: React.FC = () => {
         </div>
       ) : !chatId || messages?.length === 0 ? (
         <InitialPrompt
+          key={`initial-${chatId || 'new'}`}
           allowedDataSources={allowedDataSources}
           chatId={activeChat?.id}
           activeChat={activeChat}
@@ -184,8 +195,8 @@ export const Chats: React.FC = () => {
       ) : (
         <>
           <ScrollArea className="flex flex-1 flex-col overflow-y-hidden pr-2 pb-4">
-            {messages?.map(message =>
-              activeChat?.id ? (
+            {activeChat?.id &&
+              messages?.map(message => (
                 <div key={message.id} className="flex flex-col w-full">
                   {message.role === 'user' && (
                     <UserMessage
@@ -207,9 +218,11 @@ export const Chats: React.FC = () => {
                       />
                     </Suspense>
                   )}
+                  {message.role === 'system' && (
+                    <SystemMessage message={message} testId={`system-message-${message.id}`} />
+                  )}
                 </div>
-              ) : null
-            )}
+              ))}
           </ScrollArea>
           <div className="flex w-full justify-center">
             <UserPrompt

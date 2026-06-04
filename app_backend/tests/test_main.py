@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 from fastapi.testclient import TestClient
+
+os.environ.setdefault("DATAROBOT_API_TOKEN", "test-token")
+os.environ.setdefault("DATAROBOT_ENDPOINT", "https://example.com")
+os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 
 from app.main import app
 
@@ -23,6 +29,13 @@ def test_index() -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/html; charset=utf-8"
+
+
+def test_reports_spa_routes() -> None:
+    for path in ("/reports", "/reports/report-123"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/html; charset=utf-8"
 
 
 def test_favicon_file() -> None:

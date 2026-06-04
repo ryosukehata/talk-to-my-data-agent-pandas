@@ -1,4 +1,4 @@
-export interface IMetadata {
+interface IMetadata {
   duration?: number | null;
   attempts?: number | null;
   datasets_analyzed?: number | null;
@@ -32,7 +32,7 @@ export interface IMessageComponent {
 export interface IAnalysisComponent extends IComponent {
   type: 'analysis';
   metadata?: IMetadata;
-  dataset?: IDataset | null;
+  dataset_id?: string | null;
   code?: string | null;
 }
 
@@ -50,15 +50,34 @@ export interface IBusinessComponent extends IComponent {
   follow_up_questions?: string[] | null;
 }
 
-export interface IComponent {
+export interface ITokenUsageInfo {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  call_count: number;
+  model: string;
+}
+
+export interface IUsageInfoComponent {
+  type: 'usage_info';
+  usage: ITokenUsageInfo;
+}
+
+interface IComponent {
   status?: 'success' | 'error';
   metadata?: IMetadata;
 }
 
 export interface IChatMessage {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
-  components: (IMessageComponent | IAnalysisComponent | IChartsComponent | IBusinessComponent)[];
+  components: (
+    | IMessageComponent
+    | IAnalysisComponent
+    | IChartsComponent
+    | IBusinessComponent
+    | IUsageInfoComponent
+  )[];
   in_progress?: boolean;
   created_at?: string; // ISO timestamp for message creation time
   chat_id?: string; // ID of the chat this message belongs to

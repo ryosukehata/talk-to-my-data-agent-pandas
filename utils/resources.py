@@ -98,7 +98,7 @@ prompt_template_ai_catalog_name: str = "PROMPT_TEMPLATE_AI_CATALOG"
 class LLMDeployment(DynamicSettings):
     id: str = Field(
         validation_alias=AliasChoices(
-            "MLOPS_RUNTIME_PARAM_" + llm_deployment_env_name,
+            f"MLOPS_RUNTIME_PARAM_{llm_deployment_env_name}",
             llm_deployment_env_name,
         ),
     )

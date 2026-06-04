@@ -1,12 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { datasetKeys } from './keys';
-import { getDatasets, uploadDataset, deleteAllDatasets } from './api-requests';
+import {
+  getDatasets,
+  uploadDataset,
+  deleteAllDatasets,
+  getSupportedDataSourceTypes,
+  getDatasetById,
+  downloadDataset,
+} from './api-requests';
 import { useState } from 'react';
 import { dictionaryKeys } from '../dictionaries/keys';
 import { DictionaryTable } from '../dictionaries/types';
 import { AxiosError } from 'axios';
 
-export interface FileUploadResponse {
+interface FileUploadResponse {
   filename?: string;
   content_type?: string;
   size?: number;
@@ -22,15 +29,64 @@ export interface UploadError extends Error {
   isAxiosError?: boolean;
 }
 
-export const useFetchAllDatasets = ({ limit = 100 } = {}) => {
+export const useFetchDatasets = ({ limit = 100 } = {}) => {
   const queryResult = useQuery({
-    queryKey: datasetKeys.all,
-    queryFn: ({ signal }) => getDatasets({ signal, limit }),
+    queryKey: datasetKeys.list(limit),
+    queryFn: async ({ signal }) => {
+      const [local, remote] = await Promise.all([
+        getDatasets({ signal, limit, remote: false }),
+        getDatasets({ signal, limit, remote: true }),
+      ]);
+      return { local: local, remote: remote };
+    },
+    refetchInterval: 5 * 60 * 1000,
   });
 
   return queryResult;
 };
 
+export const useGetSupportedDataSourceTypes = () => {
+  const queryResult = useQuery({
+    queryKey: datasetKeys.supportedDataSourceTypes,
+    queryFn: getSupportedDataSourceTypes,
+  });
+
+  return queryResult;
+};
+
+export const useInfiniteDatasetById = (
+  datasetId: string | null | undefined,
+  options?: {
+    pageSize?: number;
+    enabled?: boolean;
+  }
+) => {
+  const pageSize = options?.pageSize || 1000;
+  const enabled = options?.enabled !== false && !!datasetId;
+
+  return useInfiniteQuery({
+    queryKey: datasetKeys.byId(datasetId || '', pageSize),
+    queryFn: ({ pageParam = 0 }) =>
+      getDatasetById({
+        datasetId: datasetId!,
+        skip: pageParam,
+        limit: pageSize,
+      }),
+    enabled,
+    getNextPageParam: (lastPage, allPages) => {
+      if (
+        !lastPage ||
+        !lastPage.dataset ||
+        !lastPage.dataset.data_records ||
+        lastPage.dataset.data_records.length < pageSize
+      ) {
+        return undefined;
+      }
+      return allPages.length * pageSize;
+    },
+    initialPageParam: 0,
+  });
+};
 export const useFileUploadMutation = ({
   onSuccess,
   onError,
@@ -42,10 +98,19 @@ export const useFileUploadMutation = ({
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async ({ files, catalogIds }: { files: File[]; catalogIds: string[] }) => {
+    mutationFn: async ({
+      files,
+      catalogIds,
+      dataSource,
+    }: {
+      files: File[];
+      catalogIds: string[];
+      dataSource: string;
+    }) => {
       const response = await uploadDataset({
         files,
         catalogIds,
+        dataSource,
         onUploadProgress: progressEvent => {
           if (progressEvent.total) {
             const prg = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -133,4 +198,10 @@ export const useDeleteAllDatasets = ({ onSuccess }: { onSuccess?: () => void }) 
     },
   });
   return mutation;
+};
+
+export const useDownloadDataset = () => {
+  return useMutation({
+    mutationFn: downloadDataset,
+  });
 };

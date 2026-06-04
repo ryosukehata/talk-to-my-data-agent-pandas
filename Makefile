@@ -42,10 +42,6 @@ run-local-dev-backend: install-frontend build-frontend
 	@$(SET_ENV_SCRIPT) && \
 	PYTHONPATH=app_backend SERVE_STATIC_FRONTEND=False DEV_MODE=True ./app_backend/start-app.sh
 
-run-local-dev-backend-debug: install-frontend build-frontend ## Run backend server with debug logging
-	@$(SET_ENV_SCRIPT) && \
-	PYTHONPATH=app_backend SERVE_STATIC_FRONTEND=False DEV_MODE=True LOG_LEVEL=debug ./app_backend/start-app.sh
-
 run-local-static-backend: install-frontend build-frontend
 	@$(SET_ENV_SCRIPT) && \
 	PYTHONPATH=app_backend SERVE_STATIC_FRONTEND=True DEV_MODE=True ./app_backend/start-app.sh
