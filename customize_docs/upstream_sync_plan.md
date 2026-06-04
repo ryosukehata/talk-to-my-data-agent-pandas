@@ -36,9 +36,8 @@
 
 | タグ | ブランチ | 判断 | 主な差分 | 競合/注意点 | テスト |
 | --- | --- | --- | --- | --- | --- |
-| `v0.3.20` | `codex/upstream-sync-v0.3.20` | 取り込む | `utils/analyst_db.py`, `utils/api.py`, `utils/datarobot_dataset_handler.py`, `utils/prompts.py` | `CHANGELOG.md` のみ競合。内容を両方残す方針で解消する。 | 実行予定 |
+| `v0.3.20` | `codex/upstream-sync-v0.3.20` | 取り込む | `utils/analyst_db.py`, `utils/api.py`, `utils/datarobot_dataset_handler.py`, `utils/prompts.py` | `CHANGELOG.md` のみ競合。内容を両方残して解消済み。カスタムAPIのcharacterization test追加時に `python-docx` が `app_backend/pyproject.toml` に不足していることを検知し、依存関係を追加。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped |
 | `v0.3.21` | 未作成 | 取り込む候補 | `.env.template`, `README.md`, i18n, `utils/api.py`, `utils/rest_api.py`, dataset handling | 読み取り専用マージでは `CHANGELOG.md` のみ競合。README/env/API差分は確認してからPR化する。 | 未実行 |
 | `v0.3.22` | 未作成 | 取り込む候補 | frontend select UI, `utils/base_telemetry.py` | 読み取り専用マージでは `CHANGELOG.md` のみ競合。UI差分のためfrontend検証を追加する。 | 未実行 |
 | `v0.3.23` | 未作成 | 取り込む候補 | `infra/__main__.py`, `requirements.txt`, dataset handling | 読み取り専用マージでは `CHANGELOG.md` のみ競合。infra差分はPulumi設定への影響を確認する。 | 未実行 |
 | `v0.4.24` 以降 | 未作成 | 別判断 | 大きな構成変更を含む可能性 | `utils -> core/src/core` の移植判断が必要。専用PRで扱う。 | 未実行 |
-
