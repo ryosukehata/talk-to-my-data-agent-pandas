@@ -10,8 +10,9 @@
 - 取り込み元: `upstream/main`
 - fetch確認日: 2026-06-04
 - upstream最新: `5abdbe1` (`v11.8.1` 後の追加修正を含む)
-- 現在の `dev` との共通祖先: `v0.3.19`
-- 退避ブランチ: `backup/dev-before-upstream-sync-20260604`
+- `dev` 最新: `c4d6152` (`v0.3.20` から `v0.3.23` まで取り込み済み)
+- 現在の `dev` と `v0.4.24` の共通祖先: `v0.3.23`
+- 退避ブランチ: `backup/dev-before-upstream-sync-20260604`, `backup/dev-before-v0.4.24-sync-20260604`
 
 ## 方針
 
@@ -40,4 +41,11 @@
 | `v0.3.21` | `codex/upstream-sync-v0.3.21` | 取り込む | `.env.template`, `README.md`, i18n, `utils/api.py`, `utils/rest_api.py`, dataset handling | 実マージでは競合なし。upstream追加の `pytest.ini` が既存 `pyproject.toml` の pytest 設定を上書きし `app` import を壊したため、既存設定を `pytest.ini` に統合。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped; `npm --prefix app_frontend test`: 103 passed; `npm --prefix app_frontend run lint`: passed |
 | `v0.3.22` | `codex/upstream-sync-v0.3.22` | 取り込む | frontend select UI, `utils/base_telemetry.py` | 実マージでは競合なし。UI差分のためfrontend検証を実施。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped; `npm --prefix app_frontend test`: 103 passed; `npm --prefix app_frontend run lint`: passed |
 | `v0.3.23` | `codex/upstream-sync-v0.3.23` | 取り込む | `infra/__main__.py`, `requirements.txt`, dataset handling | 実マージでは競合なし。`pulumi-datarobot>=0.10.22` 前提の `app_source.resources` 参照へ変更。ローカル解決で `ApplicationSource.resources` が存在することを確認。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped; `uv run ruff check infra/__main__.py utils/datarobot_dataset_handler.py`: passed |
-| `v0.4.24` 以降 | 未作成 | 別判断 | data connection層の再編、frontend/Streamlit、API、schema変更 | `v0.4.24` の読み取り専用マージで `frontend/01_connect_and_explore.py`, `frontend/02_chat_with_data.py`, `utils/analyst_db.py`, `utils/api.py`, `utils/data_connections/database/database_implementations.py`, `utils/rest_api.py` が競合。`utils/database_helpers.py -> utils/data_connections/database/database_implementations.py`, `utils/datarobot_dataset_handler.py -> utils/data_connections/datarobot/datarobot_dataset_handler.py` の移動を含むため、専用PRで扱う。 | 未実行 |
+| `v0.4.24` | `codex/upstream-sync-v0.4.24` | 一部取り込む | data connection層の土台、React chat message metadata、依存関係、schema補助差分 | `git merge --no-commit --no-ff v0.4.24` で `frontend/01_connect_and_explore.py`, `frontend/02_chat_with_data.py`, `utils/analyst_db.py`, `utils/api.py`, `utils/data_connections/database/database_implementations.py`, `utils/rest_api.py` が競合。Streamlit は破棄方針のため `frontend/*` 差分は除外。自動適用できた差分から、既存importを壊す `utils/database_helpers.py` 削除、`utils/datarobot_dataset_handler.py` 移動、`notebooks/testing.ipynb` 削除も除外。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped; `npm --prefix app_frontend test`: 103 passed; `npm --prefix app_frontend run lint`: passed; `uv run ruff check utils/data_connections utils/schema.py utils/credentials.py infra/settings_app_infra.py`: passed |
+| `v0.5.0` 以降 | 未作成 | 別判断 | `v0.4.24` の再編後に積まれた追加差分 | `v0.4.24` の手動移植が完了してから、タグ単位で再評価する。 | 未実行 |
+
+## `v0.4.24` の次アクション
+
+1. `utils/database_helpers.py` と `utils/datarobot_dataset_handler.py` の旧importを保ったまま、新しい data connection 層へ段階移行する。
+2. `utils/api.py` と `utils/rest_api.py` は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
+3. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
