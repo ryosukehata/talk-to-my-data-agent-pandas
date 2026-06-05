@@ -29,6 +29,14 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
         ),
         None,
     )
+    restore_files_step = next(
+        (
+            step
+            for step in steps
+            if step.get("name") == "Restore ApplicationSource files for Pulumi refresh"
+        ),
+        None,
+    )
     pulumi_steps = [step for step in steps if step.get("uses") == "pulumi/actions@v6"]
 
     assert prepare_manifest_step is not None
@@ -39,6 +47,10 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
     assert "npm install" in build_frontend_step["run"]
     assert "npm run build" in build_frontend_step["run"]
     assert steps.index(build_frontend_step) < steps.index(pulumi_steps[0])
+    assert restore_files_step is not None
+    assert "pulumi stack export" in restore_files_step["run"]
+    assert "prepare_pulumi_refresh_files.py" in restore_files_step["run"]
+    assert steps.index(restore_files_step) < steps.index(pulumi_steps[0])
     assert len(pulumi_steps) == 2
     assert {
         step["with"]["stack-name"]: step["with"].get("refresh") for step in pulumi_steps

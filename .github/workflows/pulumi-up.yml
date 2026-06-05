@@ -35,6 +35,19 @@ jobs:
           npm install
           npm run build
 
+      - name: Restore ApplicationSource files for Pulumi refresh
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          PULUMI_STACK_NAME: ${{ github.ref == 'refs/heads/main' && 'ryosukehata/dataanalyst/ttmd-pandas-react' || 'ryosukehata/dataanalyst/dev'
+            }}
+        run: |
+          if ! command -v pulumi >/dev/null 2>&1; then
+            curl -fsSL https://get.pulumi.com | sh
+            export PATH="$HOME/.pulumi/bin:$PATH"
+          fi
+          pulumi stack export --stack "$PULUMI_STACK_NAME" --file /tmp/pulumi-stack.json --non-interactive
+          python .github/scripts/prepare_pulumi_refresh_files.py /tmp/pulumi-stack.json --workspace "$GITHUB_WORKSPACE"
+
       # Run Pulumi Up for main branch
       - uses: pulumi/actions@v6
         if: github.ref == 'refs/heads/main'
