@@ -16,6 +16,7 @@ GitHub Actions の Pulumi CD で、DataRobot `ApplicationSource` 更新時に `f
   - 古い source は DataRobot 上に残るが、CD の更新を優先する。
 - CD の `pulumi up` に `refresh: true` を設定する。
   - 失敗済み update で Pulumi state に残った pending delete を、次回 update 前に実リソース状態と同期して解消するため。
+- refresh は Pulumi program が `app_backend/app_infra.json` を生成する前に state の file hash を読むため、CD 側で事前に `app_infra.json` を作成する。
 
 ## テスト
 
@@ -25,4 +26,4 @@ GitHub Actions の Pulumi CD で、DataRobot `ApplicationSource` 更新時に `f
 - `customize_docs/test_application_source_retention.py`
   - App と Dashboard の `ApplicationSource` に `retain_on_delete=True` が設定されていることを検証する。
 - `.github/workflows/pulumi-up.yml`
-  - YAML として parse できること、main/dev 両方の Pulumi action に `refresh: true` が設定されていることを確認する。
+  - YAML として parse できること、refresh 前の `app_infra.json` 作成 step があること、main/dev 両方の Pulumi action に `refresh: true` が設定されていることを確認する。
