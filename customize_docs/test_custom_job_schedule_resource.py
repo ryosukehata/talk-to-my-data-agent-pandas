@@ -22,25 +22,15 @@ def settings_job_infra(monkeypatch: pytest.MonkeyPatch):
     sys.modules.pop("infra.settings_job_infra", None)
 
 
-def test_usage_export_job_schedule_uses_provider_args(settings_job_infra) -> None:
-    original_hour = settings_job_infra.SCHEDULER_HOUR
-    settings_job_infra.SCHEDULER_HOUR = 7
-    try:
-        schedule = settings_job_infra.get_job_schedule()
-    finally:
-        settings_job_infra.SCHEDULER_HOUR = original_hour
-
-    assert schedule.minutes == ["0"]
-    assert schedule.hours == ["7"]
-    assert schedule.day_of_months == ["*"]
-    assert schedule.months == ["*"]
-    assert schedule.day_of_weeks == ["0", "1", "2", "3", "4"]
-
-
-def test_pulumi_stack_does_not_use_manual_schedule_post_actions() -> None:
+def test_pulumi_stack_does_not_manage_custom_job_schedule() -> None:
     stack_source = (Path(__file__).parents[1] / "infra" / "__main__.py").read_text()
 
     assert "CustomJobPostActions" not in stack_source
     assert "create_job_schedule" not in stack_source
-    assert "schedule=settings_job_infra.get_job_schedule()" in stack_source
+    assert "schedule=" not in stack_source
     assert "CUSTOM_JOB_SCHEDULE_ID" not in stack_source
+
+
+def test_settings_job_infra_does_not_build_deploy_schedule(settings_job_infra) -> None:
+    assert not hasattr(settings_job_infra, "get_job_schedule")
+    assert not hasattr(settings_job_infra, "create_job_schedule")

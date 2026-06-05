@@ -1,5 +1,4 @@
 import hashlib
-import os
 import textwrap
 from pathlib import Path
 from typing import Sequence, Tuple
@@ -20,9 +19,6 @@ from utils.custom_job_helper import (
 )
 
 from .settings_main import PROJECT_ROOT
-
-# scheduler configuration
-SCHEDULER_HOUR = int(os.environ.get("SCHEDULER_HOUR", "21"))
 
 # guardrails
 
@@ -158,17 +154,6 @@ def get_job_files(
     ]
 
     return source_files_tuples, content_hash
-
-
-def get_job_schedule() -> datarobot.CustomJobScheduleArgs:
-    """Return the Usage Export job schedule managed by the DataRobot provider."""
-    return datarobot.CustomJobScheduleArgs(
-        minutes=["0"],
-        hours=[str(SCHEDULER_HOUR)],
-        day_of_months=["*"],
-        months=["*"],
-        day_of_weeks=["0", "1", "2", "3", "4"],  # Sunday-Thursday UTC
-    )
 
 
 def run_job_once(custom_job_id: str) -> str:

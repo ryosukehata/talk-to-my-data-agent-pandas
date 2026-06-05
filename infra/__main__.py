@@ -397,7 +397,6 @@ def create_monitoring_resources():
         runtime_parameter_values=job_runtime_parameters,
         resource_bundle_id=settings_job_infra.resource_bundle_id,
         job_type="default",
-        schedule=settings_job_infra.get_job_schedule(),
     )
 
     pulumi.export(settings_job_infra.job_resource_name, custom_job.id)
