@@ -16,7 +16,9 @@ cleanup 時に `pulumi-resource-command` process が残っていた。
   `command:local:Command` frontend build resource を作らない。
 - workflow の事前 build 成果物を `settings_app_infra.get_app_files()` で直接読む。
 - 既存 Pulumi state に残った `command:local:Command` は update 前に
-  `pulumi state delete` で削除する。
+  stack export JSON から prune し、`pulumi stack import` で反映する。
+  - 失敗した replacement が複数残ると同一 URN が曖昧になり、`pulumi state delete`
+    では削除できないため。
 - ローカル実行では env を設定しない限り、従来通り Pulumi 内で frontend build を実行する。
 
 ## テスト
@@ -24,5 +26,7 @@ cleanup 時に `pulumi-resource-command` process が残っていた。
 - `customize_docs/test_pulumi_frontend_build.py`
   - Pulumi stack が事前 build 済み frontend assets を直接使えることを確認する。
 - `customize_docs/test_pulumi_workflow_refresh.py`
-  - workflow が `command:local:Command` state を事前削除することを確認する。
+  - workflow が `command:local:Command` state を事前 prune することを確認する。
   - Pulumi action に `SKIP_PULUMI_FRONTEND_BUILD=true` が渡ることを確認する。
+- `customize_docs/test_prune_pulumi_state_resources.py`
+  - stack export から対象 type の resources と、その依存参照を削除することを確認する。

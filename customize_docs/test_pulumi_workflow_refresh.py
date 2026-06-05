@@ -60,7 +60,7 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
     assert "prepare_pulumi_refresh_files.py" in restore_files_step["run"]
     assert steps.index(restore_files_step) < steps.index(pulumi_steps[0])
     assert remove_stale_components_step is not None
-    assert "find_pulumi_state_resources.py" in remove_stale_components_step["run"]
+    assert "prune_pulumi_state_resources.py" in remove_stale_components_step["run"]
     assert (
         "custom:resource:CustomJobPostActions" in (remove_stale_components_step["run"])
     )
@@ -69,7 +69,8 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
         in (remove_stale_components_step["run"])
     )
     assert "command:local:Command" in remove_stale_components_step["run"]
-    assert "pulumi state delete" in remove_stale_components_step["run"]
+    assert "pulumi stack import" in remove_stale_components_step["run"]
+    assert "pulumi state delete" not in remove_stale_components_step["run"]
     assert steps.index(remove_stale_components_step) < steps.index(pulumi_steps[0])
     assert len(pulumi_steps) == 2
     assert {

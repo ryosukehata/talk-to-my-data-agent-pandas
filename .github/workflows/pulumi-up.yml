@@ -58,15 +58,16 @@ jobs:
             curl -fsSL https://get.pulumi.com | sh
             export PATH="$HOME/.pulumi/bin:$PATH"
           fi
-          stale_urns="$(python .github/scripts/find_pulumi_state_resources.py /tmp/pulumi-stack.json custom:resource:CustomJobPostActions custom:resource:CustomJobScheduleCleanup command:local:Command)"
+          python .github/scripts/prune_pulumi_state_resources.py /tmp/pulumi-stack.json /tmp/pulumi-stack-pruned.json custom:resource:CustomJobPostActions custom:resource:CustomJobScheduleCleanup command:local:Command > /tmp/pruned-urns.txt
+          stale_urns="$(cat /tmp/pruned-urns.txt)"
           if [ -z "$stale_urns" ]; then
             echo "No stale Pulumi state resources found"
             exit 0
           fi
           while IFS= read -r urn; do
-            echo "Deleting stale Pulumi state resource: $urn"
-            pulumi state delete "$urn" --stack "$PULUMI_STACK_NAME" --yes --non-interactive
+            echo "Pruning stale Pulumi state resource: $urn"
           done <<< "$stale_urns"
+          pulumi stack import --stack "$PULUMI_STACK_NAME" --file /tmp/pulumi-stack-pruned.json --non-interactive
 
       # Run Pulumi Up for main branch
       - uses: pulumi/actions@v6
