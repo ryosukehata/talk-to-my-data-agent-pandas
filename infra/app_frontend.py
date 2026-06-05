@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import time
 from pathlib import Path
 
@@ -22,11 +23,14 @@ from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 project_dir = Path(__file__).parent.parent
 
 
-def build_frontend() -> command.local.Command:
+def build_frontend() -> command.local.Command | None:
     """
     Build the frontend application before deploying infrastructure.
     Split into two stages: install dependencies and build application.
     """
+    if os.environ.get("SKIP_PULUMI_FRONTEND_BUILD", "false").lower() == "true":
+        return None
+
     frontend_dir = project_dir / "app_frontend"
 
     build_react_app = command.local.Command(

@@ -41,7 +41,7 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
         (
             step
             for step in steps
-            if step.get("name") == "Remove stale custom job component resources"
+            if step.get("name") == "Remove stale Pulumi state resources"
         ),
         None,
     )
@@ -68,6 +68,7 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
         "custom:resource:CustomJobScheduleCleanup"
         in (remove_stale_components_step["run"])
     )
+    assert "command:local:Command" in remove_stale_components_step["run"]
     assert "pulumi state delete" in remove_stale_components_step["run"]
     assert steps.index(remove_stale_components_step) < steps.index(pulumi_steps[0])
     assert len(pulumi_steps) == 2
@@ -77,3 +78,6 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
         "ryosukehata/dataanalyst/ttmd-pandas-react": True,
         "ryosukehata/dataanalyst/dev": True,
     }
+    for step in pulumi_steps:
+        assert step["env"]["SKIP_PULUMI_FRONTEND_BUILD"] == "true"
+        assert "SCHEDULER_HOUR" not in step["env"]

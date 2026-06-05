@@ -300,12 +300,19 @@ if USE_LLM_GATEWAY:
         )
     )
 
-app_source = datarobot.ApplicationSource(
-    files=app_frontend.stdout.apply(
+if app_frontend is None:
+    app_source_files = settings_app_infra.get_app_files(
+        runtime_parameter_values=app_runtime_parameters
+    )
+else:
+    app_source_files = app_frontend.stdout.apply(
         lambda _: settings_app_infra.get_app_files(
             runtime_parameter_values=app_runtime_parameters
         )
-    ),
+    )
+
+app_source = datarobot.ApplicationSource(
+    files=app_source_files,
     runtime_parameter_values=app_runtime_parameters,
     resources=datarobot.ApplicationSourceResourcesArgs(
         resource_label=CustomAppResourceBundles.CPU_7XL.value.id,
