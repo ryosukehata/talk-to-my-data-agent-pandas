@@ -24,6 +24,10 @@ cleanup 時に `pulumi-resource-command` process が残っていた。
   - command resource を外した後も `datarobot:index:CustomJob Usage Export Job`
     の更新完了直後に update が終了しないため。
   - 既存 DataRobot CustomJob は削除せず、Pulumi state からのみ prune する。
+- CI では `DISALLOW_MONITORING_RESOURCES=true` も設定し、usage dashboard と
+  monitoring datasets も Pulumi state からのみ prune する。
+  - CustomJob を外した後も `Data Analyst Dashboard [dev]` の更新が完了せず、
+    update が終了しないため。
 - ローカル実行では env を設定しない限り、従来通り Pulumi 内で frontend build を実行する。
 
 ## テスト

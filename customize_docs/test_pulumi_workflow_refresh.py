@@ -70,6 +70,10 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
     )
     assert "command:local:Command" in remove_stale_components_step["run"]
     assert "datarobot:index/customJob:CustomJob" in remove_stale_components_step["run"]
+    assert "Data Analyst Dashboard Source" in remove_stale_components_step["run"]
+    assert "Data Analyst Dashboard" in remove_stale_components_step["run"]
+    assert "Dataset Trace" in remove_stale_components_step["run"]
+    assert "Dataset Access Log" in remove_stale_components_step["run"]
     assert "pulumi stack import" in remove_stale_components_step["run"]
     assert "pulumi state delete" not in remove_stale_components_step["run"]
     assert steps.index(remove_stale_components_step) < steps.index(pulumi_steps[0])
@@ -83,4 +87,5 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
     for step in pulumi_steps:
         assert step["env"]["SKIP_PULUMI_FRONTEND_BUILD"] == "true"
         assert step["env"]["SKIP_PULUMI_CUSTOM_JOBS"] == "true"
+        assert step["env"]["DISALLOW_MONITORING_RESOURCES"] == "true"
         assert "SCHEDULER_HOUR" not in step["env"]

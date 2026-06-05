@@ -53,6 +53,7 @@ def test_prune_resources_removes_matching_types_and_references() -> None:
     pruned_state, removed_urns = prune_pulumi_state_resources.prune_resources(
         stack_state=stack_state,
         resource_types={"command:local:Command"},
+        resource_names=set(),
     )
 
     assert removed_urns == [command_urn, command_urn]
@@ -60,3 +61,42 @@ def test_prune_resources_removes_matching_types_and_references() -> None:
     assert [resource["urn"] for resource in resources] == [app_source_urn]
     assert resources[0]["dependencies"] == []
     assert resources[0]["propertyDependencies"]["files"] == []
+
+
+def test_prune_resources_removes_matching_resource_names() -> None:
+    dashboard_urn = (
+        "urn:pulumi:dev::dataanalyst::datarobot:index/customApplication:"
+        "CustomApplication::Data Analyst Dashboard [dev]"
+    )
+    app_urn = (
+        "urn:pulumi:dev::dataanalyst::datarobot:index/customApplication:"
+        "CustomApplication::Data Analyst Application [dev]"
+    )
+    stack_state = {
+        "deployment": {
+            "resources": [
+                {
+                    "type": "datarobot:index/customApplication:CustomApplication",
+                    "urn": dashboard_urn,
+                },
+                {
+                    "type": "datarobot:index/customApplication:CustomApplication",
+                    "urn": app_urn,
+                },
+            ]
+        }
+    }
+
+    pruned_state, removed_urns = prune_pulumi_state_resources.prune_resources(
+        stack_state=stack_state,
+        resource_types=set(),
+        resource_names={"Data Analyst Dashboard [dev]"},
+    )
+
+    assert removed_urns == [dashboard_urn]
+    assert pruned_state["deployment"]["resources"] == [
+        {
+            "type": "datarobot:index/customApplication:CustomApplication",
+            "urn": app_urn,
+        }
+    ]

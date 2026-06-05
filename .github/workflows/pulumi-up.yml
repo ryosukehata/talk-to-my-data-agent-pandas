@@ -58,7 +58,7 @@ jobs:
             curl -fsSL https://get.pulumi.com | sh
             export PATH="$HOME/.pulumi/bin:$PATH"
           fi
-          python .github/scripts/prune_pulumi_state_resources.py /tmp/pulumi-stack.json /tmp/pulumi-stack-pruned.json custom:resource:CustomJobPostActions custom:resource:CustomJobScheduleCleanup command:local:Command datarobot:index/customJob:CustomJob datarobot:index:CustomJob > /tmp/pruned-urns.txt
+          python .github/scripts/prune_pulumi_state_resources.py /tmp/pulumi-stack.json /tmp/pulumi-stack-pruned.json custom:resource:CustomJobPostActions custom:resource:CustomJobScheduleCleanup command:local:Command datarobot:index/customJob:CustomJob datarobot:index:CustomJob --resource-name "Data Analyst Dashboard Source [dev]" --resource-name "Data Analyst Dashboard [dev]" --resource-name "Dataset Trace [dev]" --resource-name "Dataset Access Log [dev]" > /tmp/pruned-urns.txt
           stale_urns="$(cat /tmp/pruned-urns.txt)"
           if [ -z "$stale_urns" ]; then
             echo "No stale Pulumi state resources found"
@@ -87,6 +87,7 @@ jobs:
           FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE }}
           SKIP_PULUMI_FRONTEND_BUILD: "true"
           SKIP_PULUMI_CUSTOM_JOBS: "true"
+          DISALLOW_MONITORING_RESOURCES: "true"
           DATAROBOT_DEFAULT_USE_CASE: ${{ secrets.DATAROBOT_DEFAULT_USE_CASE }}
           APP_ENVIRONMENT_ID: ${{ secrets.APP_ENVIRONMENT_ID }}
           VITE_ENABLE_TEMPLATE_EDIT: ${{ secrets.VITE_ENABLE_TEMPLATE_EDIT }}
@@ -113,6 +114,7 @@ jobs:
           FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE }}
           SKIP_PULUMI_FRONTEND_BUILD: "true"
           SKIP_PULUMI_CUSTOM_JOBS: "true"
+          DISALLOW_MONITORING_RESOURCES: "true"
           DATAROBOT_DEFAULT_USE_CASE: ${{ secrets.DATAROBOT_DEFAULT_USE_CASE }}
           APP_ENVIRONMENT_ID: ${{ secrets.APP_ENVIRONMENT_ID }}
           VITE_ENABLE_TEMPLATE_EDIT: ${{ secrets.VITE_ENABLE_TEMPLATE_EDIT }}
