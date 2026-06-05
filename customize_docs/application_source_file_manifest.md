@@ -11,9 +11,14 @@ GitHub Actions の Pulumi CD で、DataRobot `ApplicationSource` 更新時に `f
 - `utils/customize/**/*.py` の二重追加を削除する。
 - Application Source に渡すファイル一覧の配置先パスを一意化する。
 - 同じ配置先に異なるローカルファイルが割り当てられた場合は、DataRobot API 送信前に `ValueError` で失敗させる。
+- `ApplicationSource` の置換時に古い source を削除しないよう、Pulumi の `retain_on_delete=True` を設定する。
+  - DataRobot 側では古い source が Custom Application から参照中と判定され、DELETE が 422 になることがあるため。
+  - 古い source は DataRobot 上に残るが、CD の更新を優先する。
 
 ## テスト
 
 - `customize_docs/test_application_source_file_manifest.py`
   - `get_app_files()` の返却する配置先パスに重複がないことを検証する。
   - 今回ログに出た `utils/customize/api_endpoints/report.py` が 1 件だけ含まれることを検証する。
+- `customize_docs/test_application_source_retention.py`
+  - App と Dashboard の `ApplicationSource` に `retain_on_delete=True` が設定されていることを検証する。

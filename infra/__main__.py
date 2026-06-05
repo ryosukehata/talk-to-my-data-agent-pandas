@@ -316,6 +316,7 @@ app_source = datarobot.ApplicationSource(
         replicas=1,
         session_affinity=True,
     ),
+    opts=pulumi.ResourceOptions(retain_on_delete=True),
     **settings_app_infra.app_source_args,
 )
 
@@ -481,6 +482,7 @@ def create_monitoring_resources():
         resources=datarobot.ApplicationSourceResourcesArgs(
             resource_label=CustomAppResourceBundles.CPU_XL.value.id,
         ),
+        opts=pulumi.ResourceOptions(retain_on_delete=True),
         **settings_dashboard_infra.dashboard_source_args,
     )
 
