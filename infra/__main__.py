@@ -43,10 +43,6 @@ from infra.components.dr_credential import (
 )
 from infra.settings_database import DATABASE_CONNECTION_TYPE
 from infra.settings_proxy_llm import CHAT_MODEL_NAME
-from utils.custom_job_helper import (
-    delete_all_custom_job_schedule,
-    get_custom_job_by_name,
-)
 from utils.customize.csv_validator import (
     validate_prompt_template_csv,
     validate_schema_table_description_csv,
@@ -384,28 +380,6 @@ def create_monitoring_resources():
         }.items()
     ]
 
-    class CustomJobScheduleCleanup(pulumi.ComponentResource):
-        def __init__(self, name, custom_job_name, opts=None):
-            super().__init__("custom:resource:CustomJobScheduleCleanup", name, {}, opts)
-            self.cleanup_done = pulumi.Output.from_input(custom_job_name).apply(
-                self._delete_schedules_if_exists
-            )
-            self.register_outputs({"cleanup_done": self.cleanup_done})
-
-        def _delete_schedules_if_exists(self, job_name):
-            job = get_custom_job_by_name(job_name)
-            if job is None:
-                # Job does not exist, skip deletion
-                return True
-            job_id = job["id"]
-            delete_all_custom_job_schedule(job_id)
-            return True
-
-    # Cleanup schedules before updating/creating custom_job
-    cleanup = CustomJobScheduleCleanup(
-        "custom-job-schedule-cleanup", settings_job_infra.job_resource_name
-    )
-
     job_files, job_files_hash = settings_job_infra.get_job_files(
         job_runtime_parameters, settings_job_infra.job_path
     )
@@ -423,40 +397,12 @@ def create_monitoring_resources():
         runtime_parameter_values=job_runtime_parameters,
         resource_bundle_id=settings_job_infra.resource_bundle_id,
         job_type="default",
-        opts=pulumi.ResourceOptions(
-            depends_on=[cleanup],
-        ),
+        schedule=settings_job_infra.get_job_schedule(),
     )
 
     pulumi.export(settings_job_infra.job_resource_name, custom_job.id)
     pulumi.export("CUSTOM_JOB_ID", custom_job.id)
-
-    class CustomJobPostActions(pulumi.ComponentResource):
-        def __init__(self, name, custom_job_id, opts=None):
-            super().__init__(
-                "custom:resource:CustomJobPostActions",
-                name,
-                {"custom_job_id": custom_job_id},
-                opts,
-            )
-            self.schedule_id = custom_job_id.apply(
-                lambda id: settings_job_infra.create_job_schedule(id)
-            )
-            # Register outputs for stack export
-            self.register_outputs(
-                {
-                    "schedule_id": self.schedule_id,
-                }
-            )
-
-    # Post-actions after custom_job is fully created/updated
-    post_actions = CustomJobPostActions(
-        "custom-job-post-actions",
-        custom_job.id,
-        opts=pulumi.ResourceOptions(depends_on=[custom_job]),
-    )
-
-    pulumi.export("CUSTOM_JOB_SCHEDULE_ID", post_actions.schedule_id)
+    pulumi.export("CUSTOM_JOB_SCHEDULE_ID", custom_job.schedule_id)
 
     dashboard_runtime_parameters = [
         datarobot.ApplicationSourceRuntimeParameterValueArgs(
@@ -511,28 +457,6 @@ def create_cleanup_job(app: datarobot.CustomApplication):
         }.items()
     ]
 
-    class CustomJobScheduleCleanup(pulumi.ComponentResource):
-        def __init__(self, name, custom_job_name, opts=None):
-            super().__init__("custom:resource:CustomJobScheduleCleanup", name, {}, opts)
-            self.cleanup_done = pulumi.Output.from_input(custom_job_name).apply(
-                self._delete_schedules_if_exists
-            )
-            self.register_outputs({"cleanup_done": self.cleanup_done})
-
-        def _delete_schedules_if_exists(self, job_name):
-            job = get_custom_job_by_name(job_name)
-            if job is None:
-                # Job does not exist, skip deletion
-                return True
-            job_id = job["id"]
-            delete_all_custom_job_schedule(job_id)
-            return True
-
-    # Cleanup schedules before updating/creating custom_job
-    cleanup = CustomJobScheduleCleanup(
-        "cleanup-job-schedule-cleanup", settings_job_infra.cleanup_job_resource_name
-    )
-
     job_files, job_files_hash = settings_job_infra.get_job_files(
         job_runtime_parameters, settings_job_infra.cleanup_job_path
     )
@@ -549,9 +473,6 @@ def create_cleanup_job(app: datarobot.CustomApplication):
         runtime_parameter_values=job_runtime_parameters,
         resource_bundle_id=settings_job_infra.resource_bundle_id,
         job_type="default",
-        opts=pulumi.ResourceOptions(
-            depends_on=[cleanup],
-        ),
     )
     pulumi.export(settings_job_infra.cleanup_job_resource_name, cleanup_custom_job.id)
     pulumi.export("CLEANUP_CUSTOM_JOB_ID", cleanup_custom_job.id)

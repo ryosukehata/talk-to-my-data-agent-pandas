@@ -15,7 +15,6 @@ from datarobot_pulumi_utils.schema.guardrails import (
 )
 
 from utils.custom_job_helper import (
-    create_or_update_custom_job_schedule,
     poll_custom_job_run_status,
     run_custom_job,
 )
@@ -161,27 +160,14 @@ def get_job_files(
     return source_files_tuples, content_hash
 
 
-def create_job_schedule(
-    custom_job_id: str,
-) -> str:
-    """
-    Create a schedule for a DataRobot custom job.
-
-    Run at the configured hour on weekdays.
-
-    Args:
-        custom_job_id (str): The ID of the custom job.
-
-    Returns:
-        str: The ID of the created schedule.
-    """
-    return create_or_update_custom_job_schedule(
-        custom_job_id,
-        minute=[0],
-        hour=[SCHEDULER_HOUR],
-        day_of_month=["*"],
-        month=["*"],
-        day_of_week=[0, 1, 2, 3, 4],  # Sunday–Thursday UTC
+def get_job_schedule() -> datarobot.CustomJobScheduleArgs:
+    """Return the Usage Export job schedule managed by the DataRobot provider."""
+    return datarobot.CustomJobScheduleArgs(
+        minutes=["0"],
+        hours=[str(SCHEDULER_HOUR)],
+        day_of_months=["*"],
+        months=["*"],
+        day_of_weeks=["0", "1", "2", "3", "4"],  # Sunday-Thursday UTC
     )
 
 
