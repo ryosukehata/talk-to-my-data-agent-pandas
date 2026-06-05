@@ -61,6 +61,9 @@ TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
 USE_DATAROBOT_LLM_GATEWAY = (
     os.environ.get("USE_DATAROBOT_LLM_GATEWAY", "false").lower() == "true"
 )
+SKIP_PULUMI_CUSTOM_JOBS = (
+    os.environ.get("SKIP_PULUMI_CUSTOM_JOBS", "false").lower() == "true"
+)
 
 
 # Check if OpenAI credentials are available (same logic as in utils/api.py)
@@ -395,19 +398,22 @@ def create_monitoring_resources():
         f"DataRobot Custom Job for telemetry export. Content Hash: {job_files_hash}"
     )
 
-    custom_job = datarobot.CustomJob(
-        resource_name=settings_job_infra.job_resource_name,
-        name=settings_job_infra.job_resource_name,
-        description=job_description,
-        environment_id=settings_job_infra.base_environment_id,
-        files=job_files,
-        runtime_parameter_values=job_runtime_parameters,
-        resource_bundle_id=settings_job_infra.resource_bundle_id,
-        job_type="default",
-    )
+    if SKIP_PULUMI_CUSTOM_JOBS:
+        pulumi.info("Skipping usage export custom job creation")
+    else:
+        custom_job = datarobot.CustomJob(
+            resource_name=settings_job_infra.job_resource_name,
+            name=settings_job_infra.job_resource_name,
+            description=job_description,
+            environment_id=settings_job_infra.base_environment_id,
+            files=job_files,
+            runtime_parameter_values=job_runtime_parameters,
+            resource_bundle_id=settings_job_infra.resource_bundle_id,
+            job_type="default",
+        )
 
-    pulumi.export(settings_job_infra.job_resource_name, custom_job.id)
-    pulumi.export("CUSTOM_JOB_ID", custom_job.id)
+        pulumi.export(settings_job_infra.job_resource_name, custom_job.id)
+        pulumi.export("CUSTOM_JOB_ID", custom_job.id)
 
     dashboard_runtime_parameters = [
         datarobot.ApplicationSourceRuntimeParameterValueArgs(
@@ -489,7 +495,9 @@ if os.environ.get("DISALLOW_MONITORING_RESOURCES", "false").lower() == "true":
 else:
     create_monitoring_resources()
 
-if os.environ.get("DISALLOW_APP_CLEANUP_JOB", "false").lower() == "true":
+if SKIP_PULUMI_CUSTOM_JOBS:
+    pulumi.info("Skipping cleanup custom job creation")
+elif os.environ.get("DISALLOW_APP_CLEANUP_JOB", "false").lower() == "true":
     pulumi.info("Skipping app data cleanup job creation")
 else:
     create_cleanup_job(app)

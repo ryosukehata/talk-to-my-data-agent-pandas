@@ -19,6 +19,11 @@ cleanup 時に `pulumi-resource-command` process が残っていた。
   stack export JSON から prune し、`pulumi stack import` で反映する。
   - 失敗した replacement が複数残ると同一 URN が曖昧になり、`pulumi state delete`
     では削除できないため。
+- CI では `SKIP_PULUMI_CUSTOM_JOBS=true` も設定し、`pulumi-datarobot` provider の
+  CustomJob 更新を避ける。
+  - command resource を外した後も `datarobot:index:CustomJob Usage Export Job`
+    の更新完了直後に update が終了しないため。
+  - 既存 DataRobot CustomJob は削除せず、Pulumi state からのみ prune する。
 - ローカル実行では env を設定しない限り、従来通り Pulumi 内で frontend build を実行する。
 
 ## テスト
