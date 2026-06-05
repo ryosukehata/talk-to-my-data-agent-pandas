@@ -12,6 +12,8 @@ GitHub Actions の Pulumi CD で、DataRobot `ApplicationSource` 更新時に `f
 - Application Source に渡すファイル一覧の配置先パスを一意化する。
 - 同じ配置先に異なるローカルファイルが割り当てられた場合は、DataRobot API 送信前に `ValueError` で失敗させる。
 - `ApplicationSource` の置換時に古い source を削除しないよう、Pulumi の `retain_on_delete=True` を設定する。
+- CD では `Data Analyst App Source` を Pulumi state から事前 prune し、旧 source の
+  delete original を Pulumi に実行させない。
   - DataRobot 側では古い source が Custom Application から参照中と判定され、DELETE が 422 になることがあるため。
   - 古い source は DataRobot 上に残るが、CD の更新を優先する。
 - CD の `pulumi up` に `refresh: true` を設定する。

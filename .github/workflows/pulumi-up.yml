@@ -58,7 +58,11 @@ jobs:
             curl -fsSL https://get.pulumi.com | sh
             export PATH="$HOME/.pulumi/bin:$PATH"
           fi
-          python .github/scripts/prune_pulumi_state_resources.py /tmp/pulumi-stack.json /tmp/pulumi-stack-pruned.json custom:resource:CustomJobPostActions custom:resource:CustomJobScheduleCleanup command:local:Command datarobot:index/customJob:CustomJob datarobot:index:CustomJob --resource-name "Data Analyst Dashboard Source [dev]" --resource-name "Data Analyst Dashboard [dev]" --resource-name "Dataset Trace [dev]" --resource-name "Dataset Access Log [dev]" > /tmp/pruned-urns.txt
+          project_name="dev"
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            project_name="ttmd-pandas-react"
+          fi
+          python .github/scripts/prune_pulumi_state_resources.py /tmp/pulumi-stack.json /tmp/pulumi-stack-pruned.json custom:resource:CustomJobPostActions custom:resource:CustomJobScheduleCleanup command:local:Command datarobot:index/customJob:CustomJob datarobot:index:CustomJob --resource-name "Data Analyst App Source [$project_name]" --resource-name "Data Analyst Dashboard Source [$project_name]" --resource-name "Data Analyst Dashboard [$project_name]" --resource-name "Dataset Trace [$project_name]" --resource-name "Dataset Access Log [$project_name]" > /tmp/pruned-urns.txt
           stale_urns="$(cat /tmp/pruned-urns.txt)"
           if [ -z "$stale_urns" ]; then
             echo "No stale Pulumi state resources found"
