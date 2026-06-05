@@ -29,6 +29,12 @@ jobs:
           {"llm":"azure-openai-gpt-4-o","database":"no_database"}
           EOF
 
+      - name: Build frontend assets for Pulumi refresh
+        run: |
+          cd app_frontend
+          npm install
+          npm run build
+
       # Run Pulumi Up for main branch
       - uses: pulumi/actions@v6
         if: github.ref == 'refs/heads/main'
