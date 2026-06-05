@@ -29,6 +29,7 @@ jobs:
         with:
           command: up
           stack-name: ryosukehata/dataanalyst/ttmd-pandas-react
+          refresh: true
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           DATAROBOT_API_TOKEN: ${{ secrets.DATAROBOT_API_TOKEN }}
@@ -53,6 +54,7 @@ jobs:
         with:
           command: up
           stack-name: ryosukehata/dataanalyst/dev
+          refresh: true
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
           DATAROBOT_API_TOKEN: ${{ secrets.DATAROBOT_API_TOKEN }}

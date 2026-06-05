@@ -14,6 +14,8 @@ GitHub Actions の Pulumi CD で、DataRobot `ApplicationSource` 更新時に `f
 - `ApplicationSource` の置換時に古い source を削除しないよう、Pulumi の `retain_on_delete=True` を設定する。
   - DataRobot 側では古い source が Custom Application から参照中と判定され、DELETE が 422 になることがあるため。
   - 古い source は DataRobot 上に残るが、CD の更新を優先する。
+- CD の `pulumi up` に `refresh: true` を設定する。
+  - 失敗済み update で Pulumi state に残った pending delete を、次回 update 前に実リソース状態と同期して解消するため。
 
 ## テスト
 
@@ -22,3 +24,5 @@ GitHub Actions の Pulumi CD で、DataRobot `ApplicationSource` 更新時に `f
   - 今回ログに出た `utils/customize/api_endpoints/report.py` が 1 件だけ含まれることを検証する。
 - `customize_docs/test_application_source_retention.py`
   - App と Dashboard の `ApplicationSource` に `retain_on_delete=True` が設定されていることを検証する。
+- `.github/workflows/pulumi-up.yml`
+  - YAML として parse できること、main/dev 両方の Pulumi action に `refresh: true` が設定されていることを確認する。
