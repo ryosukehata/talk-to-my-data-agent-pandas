@@ -402,7 +402,6 @@ def create_monitoring_resources():
 
     pulumi.export(settings_job_infra.job_resource_name, custom_job.id)
     pulumi.export("CUSTOM_JOB_ID", custom_job.id)
-    pulumi.export("CUSTOM_JOB_SCHEDULE_ID", custom_job.schedule_id)
 
     dashboard_runtime_parameters = [
         datarobot.ApplicationSourceRuntimeParameterValueArgs(

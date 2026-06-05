@@ -43,6 +43,4 @@ def test_pulumi_stack_does_not_use_manual_schedule_post_actions() -> None:
     assert "CustomJobPostActions" not in stack_source
     assert "create_job_schedule" not in stack_source
     assert "schedule=settings_job_infra.get_job_schedule()" in stack_source
-    assert 'pulumi.export("CUSTOM_JOB_SCHEDULE_ID", custom_job.schedule_id)' in (
-        stack_source
-    )
+    assert "CUSTOM_JOB_SCHEDULE_ID" not in stack_source

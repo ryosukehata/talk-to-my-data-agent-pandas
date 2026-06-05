@@ -48,6 +48,26 @@ jobs:
           pulumi stack export --stack "$PULUMI_STACK_NAME" --file /tmp/pulumi-stack.json --non-interactive
           python .github/scripts/prepare_pulumi_refresh_files.py /tmp/pulumi-stack.json --workspace "$GITHUB_WORKSPACE"
 
+      - name: Remove stale custom job component resources
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+          PULUMI_STACK_NAME: ${{ github.ref == 'refs/heads/main' && 'ryosukehata/dataanalyst/ttmd-pandas-react' || 'ryosukehata/dataanalyst/dev'
+            }}
+        run: |
+          if ! command -v pulumi >/dev/null 2>&1; then
+            curl -fsSL https://get.pulumi.com | sh
+            export PATH="$HOME/.pulumi/bin:$PATH"
+          fi
+          stale_urns="$(python .github/scripts/find_pulumi_state_resources.py /tmp/pulumi-stack.json custom:resource:CustomJobPostActions custom:resource:CustomJobScheduleCleanup)"
+          if [ -z "$stale_urns" ]; then
+            echo "No stale custom job component resources found"
+            exit 0
+          fi
+          while IFS= read -r urn; do
+            echo "Deleting stale Pulumi state resource: $urn"
+            pulumi state delete "$urn" --stack "$PULUMI_STACK_NAME" --yes --non-interactive
+          done <<< "$stale_urns"
+
       # Run Pulumi Up for main branch
       - uses: pulumi/actions@v6
         if: github.ref == 'refs/heads/main'

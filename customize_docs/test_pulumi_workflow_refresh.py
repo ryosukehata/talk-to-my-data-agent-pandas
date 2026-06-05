@@ -37,6 +37,14 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
         ),
         None,
     )
+    remove_stale_components_step = next(
+        (
+            step
+            for step in steps
+            if step.get("name") == "Remove stale custom job component resources"
+        ),
+        None,
+    )
     pulumi_steps = [step for step in steps if step.get("uses") == "pulumi/actions@v6"]
 
     assert prepare_manifest_step is not None
@@ -51,6 +59,17 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
     assert "pulumi stack export" in restore_files_step["run"]
     assert "prepare_pulumi_refresh_files.py" in restore_files_step["run"]
     assert steps.index(restore_files_step) < steps.index(pulumi_steps[0])
+    assert remove_stale_components_step is not None
+    assert "find_pulumi_state_resources.py" in remove_stale_components_step["run"]
+    assert (
+        "custom:resource:CustomJobPostActions" in (remove_stale_components_step["run"])
+    )
+    assert (
+        "custom:resource:CustomJobScheduleCleanup"
+        in (remove_stale_components_step["run"])
+    )
+    assert "pulumi state delete" in remove_stale_components_step["run"]
+    assert steps.index(remove_stale_components_step) < steps.index(pulumi_steps[0])
     assert len(pulumi_steps) == 2
     assert {
         step["with"]["stack-name"]: step["with"].get("refresh") for step in pulumi_steps
