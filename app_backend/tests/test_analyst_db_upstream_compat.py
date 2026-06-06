@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -44,11 +45,14 @@ def test_dataset_metadata_model_dump_serializes_public_fields() -> None:
     assert dumped["data_source"] == "file"
 
 
-def test_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path) -> None:
-    asyncio.run(_assert_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path))
+def test_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path, caplog) -> None:
+    asyncio.run(_assert_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path, caplog))
 
 
-async def _assert_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path) -> None:
+async def _assert_analyst_db_dataset_roundtrip_preserves_pandas(
+    tmp_path,
+    caplog,
+) -> None:
     analyst_db = await AnalystDB.create(user_id="user-1", db_path=tmp_path)
     source_df = pd.DataFrame(
         {
@@ -62,10 +66,77 @@ async def _assert_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path) -> Non
         dataset,
         data_source=InternalDataSourceType.FILE,
     )
-    restored = await analyst_db.get_dataset("sales")
+    with caplog.at_level(logging.DEBUG, logger="ApplicationDB"):
+        restored = await analyst_db.get_dataset("sales")
     metadata = await analyst_db.get_dataset_metadata("sales")
 
     assert result == {"success": True, "msg": ""}
     assert isinstance(restored.to_df(), pd.DataFrame)
     pd.testing.assert_frame_equal(restored.to_df(), source_df)
     assert metadata.model_dump(mode="json")["data_source"] == "file"
+    assert any(
+        record.levelno == logging.DEBUG
+        and record.getMessage() == "Retrieving dataframe sales"
+        for record in caplog.records
+    )
+
+
+def test_register_dataset_failure_logs_exception_info(caplog) -> None:
+    asyncio.run(_assert_register_dataset_failure_logs_exception_info(caplog))
+
+
+async def _assert_register_dataset_failure_logs_exception_info(caplog) -> None:
+    class FailingDatasetHandler:
+        async def register_dataframe(self, *args, **kwargs) -> None:
+            raise RuntimeError("boom")
+
+    analyst_db = AnalystDB.__new__(AnalystDB)
+    analyst_db.dataset_handler = FailingDatasetHandler()
+    dataset = AnalystDataset(name="sales", data=pd.DataFrame({"amount": [100]}))
+
+    with caplog.at_level(logging.ERROR, logger="ApplicationDB"):
+        result = await analyst_db.register_dataset(
+            dataset,
+            data_source=InternalDataSourceType.FILE,
+        )
+
+    assert result == {
+        "success": False,
+        "msg": "Error registering dataset 'sales': boom",
+    }
+    records = [
+        record
+        for record in caplog.records
+        if record.levelno == logging.ERROR
+        and record.getMessage() == "Error registering dataset: boom"
+    ]
+    assert records
+    assert records[-1].exc_info is not None
+
+
+def test_get_data_dictionary_missing_dataset_logs_debug(caplog) -> None:
+    asyncio.run(_assert_get_data_dictionary_missing_dataset_logs_debug(caplog))
+
+
+async def _assert_get_data_dictionary_missing_dataset_logs_debug(caplog) -> None:
+    class MissingDictionaryHandler:
+        async def get_dataframe(self, *args, **kwargs) -> pd.DataFrame:
+            raise ValueError("missing")
+
+    analyst_db = AnalystDB.__new__(AnalystDB)
+    analyst_db.dataset_handler = MissingDictionaryHandler()
+
+    with caplog.at_level(logging.DEBUG, logger="ApplicationDB"):
+        result = await analyst_db.get_data_dictionary("sales")
+
+    assert result is None
+    assert any(
+        record.levelno == logging.DEBUG
+        and record.getMessage() == "Data dictionary not defined sales"
+        for record in caplog.records
+    )
+    assert not any(
+        record.levelno >= logging.ERROR
+        and "Failed to get data dictionary sales" in record.getMessage()
+        for record in caplog.records
+    )

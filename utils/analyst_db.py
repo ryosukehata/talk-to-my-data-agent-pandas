@@ -403,18 +403,13 @@ class BaseDuckDBHandler(ABC):
             await loop.run_in_executor(None, conn.close)
 
     @asynccontextmanager
-    async def _save_to_storage(
-        self, write_connection: bool = True
-    ) -> AsyncGenerator[None, None]:
-        if write_connection:
-            async with self._write_lock:
-                yield
-                if self._storage:
-                    await self._storage.save_to_storage(
-                        self.db_path.name, str(self.db_path.absolute())
-                    )
-        else:
+    async def _save_to_storage(self) -> AsyncGenerator[None, None]:
+        async with self._write_lock:
             yield
+            if self._storage:
+                await self._storage.save_to_storage(
+                    self.db_path.name, str(self.db_path.absolute())
+                )
 
     @telemetry.meter_and_trace
     async def execute_query(
@@ -772,7 +767,7 @@ class DatasetHandler(BaseDuckDBHandler):
         Raises:
             ValueError: If dataset doesn't exist or is of wrong type
         """
-        logger.info(f"Retrieving dataframe {name}")
+        logger.debug(f"Retrieving dataframe {name}")
 
         # First verify the dataset exists and check its type
         if not await self.table_exists(name):
@@ -2084,7 +2079,7 @@ class AnalystDB:
                 clobber=clobber,
             )
         except Exception as e:
-            logger.error(f"Error registering dataset: {e}")
+            logger.error(f"Error registering dataset: {e}", exc_info=True)
             return {
                 "success": False,
                 "msg": f"Error registering dataset '{df.name}': {e}",
@@ -2143,9 +2138,11 @@ class AnalystDB:
                 f"{name}_dict", expected_type=DatasetType.DICTIONARY
             )
             return DataDictionary.from_application_df(df, name=name)
-        except Exception as e:
-            logger.error(f"Failed to get data dictionary {name}: {e}")
-            return None
+        except ValueError:
+            logger.debug(f"Data dictionary not defined {name}")
+        except Exception:
+            logger.error(f"Failed to get data dictionary {name}", exc_info=True)
+        return None
 
     async def get_cleansing_report(
         self, dataset_name: str
