@@ -50,3 +50,9 @@
 2. PR2では `analyst_db.py` の `DatasetMetadata` モデル化と保存時ロックのみを移植する。pandas前提は維持し、upstreamのpandas→polars差分は取り込まない。
 3. `utils/api.py` と `utils/rest_api.py` は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
 4. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
+
+## PR2 CI対応メモ
+
+- 2026-06-07: PR2のCIで `tests/test_analyst_db_upstream_compat.py` が失敗。原因はCI環境に `pytest-asyncio` が入っておらず、`@pytest.mark.asyncio` の async test を実行できなかったこと。
+- 実装差分ではなくテスト起動方法の問題のため、既存テストと同じく `asyncio.run(...)` で非同期処理を呼び出す同期テストへ変更する。
+- pandas前提の回帰確認は維持する。pandas→polars差分は引き続き取り込まない。

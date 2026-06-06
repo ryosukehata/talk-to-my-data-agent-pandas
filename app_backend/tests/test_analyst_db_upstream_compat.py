@@ -1,8 +1,8 @@
+import asyncio
 import os
 from datetime import datetime, timezone
 
 import pandas as pd
-import pytest
 
 os.environ.setdefault("DATAROBOT_API_TOKEN", "test-token")
 os.environ.setdefault("DATAROBOT_ENDPOINT", "https://example.com")
@@ -39,10 +39,11 @@ def test_dataset_metadata_model_dump_serializes_public_fields() -> None:
     assert dumped["data_source"] == "file"
 
 
-@pytest.mark.asyncio
-async def test_analyst_db_dataset_roundtrip_preserves_pandas(
-    tmp_path,
-) -> None:
+def test_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path) -> None:
+    asyncio.run(_assert_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path))
+
+
+async def _assert_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path) -> None:
     analyst_db = await AnalystDB.create(user_id="user-1", db_path=tmp_path)
     source_df = pd.DataFrame(
         {
