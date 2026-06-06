@@ -144,8 +144,7 @@ async def async_all(x: Generator[Awaitable[bool]]) -> bool:
     return True
 
 
-@dataclass
-class DatasetMetadata:
+class DatasetMetadata(BaseModel):
     name: str
     external_id: str | None
     dataset_type: DatasetType
@@ -160,6 +159,15 @@ class DatasetMetadata:
     row_count: int
     data_source: DataSourceType
     file_size: int = 0  # Size of the file in bytes
+
+    @field_serializer("created_at", "dataset_type")
+    def serialize_fields(self, value: Any) -> str:
+        if isinstance(value, datetime):
+            serialized = value.isoformat()
+            return serialized.replace("+00:00", "Z")
+        if isinstance(value, DatasetType):
+            return value.value
+        return str(value)
 
     @field_serializer("data_source")
     def serialize_data_source(self, ds: DataSourceType) -> str:
@@ -195,6 +203,7 @@ class BaseDuckDBHandler(ABC):
         self.db_path = self.get_db_path(user_id=user_id, db_path=db_path, name=name)
         self._async_path = AsyncPath(self.db_path)
         self._storage = PersistentStorage(user_id) if use_persistent_storage else None
+        self._write_lock = asyncio.Lock()
 
     async def _create_db_version_table(
         self,
@@ -395,11 +404,12 @@ class BaseDuckDBHandler(ABC):
         self, write_connection: bool = True
     ) -> AsyncGenerator[None, None]:
         if write_connection:
-            yield
-            if self._storage:
-                await self._storage.save_to_storage(
-                    self.db_path.name, str(self.db_path.absolute())
-                )
+            async with self._write_lock:
+                yield
+                if self._storage:
+                    await self._storage.save_to_storage(
+                        self.db_path.name, str(self.db_path.absolute())
+                    )
         else:
             yield
 
@@ -625,7 +635,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     data_source=get_data_source_type(row[6]),
                     file_size=row[7],
                     external_id=row[8],
-                    original_column_types=row[9],
+                    original_column_types=json.loads(row[9]) if row[9] else row[9],
                 )
                 for row in rows
             ]
