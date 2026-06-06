@@ -55,4 +55,5 @@
 
 - 2026-06-07: PR2のCIで `tests/test_analyst_db_upstream_compat.py` が失敗。原因はCI環境に `pytest-asyncio` が入っておらず、`@pytest.mark.asyncio` の async test を実行できなかったこと。
 - 実装差分ではなくテスト起動方法の問題のため、既存テストと同じく `asyncio.run(...)` で非同期処理を呼び出す同期テストへ変更する。
+- 追加でPython 3.11のCIにより、`str in Enum` が `TypeError` になる互換性問題を検出。`get_data_source_type()` は `Enum(value)` 変換と `ValueError` 捕捉に変更し、Python 3.10/3.11/3.12で同じ挙動にする。
 - pandas前提の回帰確認は維持する。pandas→polars差分は引き続き取り込まない。

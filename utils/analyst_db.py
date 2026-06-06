@@ -122,9 +122,12 @@ def get_data_source_type(value: str) -> DataSourceType:
     Returns:
         DataSourceType: The corresponding data source type.
     """
-    if value in InternalDataSourceType:
+    try:
         return InternalDataSourceType(value)
-    elif DATA_STORE_TYPE_REGEX.match(value):
+    except ValueError:
+        pass
+
+    if DATA_STORE_TYPE_REGEX.match(value):
         return ExternalDataStoreNameDataSourceType(name=value)
     raise ValueError(f"'{value}' could not be interpreted as a data source.")
 

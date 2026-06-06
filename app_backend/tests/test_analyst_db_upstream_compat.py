@@ -13,8 +13,13 @@ from utils.analyst_db import (
     DatasetMetadata,
     DatasetType,
     InternalDataSourceType,
+    get_data_source_type,
 )
 from utils.schema import AnalystDataset
+
+
+def test_get_data_source_type_accepts_internal_string_values() -> None:
+    assert get_data_source_type("file") is InternalDataSourceType.FILE
 
 
 def test_dataset_metadata_model_dump_serializes_public_fields() -> None:
