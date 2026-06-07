@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import copy
 import functools
 import inspect
 import json
@@ -30,6 +31,7 @@ from typing import (
     Any,
     AsyncGenerator,
     Callable,
+    Literal,
     TypeVar,
     cast,
 )
@@ -1464,12 +1466,20 @@ async def get_business_analysis(
 @telemetry.trace
 async def _run_analysis(
     request: RunAnalysisRequest,
-    analyst_db: AnalystDB,
+    analyst_db: AnalystDB | None = None,
     exception_history: list[InvalidGeneratedCode] | None = None,
     token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
+    analysis_context: RunCompleteAnalysisRequestContext | None = None,
 ) -> RunAnalysisResult:
     start_time = datetime.now()
+
+    if analysis_context:
+        analyst_db = analysis_context.analyst_db
+        token_tracker = analysis_context.token_tracker
+
+    if analyst_db is None:
+        raise ValueError("analyst_db is required")
 
     if not request.dataset_names:
         raise ValueError(VALUE_ERROR_MESSAGE)
@@ -1477,6 +1487,16 @@ async def _run_analysis(
     if exception_history is None:
         exception_history = []
     logger.info(f"Running analysis (attempt {len(exception_history)})")
+
+    if (
+        analysis_context
+        and analysis_context.assistant_message_id
+        and analysis_context.assistant_message
+    ):
+        analysis_context.assistant_message.step_value = "GENERATING_QUERY"
+        analysis_context.assistant_message.step_reattempt = len(exception_history)
+        analysis_context.stage_message_update()
+
     code = await _generate_run_analysis_python_code(
         request,
         analyst_db,
@@ -1486,6 +1506,16 @@ async def _run_analysis(
         telemetry_json=telemetry_json,
     )
     logger.info("Code generated, preparing execution")
+
+    if (
+        analysis_context
+        and analysis_context.assistant_message_id
+        and analysis_context.assistant_message
+    ):
+        analysis_context.assistant_message.step_value = "RUNNING_QUERY"
+        analysis_context.assistant_message.step_reattempt = len(exception_history)
+        analysis_context.stage_message_update()
+
     dataframes: dict[str, pd.DataFrame] = {}
 
     for dataset_name in request.dataset_names:
@@ -1554,9 +1584,10 @@ async def _run_analysis(
 @log_api_call
 async def run_analysis(
     request: RunAnalysisRequest,
-    analyst_db: AnalystDB,
+    analyst_db: AnalystDB | None = None,
     token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
+    analysis_context: RunCompleteAnalysisRequestContext | None = None,
 ) -> RunAnalysisResult:
     """Execute analysis workflow on datasets."""
     logger.debug("Entering run_analysis")
@@ -1567,6 +1598,7 @@ async def run_analysis(
             analyst_db=analyst_db,
             token_tracker=token_tracker,
             telemetry_json=telemetry_json,
+            analysis_context=analysis_context,
         )
     except MaxReflectionAttempts as e:
         return RunAnalysisResult(
@@ -1809,6 +1841,61 @@ class AnalysisGenerationError:
     original_error: BaseException | None = None
 
 
+@dataclass
+class RunCompleteAnalysisRequestContext:
+    chat_request: ChatRequest
+    request: Request | None
+    data_source: DataSourceType
+    dataset_metadata: list[DatasetMetadata]
+    analyst_db: AnalystDB
+    chat_id: str
+    user_message_id: str
+    enable_chart_generation: bool
+    enable_business_insights: bool
+    token_tracker: TokenUsageTracker
+
+    user_message: AnalystChatMessage | None = None
+    assistant_message_id: str | None = None
+    assistant_message: AnalystChatMessage | None = None
+    database: DatabaseOperator[Any] | None = None
+    recipe: BaseRecipe | None = None
+
+    message_update_task: asyncio.Task[Any] | None = None
+
+    def stage_message_update(
+        self, target: Literal["assistant", "user"] = "assistant"
+    ) -> None:
+        target_message_id = (
+            self.assistant_message_id if target == "assistant" else self.user_message_id
+        )
+        target_message = copy.copy(
+            self.assistant_message if target == "assistant" else self.user_message
+        )
+        if target_message:
+            target_message.step = copy.copy(target_message.step)
+
+        if not target_message or not target_message_id:
+            return
+
+        previous_task = self.message_update_task
+
+        async def update_task() -> None:
+            if previous_task:
+                await previous_task
+
+            await self.analyst_db.update_chat_message(
+                message_id=target_message_id,
+                message=target_message,
+            )
+
+        self.message_update_task = asyncio.create_task(update_task())
+
+    async def await_message_update(self) -> None:
+        if self.message_update_task:
+            await self.message_update_task
+            self.message_update_task = None
+
+
 async def execute_business_analysis_and_charts(
     analysis_result: RunAnalysisResult | RunDatabaseAnalysisResult,
     enhanced_message: str,
@@ -1870,8 +1957,22 @@ async def run_complete_analysis(
     telemetry_json: dict[str, Any] | None = None,
 ) -> AsyncGenerator[Component | AnalysisGenerationError, None]:
     datasets_names = [ds.name for ds in dataset_metadata]
+    token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
+    analysis_context = RunCompleteAnalysisRequestContext(
+        chat_request=chat_request,
+        request=request,
+        data_source=data_source,
+        dataset_metadata=dataset_metadata,
+        analyst_db=analyst_db,
+        chat_id=chat_id,
+        user_message_id=message_id,
+        enable_chart_generation=enable_chart_generation,
+        enable_business_insights=enable_business_insights,
+        token_tracker=token_tracker,
+    )
 
     user_message = await analyst_db.get_chat_message(message_id=message_id)
+    analysis_context.user_message = user_message
     if user_message is None or user_message.role != "user":
         yield AnalysisGenerationError("Message not found")
 
@@ -1885,8 +1986,6 @@ async def run_complete_analysis(
         telemetry_json["enable_chart_generation"] = enable_chart_generation
         telemetry_json["enable_business_insights"] = enable_business_insights
     try:
-        token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
-
         logger.info("Getting rephrased question...")
         enhanced_message = await rephrase_message(
             chat_request, token_tracker=token_tracker, telemetry_json=telemetry_json
@@ -1913,8 +2012,20 @@ async def run_complete_analysis(
         components=[EnhancedQuestionGeneration(enhanced_user_message=enhanced_message)],
         in_progress=True,
     )
+    should_test_connection = (
+        data_source == InternalDataSourceType.DATABASE
+        or data_source == InternalDataSourceType.REMOTE_REGISTRY
+        or isinstance(data_source, ExternalDataStoreNameDataSourceType)
+    )
+    assistant_message.step_value = (
+        "TESTING_CONNECTION" if should_test_connection else "GENERATING_QUERY"
+    )
+    analysis_context.assistant_message = assistant_message
 
-    await analyst_db.add_chat_message(chat_id=chat_id, message=assistant_message)
+    analysis_context.assistant_message_id = await analyst_db.add_chat_message(
+        chat_id=chat_id,
+        message=assistant_message,
+    )
 
     user_message.in_progress = False
     await analyst_db.update_chat_message(
@@ -2042,14 +2153,15 @@ async def run_complete_analysis(
                         dataset_names=datasets_names,
                         question=enhanced_message,
                     ),
-                    analyst_db,
-                    token_tracker,
+                    analysis_context=analysis_context,
+                    telemetry_json=telemetry_json,
                 )
             else:
                 raise ValueError(
                     "Cannot run analysis on a mix of local and remote datasets."
                 )
 
+        await analysis_context.await_message_update()
         log_memory()
         logger.info("Getting analysis result done")
 

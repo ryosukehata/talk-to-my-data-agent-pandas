@@ -120,6 +120,14 @@ class DatabaseOperator(ABC, Generic[T]):
         """Return a query-friendly version of the dataset name (e.g. quoted table name if that's required)."""
         return dataset_name
 
+    def warmup_query(self) -> str | None:
+        return None
+
+    async def warmup(self) -> None:
+        query = self.warmup_query()
+        if query:
+            await self.execute_query(query)
+
 
 class NoDatabaseOperator(DatabaseOperator[NoDatabaseCredentialArgs]):
     def __init__(
