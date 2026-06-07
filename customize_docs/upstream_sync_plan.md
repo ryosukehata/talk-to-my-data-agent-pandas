@@ -51,8 +51,9 @@
 3. PR3では `utils/rest_api.py` のCSV decode/validationとdatabase endpointのbackground化を移植する。pandas前提は維持し、CSV loaderは `pd.DataFrame` を返す。
 4. PR4では `utils/api.py` の分析実行まわりから、`RunCompleteAnalysisRequestContext` と分析step更新 (`GENERATING_QUERY` / `RUNNING_QUERY`) を移植する。pandas前提は維持し、upstreamの `polars` allowed module追加や `pd.DataFrame` 置換は取り込まない。
 5. PR5では `utils/api.py` のLLM応答validation/error handling差分を小さく移植する。チャート生成、ビジネス分析、database SQL生成で `ValidationError` をユーザー向けの `AnalysisError` に変換する。
-6. `utils/api.py` と `utils/rest_api.py` の残り差分は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
-7. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
+6. PR6では `run_complete_analysis()` のdatabase分析経路で `telemetry_json` を `run_database_analysis()` へ渡す。External Data Store の `data_source` telemetryは `.value` ではなく `.name` を使う。
+7. `utils/api.py` と `utils/rest_api.py` の残り差分は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
+8. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
 
 ## PR2 CI対応メモ
 
@@ -82,3 +83,10 @@
 - `get_business_analysis()` は `ValueError` とその他例外も分離し、ユーザーに返すmetadataでは `exception=AnalysisError.from_value_error(...)` を使う。既存の成功レスポンスとpandas DataFrame入力は変更しない。
 - `_generate_database_analysis_code()` は LLM応答のvalidation失敗を database SQL生成用の説明メッセージに変換する。SQL sample生成は既存のpandas `.to_df()` 経路を維持する。
 - 追加テスト: `app_backend/tests/test_api_validation_errors_v0424_compat.py`。analysis/charts/business/database SQL生成の4経路で raw `ValidationError` が外に出ず、ユーザー向けメッセージに変換されることを検証する。
+
+## PR6 実装メモ
+
+- 2026-06-07: `run_complete_analysis()` のdatabase分析3経路 (`DATABASE`, External Data Store, Remote Registry) から `run_database_analysis()` へ `telemetry_json` が渡ることを回帰テストで固定する。
+- Direct database経路は既に `telemetry_json` を渡していたため、External Data Store と Remote Registry の `database_override` 経路に追加する。
+- External Data Store は `ExternalDataStoreNameDataSourceType` で `.value` を持たないため、telemetryの `data_source` には `.name` を使う。Internal sourceは従来どおり `.value` を使う。
+- 2026-06-08: `run_database_analysis()` の内側も確認し、`_run_database_analysis()` から `_generate_database_analysis_code()` への呼び出しで `database` が余分に1つ渡されていた問題を修正する。`run_database_analysis` / `_run_database_analysis` / `_generate_database_analysis_code` の全呼び出しに `telemetry_json` keyword があることをASTテストで固定する。
