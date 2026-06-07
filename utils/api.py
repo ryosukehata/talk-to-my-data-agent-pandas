@@ -1826,7 +1826,6 @@ async def _run_database_analysis(
 
     sql_code = await _generate_database_analysis_code(
         database,
-        database,
         request,
         analyst_db,
         next(iter(exception_history[::-1]), None),
@@ -2042,7 +2041,11 @@ async def run_complete_analysis(
     if telemetry_json is not None:
         telemetry_json["chat_id"] = chat_id
         telemetry_json["chat_seq"] = len(chat_request.messages)
-        telemetry_json["data_source"] = data_source.value
+        telemetry_json["data_source"] = (
+            data_source.value
+            if isinstance(data_source, InternalDataSourceType)
+            else data_source.name
+        )
         telemetry_json["datasets_names"] = datasets_names
         telemetry_json["enable_chart_generation"] = enable_chart_generation
         telemetry_json["enable_business_insights"] = enable_business_insights
@@ -2167,6 +2170,7 @@ async def run_complete_analysis(
                 analyst_db,
                 database_override=recipe.as_database_operator(),
                 token_tracker=token_tracker,
+                telemetry_json=telemetry_json,
             )
 
         else:
@@ -2206,6 +2210,7 @@ async def run_complete_analysis(
                     analyst_db,
                     database_override=recipe.as_database_operator(),
                     token_tracker=token_tracker,
+                    telemetry_json=telemetry_json,
                 )
             elif all(m.external_id is None for m in dataset_metadata):
                 logging.info("Running local analysis")
