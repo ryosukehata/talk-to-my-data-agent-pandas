@@ -122,9 +122,12 @@ def get_data_source_type(value: str) -> DataSourceType:
     Returns:
         DataSourceType: The corresponding data source type.
     """
-    if value in InternalDataSourceType:
+    try:
         return InternalDataSourceType(value)
-    elif DATA_STORE_TYPE_REGEX.match(value):
+    except ValueError:
+        pass
+
+    if DATA_STORE_TYPE_REGEX.match(value):
         return ExternalDataStoreNameDataSourceType(name=value)
     raise ValueError(f"'{value}' could not be interpreted as a data source.")
 
@@ -144,8 +147,7 @@ async def async_all(x: Generator[Awaitable[bool]]) -> bool:
     return True
 
 
-@dataclass
-class DatasetMetadata:
+class DatasetMetadata(BaseModel):
     name: str
     external_id: str | None
     dataset_type: DatasetType
@@ -160,6 +162,15 @@ class DatasetMetadata:
     row_count: int
     data_source: DataSourceType
     file_size: int = 0  # Size of the file in bytes
+
+    @field_serializer("created_at", "dataset_type")
+    def serialize_fields(self, value: Any) -> str:
+        if isinstance(value, datetime):
+            serialized = value.isoformat()
+            return serialized.replace("+00:00", "Z")
+        if isinstance(value, DatasetType):
+            return value.value
+        return str(value)
 
     @field_serializer("data_source")
     def serialize_data_source(self, ds: DataSourceType) -> str:
@@ -195,6 +206,7 @@ class BaseDuckDBHandler(ABC):
         self.db_path = self.get_db_path(user_id=user_id, db_path=db_path, name=name)
         self._async_path = AsyncPath(self.db_path)
         self._storage = PersistentStorage(user_id) if use_persistent_storage else None
+        self._write_lock = asyncio.Lock()
 
     async def _create_db_version_table(
         self,
@@ -391,17 +403,13 @@ class BaseDuckDBHandler(ABC):
             await loop.run_in_executor(None, conn.close)
 
     @asynccontextmanager
-    async def _save_to_storage(
-        self, write_connection: bool = True
-    ) -> AsyncGenerator[None, None]:
-        if write_connection:
+    async def _save_to_storage(self) -> AsyncGenerator[None, None]:
+        async with self._write_lock:
             yield
             if self._storage:
                 await self._storage.save_to_storage(
                     self.db_path.name, str(self.db_path.absolute())
                 )
-        else:
-            yield
 
     @telemetry.meter_and_trace
     async def execute_query(
@@ -625,7 +633,7 @@ class DatasetHandler(BaseDuckDBHandler):
                     data_source=get_data_source_type(row[6]),
                     file_size=row[7],
                     external_id=row[8],
-                    original_column_types=row[9],
+                    original_column_types=json.loads(row[9]) if row[9] else row[9],
                 )
                 for row in rows
             ]
@@ -759,7 +767,7 @@ class DatasetHandler(BaseDuckDBHandler):
         Raises:
             ValueError: If dataset doesn't exist or is of wrong type
         """
-        logger.info(f"Retrieving dataframe {name}")
+        logger.debug(f"Retrieving dataframe {name}")
 
         # First verify the dataset exists and check its type
         if not await self.table_exists(name):
@@ -2071,7 +2079,7 @@ class AnalystDB:
                 clobber=clobber,
             )
         except Exception as e:
-            logger.error(f"Error registering dataset: {e}")
+            logger.error(f"Error registering dataset: {e}", exc_info=True)
             return {
                 "success": False,
                 "msg": f"Error registering dataset '{df.name}': {e}",
@@ -2130,9 +2138,11 @@ class AnalystDB:
                 f"{name}_dict", expected_type=DatasetType.DICTIONARY
             )
             return DataDictionary.from_application_df(df, name=name)
-        except Exception as e:
-            logger.error(f"Failed to get data dictionary {name}: {e}")
-            return None
+        except ValueError:
+            logger.debug(f"Data dictionary not defined {name}")
+        except Exception:
+            logger.error(f"Failed to get data dictionary {name}", exc_info=True)
+        return None
 
     async def get_cleansing_report(
         self, dataset_name: str

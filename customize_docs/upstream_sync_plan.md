@@ -47,5 +47,14 @@
 ## `v0.4.24` の次アクション
 
 1. `utils/database_helpers.py` と `utils/datarobot_dataset_handler.py` の旧importを保ったまま、新しい data connection 層へ段階移行する。PR1では `utils.data_connections.database.database_implementations` を互換ファサードとして追加し、旧パス・新パスのimport回帰テストを追加する。
-2. `utils/api.py` と `utils/rest_api.py` は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
-3. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
+2. PR2では `analyst_db.py` の `DatasetMetadata` モデル化、保存時ロック、メタデータJSON decode、ログ/例外処理の小差分を移植する。pandas前提は維持し、upstreamのpandas→polars差分は取り込まない。
+3. `utils/api.py` と `utils/rest_api.py` は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
+4. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
+
+## PR2 CI対応メモ
+
+- 2026-06-07: PR2のCIで `tests/test_analyst_db_upstream_compat.py` が失敗。原因はCI環境に `pytest-asyncio` が入っておらず、`@pytest.mark.asyncio` の async test を実行できなかったこと。
+- 実装差分ではなくテスト起動方法の問題のため、既存テストと同じく `asyncio.run(...)` で非同期処理を呼び出す同期テストへ変更する。
+- 追加でPython 3.11のCIにより、`str in Enum` が `TypeError` になる互換性問題を検出。`get_data_source_type()` は `Enum(value)` 変換と `ValueError` 捕捉に変更し、Python 3.10/3.11/3.12で同じ挙動にする。
+- 2026-06-07: upstream `v0.4.24` の残り小差分から、`_save_to_storage()` 簡略化、`get_dataframe()` debugログ化、`register_dataset()` の `exc_info=True`、`get_data_dictionary()` の `ValueError` 分離を追加移植。`register_dataset()` の成功/失敗dict返却とpandas DataFrame返却は維持する。
+- pandas前提の回帰確認は維持する。pandas→polars差分は引き続き取り込まない。
