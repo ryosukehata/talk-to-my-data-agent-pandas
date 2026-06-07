@@ -48,8 +48,9 @@
 
 1. `utils/database_helpers.py` と `utils/datarobot_dataset_handler.py` の旧importを保ったまま、新しい data connection 層へ段階移行する。PR1では `utils.data_connections.database.database_implementations` を互換ファサードとして追加し、旧パス・新パスのimport回帰テストを追加する。
 2. PR2では `analyst_db.py` の `DatasetMetadata` モデル化、保存時ロック、メタデータJSON decode、ログ/例外処理の小差分を移植する。pandas前提は維持し、upstreamのpandas→polars差分は取り込まない。
-3. `utils/api.py` と `utils/rest_api.py` は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
-4. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
+3. PR3では `utils/rest_api.py` のCSV decode/validationとdatabase endpointのbackground化を移植する。pandas前提は維持し、CSV loaderは `pd.DataFrame` を返す。
+4. `utils/api.py` と `utils/rest_api.py` の残り差分は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
+5. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
 
 ## PR2 CI対応メモ
 
@@ -58,3 +59,9 @@
 - 追加でPython 3.11のCIにより、`str in Enum` が `TypeError` になる互換性問題を検出。`get_data_source_type()` は `Enum(value)` 変換と `ValueError` 捕捉に変更し、Python 3.10/3.11/3.12で同じ挙動にする。
 - 2026-06-07: upstream `v0.4.24` の残り小差分から、`_save_to_storage()` 簡略化、`get_dataframe()` debugログ化、`register_dataset()` の `exc_info=True`、`get_data_dictionary()` の `ValueError` 分離を追加移植。`register_dataset()` の成功/失敗dict返却とpandas DataFrame返却は維持する。
 - pandas前提の回帰確認は維持する。pandas→polars差分は引き続き取り込まない。
+
+## PR3 実装メモ
+
+- 2026-06-07: `utils/rest_api.py` にCSVのencoding検出、UTF-8 BOM除去、delimiter検出、header-only CSVの検証を追加。upstreamはpolars loaderだが、このリポジトリでは `pd.read_csv` を使い `pd.DataFrame` を返す。
+- `/database/select` は選択table名を即時返し、空のpandas datasetを `InternalDataSourceType.DATABASE` として登録してから、実データ取得と cleansing/dictionary 生成をbackground taskへ移す。schema指定は既存仕様を維持する。
+- `chardet` は既にrequirementsにあるが、CIのbackend testは `app_backend/pyproject.toml` から `uv sync` するため、同ファイルにも依存を追加する。
