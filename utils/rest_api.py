@@ -25,6 +25,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Iterable, List, Union, cast
 
+import chardet
 import datarobot as dr
 import pandas as pd
 from fastapi import (
@@ -117,6 +118,100 @@ from utils.token_tracking import (
 logger = get_logger()
 
 MAX_EXCEL_ROWS = 50000  # Maximum rows to export to Excel to prevent memory issues
+
+
+def detect_and_decode_csv(raw_bytes: bytes, filename: str) -> str:
+    """
+    Detect encoding and decode CSV content with UTF-8 BOM handling.
+
+    Raises ValueError with a descriptive message when decoding fails.
+    """
+    if raw_bytes.startswith(b"\xef\xbb\xbf"):
+        logger.info(f"Stripped UTF-8 BOM from '{filename}'")
+        raw_bytes = raw_bytes[3:]
+
+    if not raw_bytes:
+        raise ValueError(f"File '{filename}' is empty or could not be read.")
+
+    detection_result = chardet.detect(raw_bytes)
+    detected_encoding = detection_result.get("encoding")
+    confidence = detection_result.get("confidence") or 0
+
+    if detected_encoding:
+        logger.info(
+            f"Detected encoding for '{filename}': {detected_encoding} "
+            f"(confidence: {confidence:.2f})"
+        )
+
+    encodings_to_try: list[str] = []
+    if detected_encoding and confidence >= 0.7:
+        encodings_to_try.append(detected_encoding)
+    encodings_to_try.extend(["utf-8", "cp932", "shift_jis"])
+
+    tried: set[str] = set()
+    for encoding in encodings_to_try:
+        normalized_encoding = encoding.lower()
+        if normalized_encoding in tried:
+            continue
+        tried.add(normalized_encoding)
+        try:
+            return raw_bytes.decode(encoding)
+        except (UnicodeDecodeError, LookupError) as e:
+            logger.debug(f"Failed to decode '{filename}' with encoding {encoding}: {e}")
+
+    raise ValueError(
+        f"Unable to decode file '{filename}'. All encoding attempts failed."
+    )
+
+
+def detect_delimiter(content: str) -> str:
+    """Detect a CSV delimiter from the first few lines, defaulting to comma."""
+    lines = content.split("\n")[:5]
+    delimiters = {",": 0, ";": 0, "\t": 0, "|": 0}
+
+    for line in lines:
+        if not line.strip():
+            continue
+        for delimiter in delimiters:
+            delimiters[delimiter] += line.count(delimiter)
+
+    best_delimiter = max(delimiters, key=lambda delimiter: delimiters[delimiter])
+    return best_delimiter if delimiters[best_delimiter] > 0 else ","
+
+
+def load_and_validate_csv(decoded_content: str, filename: str) -> pd.DataFrame:
+    """
+    Parse CSV content into a pandas DataFrame and validate that rows are present.
+
+    Raises ValueError with a descriptive message on parse or validation failure.
+    """
+    if "\r" in decoded_content:
+        decoded_content = decoded_content.replace("\r\n", "\n").replace("\r", "\n")
+
+    separator = detect_delimiter(decoded_content)
+    if separator != ",":
+        logger.info(f"Detected delimiter '{separator}' for '{filename}'")
+
+    try:
+        dataframe = pd.read_csv(io.StringIO(decoded_content), sep=separator)
+    except pd.errors.EmptyDataError as e:
+        raise ValueError(f"CSV file '{filename}' is empty.") from e
+    except pd.errors.ParserError as e:
+        raise ValueError(f"Unable to parse CSV file '{filename}'. Error: {e}") from e
+
+    if dataframe.empty:
+        raise ValueError(f"CSV file '{filename}' contains only headers, no data rows.")
+
+    lines = [line for line in decoded_content.split("\n") if line.strip()]
+    if len(lines) > 1:
+        expected_rows = len(lines) - 1
+        if len(dataframe) < expected_rows * 0.9:
+            logger.warning(
+                f"CSV file '{filename}' had inconsistent row lengths. "
+                f"Expected ~{expected_rows} rows, got {len(dataframe)}."
+            )
+
+    return dataframe
 
 
 def _chart_trace_to_dataframe(trace: dict[str, Any]) -> pd.DataFrame:
@@ -510,9 +605,18 @@ async def upload_files(
                 if file_extension == ".csv":
                     logger.info(f"Loading CSV: {file.filename}")
                     log_memory()
-                    df = pd.read_csv(
-                        io.StringIO(contents.decode("utf-8")),
-                    )
+                    try:
+                        decoded_content = detect_and_decode_csv(contents, file.filename)
+                        df = load_and_validate_csv(decoded_content, file.filename)
+                    except ValueError as e:
+                        raise HTTPException(status_code=400, detail=str(e)) from e
+                    except Exception as e:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                f"Failed to read CSV file '{file.filename}': {str(e)}"
+                            ),
+                        ) from e
                     log_memory()
                     dataset_name = os.path.splitext(file.filename)[0]
                     dataset = AnalystDataset(name=dataset_name, data=df)
@@ -546,9 +650,18 @@ async def upload_files(
 
                 elif file_extension in [".xlsx", ".xls"]:
                     base_name = os.path.splitext(file.filename)[0]
-                    excel_dataset = pd.read_excel(
-                        io.BytesIO(contents), sheet_name=None
-                    )  # Get available sheet names
+                    try:
+                        excel_dataset = pd.read_excel(
+                            io.BytesIO(contents), sheet_name=None
+                        )
+                    except Exception as e:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                f"Unable to read Excel file '{file.filename}'. "
+                                f"Error: {str(e)}"
+                            ),
+                        ) from e
                     if isinstance(excel_dataset, dict):
                         for sheet_name, data in excel_dataset.items():
                             dataset_name = f"{base_name}_{sheet_name}"
@@ -656,27 +769,42 @@ async def load_from_database(
     data: LoadDatabaseRequest,
     background_tasks: BackgroundTasks,
     analyst_db: AnalystDB = Depends(get_initialized_db),
-    sample_size: int = 5000,
+    sample_size: int = 1_000,
 ) -> list[str]:
-    dataset_names = []
+    await asyncio.gather(
+        *[
+            analyst_db.register_dataset(
+                AnalystDataset(name=table_name),
+                InternalDataSourceType.DATABASE,
+            )
+            for table_name in data.table_names
+        ]
+    )
 
-    # Load the data from the database
     if data.table_names:
-        dataframes = await get_external_database(schema=data.schema_name).get_data(
-            *data.table_names, analyst_db=analyst_db, sample_size=sample_size
-        )
-        dataset_names.extend(dataframes)
-
-    # Process the data in the background (cleansing and dictionary generation)
-    if dataset_names:
         background_tasks.add_task(
-            process_and_update,
-            dataset_names,
+            get_and_process_tables,
+            data.table_names,
             analyst_db,
-            InternalDataSourceType.DATABASE,
+            sample_size,
+            data.schema_name,
         )
 
-    return dataset_names
+    return data.table_names
+
+
+async def get_and_process_tables(
+    table_names: list[str],
+    analyst_db: AnalystDB,
+    sample_size: int,
+    schema_name: str | None = None,
+) -> None:
+    dataset_names = await get_external_database(schema=schema_name).get_data(
+        *table_names,
+        analyst_db=analyst_db,
+        sample_size=sample_size,
+    )
+    await process_and_update(dataset_names, analyst_db, InternalDataSourceType.DATABASE)
 
 
 @router.get("/dictionaries")
