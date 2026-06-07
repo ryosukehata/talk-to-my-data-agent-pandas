@@ -1344,9 +1344,20 @@ async def run_charts(
             request, token_tracker=token_tracker, telemetry_json=telemetry_json
         )
         return chart_result
-    except ValidationError:
+    except ValidationError as e:
+        logger.error(f"Failed to parse LLM response for charts: {e}")
+        user_friendly_error = ValueError(
+            "Unable to generate charts for this analysis. "
+            "The data structure may not be suitable for visualization. "
+            "The analysis results are still available."
+        )
         return RunChartsResult(
-            status="error", metadata=RunAnalysisResultMetadata(duration=0, attempts=1)
+            status="error",
+            metadata=RunAnalysisResultMetadata(
+                duration=0,
+                attempts=1,
+                exception=AnalysisError.from_value_error(user_friendly_error),
+            ),
         )
     except MaxReflectionAttempts as e:
         return RunChartsResult(
@@ -1450,6 +1461,33 @@ async def get_business_analysis(
             metadata=metadata,
         )
 
+    except ValidationError as e:
+        logger.error(f"Failed to parse LLM response for business analysis: {e}")
+        user_friendly_error = ValueError(
+            "Unable to generate business insights for this analysis. "
+            "The analysis results are still available. "
+            "Try simplifying your question or checking your data."
+        )
+        return GetBusinessAnalysisResult(
+            status="error",
+            metadata=GetBusinessAnalysisMetadata(
+                exception=AnalysisError.from_value_error(user_friendly_error)
+            ),
+            additional_insights="",
+            follow_up_questions=[],
+            bottom_line="",
+        )
+    except ValueError as e:
+        logger.error(f"ValueError during business analysis generation: {e}")
+        return GetBusinessAnalysisResult(
+            status="error",
+            metadata=GetBusinessAnalysisMetadata(
+                exception=AnalysisError.from_value_error(e)
+            ),
+            additional_insights="",
+            follow_up_questions=[],
+            bottom_line="",
+        )
     except Exception as e:
         msg = type(e).__name__ + f": {str(e)}"
         logger.error(f"Error in get_business_analysis: {msg}")
@@ -1609,6 +1647,21 @@ async def run_analysis(
                 exception=AnalysisError.from_max_reflection_exception(e),
             ),
         )
+    except ValidationError as e:
+        logger.error(f"Failed to parse LLM response for analysis: {e}")
+        user_friendly_error = ValueError(
+            "Unable to complete the analysis. "
+            "This could be due to data quality issues, complex dataset structure, or the question being too complex. "
+            "Try simplifying your question or verifying your data quality."
+        )
+        return RunAnalysisResult(
+            status="error",
+            metadata=RunAnalysisResultMetadata(
+                duration=0,
+                attempts=1,
+                exception=AnalysisError.from_value_error(user_friendly_error),
+            ),
+        )
     except ValueError as e:
         return RunAnalysisResult(
             status="error",
@@ -1718,15 +1771,23 @@ async def _generate_database_analysis_code(
         with telemetry.time(
             f"{_generate_database_analysis_code.__module__}.{_generate_database_analysis_code.__qualname__}.llm_call"
         ):
-            (
-                completion,
-                completion_org,
-            ) = await client.chat.completions.create_with_completion(
-                response_model=DatabaseAnalysisCodeGeneration,
-                model=ALTERNATIVE_LLM_BIG,
-                temperature=0.1,
-                messages=messages,
-            )
+            try:
+                (
+                    completion,
+                    completion_org,
+                ) = await client.chat.completions.create_with_completion(
+                    response_model=DatabaseAnalysisCodeGeneration,
+                    model=ALTERNATIVE_LLM_BIG,
+                    temperature=0.1,
+                    messages=messages,
+                )
+            except ValidationError as e:
+                logger.error(f"LLM returned invalid database analysis response: {e}")
+                raise ValueError(
+                    "Unable to analyze your data. "
+                    "This could be due to data quality issues, complex dataset structure, or the question being too complex. "
+                    "Try simplifying your question or checking your data."
+                ) from e
     association_id = completion_org.datarobot_moderations["association_id"]
     logger.info(f"Association ID: {association_id}")
 

@@ -51,7 +51,8 @@
 3. PR3では `utils/rest_api.py` のCSV decode/validationとdatabase endpointのbackground化を移植する。pandas前提は維持し、CSV loaderは `pd.DataFrame` を返す。
 4. PR4では `utils/api.py` の分析実行まわりから、`RunCompleteAnalysisRequestContext` と分析step更新 (`GENERATING_QUERY` / `RUNNING_QUERY`) を移植する。pandas前提は維持し、upstreamの `polars` allowed module追加や `pd.DataFrame` 置換は取り込まない。
 5. PR5では `utils/api.py` のLLM応答validation/error handling差分を小さく移植する。チャート生成、ビジネス分析、database SQL生成で `ValidationError` をユーザー向けの `AnalysisError` に変換する。
-6. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
+6. `utils/api.py` と `utils/rest_api.py` の残り差分は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
+7. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
 
 ## PR2 CI対応メモ
 
@@ -74,3 +75,10 @@
 - `run_complete_analysis()` はローカル分析経路でcontextを渡す。既存のpandas DataFrame入力、`execute_python` の allowed modules、`AnalystDataset.to_df()` は維持する。
 - legacy `utils.database_helpers.DatabaseOperator` に no-op `warmup_query()` / `warmup()` を追加し、upstreamの接続テスト呼び出しに備える。DB実装階層や `utils.data_connections` への全面差し替えはしない。
 - 追加テスト: `app_backend/tests/test_api_analysis_execution_v0424_compat.py`。staged updateの順序、`run_analysis` のstep更新、pandas DataFrame維持、no-op warmupを検証する。
+
+## PR5 実装メモ
+
+- 2026-06-07: `utils/api.py` の LLM response parsing failure を個別に扱う。`run_analysis()`、`run_charts()`、`get_business_analysis()`、`_generate_database_analysis_code()` で `ValidationError` を raw のまま返さず、ユーザー向けの `AnalysisError` / `ValueError` へ変換する。
+- `get_business_analysis()` は `ValueError` とその他例外も分離し、ユーザーに返すmetadataでは `exception=AnalysisError.from_value_error(...)` を使う。既存の成功レスポンスとpandas DataFrame入力は変更しない。
+- `_generate_database_analysis_code()` は LLM応答のvalidation失敗を database SQL生成用の説明メッセージに変換する。SQL sample生成は既存のpandas `.to_df()` 経路を維持する。
+- 追加テスト: `app_backend/tests/test_api_validation_errors_v0424_compat.py`。analysis/charts/business/database SQL生成の4経路で raw `ValidationError` が外に出ず、ユーザー向けメッセージに変換されることを検証する。
