@@ -49,8 +49,9 @@
 1. `utils/database_helpers.py` と `utils/datarobot_dataset_handler.py` の旧importを保ったまま、新しい data connection 層へ段階移行する。PR1では `utils.data_connections.database.database_implementations` を互換ファサードとして追加し、旧パス・新パスのimport回帰テストを追加する。
 2. PR2では `analyst_db.py` の `DatasetMetadata` モデル化、保存時ロック、メタデータJSON decode、ログ/例外処理の小差分を移植する。pandas前提は維持し、upstreamのpandas→polars差分は取り込まない。
 3. PR3では `utils/rest_api.py` のCSV decode/validationとdatabase endpointのbackground化を移植する。pandas前提は維持し、CSV loaderは `pd.DataFrame` を返す。
-4. `utils/api.py` と `utils/rest_api.py` の残り差分は upstream 版を全面採用せず、既存カスタムAPIのcharacterization testを通しながら必要差分だけ移植する。
-5. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
+4. PR4では `utils/api.py` の分析実行まわりから、`RunCompleteAnalysisRequestContext` と分析step更新 (`GENERATING_QUERY` / `RUNNING_QUERY`) を移植する。pandas前提は維持し、upstreamの `polars` allowed module追加や `pd.DataFrame` 置換は取り込まない。
+5. PR5では `utils/api.py` のLLM応答validation/error handling差分を小さく移植する。チャート生成、ビジネス分析、database SQL生成で `ValidationError` をユーザー向けの `AnalysisError` に変換する。
+6. Streamlit (`frontend/*`) は破棄方針のため、upstream同期では衝突解消せず別途削除・整理する。
 
 ## PR2 CI対応メモ
 
@@ -65,3 +66,11 @@
 - 2026-06-07: `utils/rest_api.py` にCSVのencoding検出、UTF-8 BOM除去、delimiter検出、header-only CSVの検証を追加。upstreamはpolars loaderだが、このリポジトリでは `pd.read_csv` を使い `pd.DataFrame` を返す。
 - `/database/select` は選択table名を即時返し、空のpandas datasetを `InternalDataSourceType.DATABASE` として登録してから、実データ取得と cleansing/dictionary 生成をbackground taskへ移す。schema指定は既存仕様を維持する。
 - `chardet` は既にrequirementsにあるが、CIのbackend testは `app_backend/pyproject.toml` から `uv sync` するため、同ファイルにも依存を追加する。
+
+## PR4 実装メモ
+
+- 2026-06-07: `utils/api.py` に `RunCompleteAnalysisRequestContext` を追加し、assistant/user message更新を順序付きbackground taskとしてstageできるようにする。保存前に message と step を浅くコピーし、後続のstep変更で先に積んだ更新内容が変わらないようにする。
+- ローカル分析の `_run_analysis()` / `run_analysis()` は新しいcontext経由でも呼べるようにし、コード生成前に `GENERATING_QUERY`、Python実行前に `RUNNING_QUERY` を保存する。既存の `analyst_db` / `token_tracker` 引数の呼び出し互換は残す。
+- `run_complete_analysis()` はローカル分析経路でcontextを渡す。既存のpandas DataFrame入力、`execute_python` の allowed modules、`AnalystDataset.to_df()` は維持する。
+- legacy `utils.database_helpers.DatabaseOperator` に no-op `warmup_query()` / `warmup()` を追加し、upstreamの接続テスト呼び出しに備える。DB実装階層や `utils.data_connections` への全面差し替えはしない。
+- 追加テスト: `app_backend/tests/test_api_analysis_execution_v0424_compat.py`。staged updateの順序、`run_analysis` のstep更新、pandas DataFrame維持、no-op warmupを検証する。
