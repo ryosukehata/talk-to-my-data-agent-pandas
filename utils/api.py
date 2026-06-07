@@ -2154,6 +2154,7 @@ async def run_complete_analysis(
                         question=enhanced_message,
                     ),
                     analysis_context=analysis_context,
+                    token_tracker=token_tracker,
                     telemetry_json=telemetry_json,
                 )
             else:
