@@ -13,7 +13,9 @@ def test_quickstart_accepts_missing_stack_name(monkeypatch) -> None:
 
 
 def test_quickstart_accepts_explicit_stack_name(monkeypatch) -> None:
-    monkeypatch.setattr(sys, "argv", ["quickstart.py", "demo-stack", "--action", "destroy"])
+    monkeypatch.setattr(
+        sys, "argv", ["quickstart.py", "demo-stack", "--action", "destroy"]
+    )
 
     args = quickstart.parse_args()
 
