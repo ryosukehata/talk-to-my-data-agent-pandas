@@ -13,7 +13,6 @@
 # limitations under the License.
 import os
 import sys
-from typing import Any, Optional
 
 import datarobot as dr
 import pulumi
@@ -44,10 +43,6 @@ from infra.components.dr_credential import (
 )
 from infra.settings_database import DATABASE_CONNECTION_TYPE
 from infra.settings_proxy_llm import CHAT_MODEL_NAME
-from utils.custom_job_helper import (
-    delete_all_custom_job_schedule,
-    get_custom_job_by_name,
-)
 from utils.customize.csv_validator import (
     validate_prompt_template_csv,
     validate_schema_table_description_csv,
@@ -61,69 +56,13 @@ from utils.resources import (
 )
 from utils.schema import AppInfra
 
-
-def fetch_and_prepare_app_resources(source_id: str) -> Optional[dict[str, Any]]:
-    """
-    Fetch resource configuration from a CustomApplicationSource entity
-    and prepare it for CustomApplication creation.
-
-    Args:
-        source_id: The ID of the CustomApplicationSource to fetch resources from
-
-    Returns:
-        Dictionary containing resource configuration compatible with CustomApplication,
-        or None if not configured
-    """
-    try:
-        source = dr.CustomApplicationSource.get(source_id)
-        pulumi.info(f"Fetched CustomApplicationSource: {source.name} (ID: {source.id})")
-
-        resources = source.get_resources()
-        if resources:
-            pulumi.info(f"Found resources in source: {resources}")
-            # Prepare resources in the format expected by CustomApplication
-            app_resources = {
-                "resource_label": resources.get("resource_label"),
-                "replicas": resources.get("replicas"),
-            }
-            # Optional fields - only include if present
-            if resources.get("session_affinity") is not None:
-                app_resources["session_affinity"] = resources.get("session_affinity")
-            if resources.get("service_web_requests_on_root_path") is not None:
-                app_resources["service_web_requests_on_root_path"] = resources.get(
-                    "service_web_requests_on_root_path"
-                )
-            return app_resources
-        else:
-            pulumi.warn("No resources configured in CustomApplicationSource")
-            return None
-    except Exception as e:
-        pulumi.warn(f"Failed to fetch resources from CustomApplicationSource: {e}")
-        return None
-
-
-def create_resources_args(
-    source_id: str,
-) -> Optional[datarobot.CustomApplicationResourcesArgs]:
-    """
-    Fetch resources from source and convert to Pulumi CustomApplicationResourcesArgs.
-
-    Args:
-        source_id: The ID of the CustomApplicationSource
-
-    Returns:
-        CustomApplicationResourcesArgs if resources exist, None otherwise
-    """
-    resources = fetch_and_prepare_app_resources(source_id)
-    if resources:
-        return datarobot.CustomApplicationResourcesArgs(**resources)
-    return None
-
-
 TEXTGEN_DEPLOYMENT_ID = os.environ.get("TEXTGEN_DEPLOYMENT_ID")
 TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
 USE_DATAROBOT_LLM_GATEWAY = (
     os.environ.get("USE_DATAROBOT_LLM_GATEWAY", "false").lower() == "true"
+)
+SKIP_PULUMI_CUSTOM_JOBS = (
+    os.environ.get("SKIP_PULUMI_CUSTOM_JOBS", "false").lower() == "true"
 )
 
 
@@ -364,18 +303,26 @@ if USE_LLM_GATEWAY:
         )
     )
 
-app_source = datarobot.ApplicationSource(
-    files=app_frontend.stdout.apply(
+if app_frontend is None:
+    app_source_files = settings_app_infra.get_app_files(
+        runtime_parameter_values=app_runtime_parameters
+    )
+else:
+    app_source_files = app_frontend.stdout.apply(
         lambda _: settings_app_infra.get_app_files(
             runtime_parameter_values=app_runtime_parameters
         )
-    ),
+    )
+
+app_source = datarobot.ApplicationSource(
+    files=app_source_files,
     runtime_parameter_values=app_runtime_parameters,
     resources=datarobot.ApplicationSourceResourcesArgs(
         resource_label=CustomAppResourceBundles.CPU_7XL.value.id,
         replicas=1,
         session_affinity=True,
     ),
+    opts=pulumi.ResourceOptions(retain_on_delete=True),
     **settings_app_infra.app_source_args,
 )
 
@@ -386,7 +333,7 @@ app = datarobot.CustomApplication(
     source_version_id=app_source.version_id,
     use_case_ids=[use_case.id],
     allow_auto_stopping=True,
-    resources=app_source.id.apply(create_resources_args),  # type: ignore[arg-type]
+    resources=app_source.resources,
 )
 
 pulumi.export(llm_deployment_env_name, llm_deployment.id)
@@ -443,28 +390,6 @@ def create_monitoring_resources():
         }.items()
     ]
 
-    class CustomJobScheduleCleanup(pulumi.ComponentResource):
-        def __init__(self, name, custom_job_name, opts=None):
-            super().__init__("custom:resource:CustomJobScheduleCleanup", name, {}, opts)
-            self.cleanup_done = pulumi.Output.from_input(custom_job_name).apply(
-                self._delete_schedules_if_exists
-            )
-            self.register_outputs({"cleanup_done": self.cleanup_done})
-
-        def _delete_schedules_if_exists(self, job_name):
-            job = get_custom_job_by_name(job_name)
-            if job is None:
-                # Job does not exist, skip deletion
-                return True
-            job_id = job["id"]
-            delete_all_custom_job_schedule(job_id)
-            return True
-
-    # Cleanup schedules before updating/creating custom_job
-    cleanup = CustomJobScheduleCleanup(
-        "custom-job-schedule-cleanup", settings_job_infra.job_resource_name
-    )
-
     job_files, job_files_hash = settings_job_infra.get_job_files(
         job_runtime_parameters, settings_job_infra.job_path
     )
@@ -473,49 +398,22 @@ def create_monitoring_resources():
         f"DataRobot Custom Job for telemetry export. Content Hash: {job_files_hash}"
     )
 
-    custom_job = datarobot.CustomJob(
-        resource_name=settings_job_infra.job_resource_name,
-        name=settings_job_infra.job_resource_name,
-        description=job_description,
-        environment_id=settings_job_infra.base_environment_id,
-        files=job_files,
-        runtime_parameter_values=job_runtime_parameters,
-        resource_bundle_id=settings_job_infra.resource_bundle_id,
-        job_type="default",
-        opts=pulumi.ResourceOptions(
-            depends_on=[cleanup],
-        ),
-    )
+    if SKIP_PULUMI_CUSTOM_JOBS:
+        pulumi.info("Skipping usage export custom job creation")
+    else:
+        custom_job = datarobot.CustomJob(
+            resource_name=settings_job_infra.job_resource_name,
+            name=settings_job_infra.job_resource_name,
+            description=job_description,
+            environment_id=settings_job_infra.base_environment_id,
+            files=job_files,
+            runtime_parameter_values=job_runtime_parameters,
+            resource_bundle_id=settings_job_infra.resource_bundle_id,
+            job_type="default",
+        )
 
-    pulumi.export(settings_job_infra.job_resource_name, custom_job.id)
-    pulumi.export("CUSTOM_JOB_ID", custom_job.id)
-
-    class CustomJobPostActions(pulumi.ComponentResource):
-        def __init__(self, name, custom_job_id, opts=None):
-            super().__init__(
-                "custom:resource:CustomJobPostActions",
-                name,
-                {"custom_job_id": custom_job_id},
-                opts,
-            )
-            self.schedule_id = custom_job_id.apply(
-                lambda id: settings_job_infra.create_job_schedule(id)
-            )
-            # Register outputs for stack export
-            self.register_outputs(
-                {
-                    "schedule_id": self.schedule_id,
-                }
-            )
-
-    # Post-actions after custom_job is fully created/updated
-    post_actions = CustomJobPostActions(
-        "custom-job-post-actions",
-        custom_job.id,
-        opts=pulumi.ResourceOptions(depends_on=[custom_job]),
-    )
-
-    pulumi.export("CUSTOM_JOB_SCHEDULE_ID", post_actions.schedule_id)
+        pulumi.export(settings_job_infra.job_resource_name, custom_job.id)
+        pulumi.export("CUSTOM_JOB_ID", custom_job.id)
 
     dashboard_runtime_parameters = [
         datarobot.ApplicationSourceRuntimeParameterValueArgs(
@@ -541,6 +439,7 @@ def create_monitoring_resources():
         resources=datarobot.ApplicationSourceResourcesArgs(
             resource_label=CustomAppResourceBundles.CPU_XL.value.id,
         ),
+        opts=pulumi.ResourceOptions(retain_on_delete=True),
         **settings_dashboard_infra.dashboard_source_args,
     )
 
@@ -569,28 +468,6 @@ def create_cleanup_job(app: datarobot.CustomApplication):
         }.items()
     ]
 
-    class CustomJobScheduleCleanup(pulumi.ComponentResource):
-        def __init__(self, name, custom_job_name, opts=None):
-            super().__init__("custom:resource:CustomJobScheduleCleanup", name, {}, opts)
-            self.cleanup_done = pulumi.Output.from_input(custom_job_name).apply(
-                self._delete_schedules_if_exists
-            )
-            self.register_outputs({"cleanup_done": self.cleanup_done})
-
-        def _delete_schedules_if_exists(self, job_name):
-            job = get_custom_job_by_name(job_name)
-            if job is None:
-                # Job does not exist, skip deletion
-                return True
-            job_id = job["id"]
-            delete_all_custom_job_schedule(job_id)
-            return True
-
-    # Cleanup schedules before updating/creating custom_job
-    cleanup = CustomJobScheduleCleanup(
-        "cleanup-job-schedule-cleanup", settings_job_infra.cleanup_job_resource_name
-    )
-
     job_files, job_files_hash = settings_job_infra.get_job_files(
         job_runtime_parameters, settings_job_infra.cleanup_job_path
     )
@@ -607,9 +484,6 @@ def create_cleanup_job(app: datarobot.CustomApplication):
         runtime_parameter_values=job_runtime_parameters,
         resource_bundle_id=settings_job_infra.resource_bundle_id,
         job_type="default",
-        opts=pulumi.ResourceOptions(
-            depends_on=[cleanup],
-        ),
     )
     pulumi.export(settings_job_infra.cleanup_job_resource_name, cleanup_custom_job.id)
     pulumi.export("CLEANUP_CUSTOM_JOB_ID", cleanup_custom_job.id)
@@ -621,7 +495,9 @@ if os.environ.get("DISALLOW_MONITORING_RESOURCES", "false").lower() == "true":
 else:
     create_monitoring_resources()
 
-if os.environ.get("DISALLOW_APP_CLEANUP_JOB", "false").lower() == "true":
+if SKIP_PULUMI_CUSTOM_JOBS:
+    pulumi.info("Skipping cleanup custom job creation")
+elif os.environ.get("DISALLOW_APP_CLEANUP_JOB", "false").lower() == "true":
     pulumi.info("Skipping app data cleanup job creation")
 else:
     create_cleanup_job(app)

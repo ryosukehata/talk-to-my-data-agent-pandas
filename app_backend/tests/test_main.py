@@ -38,6 +38,18 @@ def test_reports_spa_routes() -> None:
         assert response.headers["content-type"] == "text/html; charset=utf-8"
 
 
+def test_customize_api_routes_are_mounted() -> None:
+    paths = {
+        getattr(route, "path", "")
+        for route in app.routes
+        if getattr(route, "path", "").startswith("/api/v1")
+    }
+
+    assert "/api/v1/config/feature-flags" in paths
+    assert "/api/v1/refiner" in paths
+    assert "/api/v1/reports" in paths
+
+
 def test_favicon_file() -> None:
     response = client.get("/datarobot_favicon.png")
     assert response.status_code == 200

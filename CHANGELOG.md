@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2025-12-10
+
+### Added
+- DataRobot CLI integration: Introduced CLI-driven quickstart and configuration via `dr start`.
+
+### Improvements
+- Updated `README.md` to prioritize CLI-based quickstart (`dr start`), improved setup flow and Codespace instructions.
+- Enhanced `quickstart.py` UX: made `stack_name` optional and interactive;
+
+## [0.5.0] - 2025-12-10
+
+### Improvements
+
+- Improved the text description in the upload modal.
+
+## [0.4.24] - 2025-12-8
+
+### Fixes
+
+- Async handling of external databases (Snowflake, BigQuery, SAP), allowing app to run queries in background and service other requests.
+- More robust handling of invalid JSON produced by LLMs.
+- Fixed uploading BOM-encoded CSV files.
+
+## [0.3.23] - 2025-12-2
+
+### Fixes
+
+- Bug with handling remote registry with file extensions.
+
+### Improvements
+
+- Add pre-analysis connection test for DataRobot remote registry and data source connections.
+- Track and display in UI current analysis step.
+- Bump pulumi-datarobot to version 0.10.22 and simplify resource injection into CustomApplications
+
+## [0.3.22] - 2025-11-27
+
+### Fixes
+
+- Fixed telemetry initialization in local development mode and in environments where OTLP endpoint is not configured.
+
+## [0.3.21] - 2025-11-24
+
+### Improvements
+
+- Improve scalability of DataWrangling usage.
+- Tweaked Redshift prompt to better handle epoch timestamps.
+
+### Fixes
+
+- Root cause messages not propagated for some query failures through DataRobot DataWrangling.
+
+## [0.3.20] - 2025-11-20
+
+### Improvements
+
+- Improved data type handling for DataRobot connections.
+- Unrolled templated prompts for ease of editing.
+
 ## [0.3.19.1] - 2025-12-09
 
 ### Added

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import concurrent.futures
 import datetime
 import json
 import logging
@@ -27,7 +28,17 @@ import threading
 import uuid
 from contextlib import contextmanager
 from functools import cache, lru_cache
-from typing import Any, Callable, Generator, Iterable, ParamSpec, TypeVar, cast
+from typing import (
+    Any,
+    AsyncGenerator,
+    Callable,
+    Generator,
+    Iterable,
+    NamedTuple,
+    ParamSpec,
+    TypeVar,
+    cast,
+)
 
 import datarobot as dr
 import polars as pl
@@ -50,7 +61,6 @@ from datarobot.models.recipe import (
     RecipeDatasetInput,
 )
 from datarobot.models.use_cases.use_case import UseCase
-from datarobot.utils.pagination import unpaginate
 from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
 )
@@ -77,10 +87,9 @@ from utils.data_analyst_telemetry import telemetry
 from utils.database_helpers import _DEFAULT_DB_QUERY_TIMEOUT, DatabaseOperator
 from utils.logging_helper import get_logger
 from utils.prompts import (
-    PostgresPromptFactory,
-    QueryPromptFactory,
-    RedshiftPromptFactory,
-    SparkPromptFactory,
+    SYSTEM_PROMPT_POSTGRES,
+    SYSTEM_PROMPT_REDSHIFT,
+    SYSTEM_PROMPT_SPARK_SQL,
 )
 from utils.schema import (
     DataFrameWrapper,
@@ -100,6 +109,9 @@ class SparkRecipeError(RuntimeError):
         super().__init__(*args)
 
 
+ASYNC_PROCESS_PRE_JOB_TOKEN = "Job Data:"
+
+
 def find_underlying_client_message(exc: BaseException) -> str | None:
     stack: list[BaseException] = [exc]
     while stack:
@@ -108,6 +120,21 @@ def find_underlying_client_message(exc: BaseException) -> str | None:
             return cast(str, exc.json["message"])
         if isinstance(exc, HTTPError) and "message" in exc.response.json():
             return cast(str, exc.response.json()["message"])
+        if (
+            isinstance(exc, dr.errors.AsyncProcessUnsuccessfulError)
+            and exc.args
+            and isinstance(exc.args[0], str)
+        ):
+            message: str = exc.args[0]
+            if ASYNC_PROCESS_PRE_JOB_TOKEN in message:
+                index = message.find(ASYNC_PROCESS_PRE_JOB_TOKEN)
+                if index:
+                    json_portion = message[index + len(ASYNC_PROCESS_PRE_JOB_TOKEN) :]
+                    try:
+                        message = json.loads(json_portion)["message"]
+                    except Exception:
+                        message = json_portion
+            return message
         stack.extend(
             [
                 e
@@ -347,6 +374,11 @@ def get_or_create_wrangling_use_case(analyst_db: AnalystDB) -> UseCase:
     return use_case
 
 
+class RunSqlResponse(NamedTuple):
+    response: DataFrameWrapper
+    original_types: dict[str, str]
+
+
 class BaseRecipe(abc.ABC):
     MAX_ROWS = 1000
 
@@ -410,8 +442,11 @@ class BaseRecipe(abc.ABC):
         logger.debug(
             "Setting recipe query.", extra={"recipe_id": self._recipe.id, "sql": query}
         )
+        loop = asyncio.get_running_loop()
         with handle_datarobot_error(f"Recipe.set_recipe_metadata({self._recipe.id})"):
-            Recipe.set_recipe_metadata(self._recipe.id, {"sql": query})
+            await loop.run_in_executor(
+                None, Recipe.set_recipe_metadata, self._recipe.id, {"sql": query}
+            )
 
     @default_retry
     @telemetry.trace
@@ -421,8 +456,11 @@ class BaseRecipe(abc.ABC):
         """
         await self._ensure_recipe_initialized()
         assert self._recipe is not None
+        loop = asyncio.get_running_loop()
         with handle_datarobot_error(f"Recipe.set_recipe_metadata({self._recipe.id})"):
-            Recipe.set_recipe_metadata(self._recipe.id, {})
+            await loop.run_in_executor(
+                None, Recipe.set_recipe_metadata, self._recipe.id, {}
+            )
 
     @retry(
         wait=wait_random_exponential(multiplier=2, max=300),
@@ -432,13 +470,18 @@ class BaseRecipe(abc.ABC):
         after=after_log(logger, logging.DEBUG),
     )
     @telemetry.trace
-    async def _retrieve_preview(self, timeout_seconds: int = 300) -> DataFrameWrapper:
+    async def _retrieve_preview(self, timeout_seconds: int = 300) -> RunSqlResponse:
         assert self._recipe is not None
+
+        loop = asyncio.get_running_loop()
+
         logger.debug(
             "Retrieving preview of recipe.", extra={"recipe_id": self._recipe.id}
         )
-        preview = self._recipe.retrieve_preview(timeout_seconds)
-        schema = preview["resultSchema"]
+        preview = await loop.run_in_executor(
+            None, self._recipe.retrieve_preview, timeout_seconds
+        )
+        schema: list[dict[str, Any]] = preview["resultSchema"]
 
         # Unfortunately the Python SDK currently doesn't have a nice API for Previews
         all_rows: list[Any] = preview["data"]
@@ -448,18 +491,52 @@ class BaseRecipe(abc.ABC):
                 "Fetching additional pages of preview.",
                 extra={"recipe_id": self._recipe.id},
             )
-            for row in unpaginate(
-                preview["next"], initial_params=None, client=dr.client.get_client()
+            async for row in self._unpaginate(
+                loop,
+                preview["next"],
+                initial_params=None,
+                client=dr.client.get_client(),
             ):
                 all_rows.append(row)
                 # Normally queries should be limited in how much data they return, this serves as a backstop.
                 if len(all_rows) >= BaseRecipe.MAX_ROWS:
                     break
 
-        return DatasetSparkRecipe.convert_preview_to_dataframe(schema, all_rows)
+        original_types = {col["name"]: col["dataType"] for col in schema}
+        dataframe = DatasetSparkRecipe.convert_preview_to_dataframe(schema, all_rows)
+        return RunSqlResponse(dataframe, original_types)
+
+    async def _unpaginate(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        initial_url: str,
+        initial_params: None | dict[Any, Any],
+        client: dr.client.RESTClientObject,
+    ) -> AsyncGenerator[Any, None]:
+        """Iterate over a paginated endpoint and get all results
+
+        Assumes the endpoint follows the "standard" pagination interface (data stored under "data",
+        "next" used to link next page, "offset" and "limit" accepted as query parameters).
+
+        Yields
+        ------
+        data : dict
+            a series of objects from the endpoint's data, as raw server data
+        """
+
+        resp_data = (
+            await loop.run_in_executor(None, client.get, initial_url, initial_params)
+        ).json()
+        for data in resp_data["data"]:
+            yield data
+        while resp_data["next"] is not None:
+            next_url = resp_data["next"]
+            resp_data = (await loop.run_in_executor(None, client.get, next_url)).json()
+            for data in resp_data["data"]:
+                yield data
 
     @telemetry.meter_and_trace
-    async def retrieve_preview(self, timeout_seconds: int = 900) -> DataFrameWrapper:
+    async def retrieve_preview(self, timeout_seconds: int = 900) -> RunSqlResponse:
         """
         Retrieve a preview of the set SQL query.
 
@@ -473,16 +550,12 @@ class BaseRecipe(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def prompt(self) -> QueryPromptFactory:
+    def prompt(self) -> str:
         pass
 
-    @property
-    def catalog(self) -> str | None:
-        return None
-
-    @property
-    def schema(self) -> str | None:
-        return None
+    @abc.abstractmethod
+    def query_friendly_name(self, dataset_name: str) -> str:
+        pass
 
     def as_database_operator(self) -> DataRobotOperator:
         return DataRobotOperator(NoDatabaseCredentials(), self)
@@ -613,6 +686,14 @@ class BaseRecipe(abc.ABC):
         return pl.String
 
 
+def format_postgres_table(table_parts: list[str]) -> str:
+    return ".".join(f'"{part}"' for part in table_parts)
+
+
+def format_spark_table(table_parts: list[str]) -> str:
+    return ".".join(f"`{part}`" for part in table_parts)
+
+
 class DataSourceRecipe(BaseRecipe):
     """
     A recipe defined over data sources.
@@ -625,15 +706,21 @@ class DataSourceRecipe(BaseRecipe):
         "postgres": DataWranglingDialect.POSTGRES,
         "redshift": DataWranglingDialect.POSTGRES,
     }
-    PROMPTS: dict[str, QueryPromptFactory] = {
-        "postgres": PostgresPromptFactory(),
-        "redshift": RedshiftPromptFactory(),
+    PROMPTS: dict[str, str] = {
+        "postgres": SYSTEM_PROMPT_POSTGRES,
+        "redshift": SYSTEM_PROMPT_REDSHIFT,
+    }
+    FORMAT_TABLE_NAME: dict[str, Callable[[list[str]], str]] = {
+        "postgres": format_postgres_table,
+        "redshift": format_postgres_table,
     }
     INSTANCE_CACHE: dict[tuple[str, str], DataSourceRecipe] = {}
     EXTERNAL_DATA_STORE_CACHE: dict[
         str, tuple[datetime.datetime, list[ExternalDataStore]]
     ] = {}
     EXTERNAL_DATA_STORE_CACHE_MAX_SIZE = 1024
+    DATA_STORE_ID_TO_NAME_CACHE: dict[str, str] = {}
+    DATA_STORE_NAME_TO_ID_CACHE: dict[str, str] = {}
     PER_USER_LOCKS: dict[str, threading.Lock] = {}
     PER_USER_LOCKS_LOCK: threading.Lock = threading.Lock()
     EXTERNAL_DATA_STORE_REFRESH_INTERVAL: datetime.timedelta = datetime.timedelta(
@@ -692,7 +779,13 @@ class DataSourceRecipe(BaseRecipe):
 
                 external_data_stores = []
 
-                for data_store in data_stores:
+                # Process datastores concurrently in a threadpool to avoid serial blocking
+                loop = asyncio.get_running_loop()
+
+                def _process_store(
+                    data_store: dict[str, Any],
+                    executor: concurrent.futures.ThreadPoolExecutor,
+                ) -> ExternalDataStore | None:
                     driver: str | None = data_store.get("driverClassType")
 
                     data_store_obj = DataStore.from_server_data(data_store)
@@ -702,7 +795,7 @@ class DataSourceRecipe(BaseRecipe):
                         or not data_store_obj.id
                         or not data_store_obj.canonical_name
                     ):
-                        continue
+                        return None
 
                     external_data_store = ExternalDataStore(
                         id=data_store_obj.id,
@@ -714,17 +807,34 @@ class DataSourceRecipe(BaseRecipe):
                     cred = DataSourceRecipe._fetch_default_cred(data_store_obj, user_id)
 
                     if not cred:
-                        continue
+                        return None
 
                     external_data_sources = DataSourceRecipe._fetch_tables(
-                        user_id, data_store_obj, cred
+                        user_id, data_store_obj, cred, executor
                     )
 
                     if not external_data_sources:
-                        continue
+                        return None
 
                     external_data_store.defined_data_sources = external_data_sources
-                    external_data_stores.append(external_data_store)
+                    return external_data_store
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                    tasks = [
+                        loop.run_in_executor(executor, _process_store, ds, executor)
+                        for ds in data_stores
+                    ]
+                    results = await asyncio.gather(*tasks)
+                for res in results:
+                    if res:
+                        cleaned_name = res.canonical_name.lower().strip()
+                        DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE[res.id] = (
+                            cleaned_name
+                        )
+                        DataSourceRecipe.DATA_STORE_NAME_TO_ID_CACHE[cleaned_name] = (
+                            res.id
+                        )
+                        external_data_stores.append(res)
 
                 refresh_time = datetime.datetime.now(datetime.timezone.utc)
 
@@ -808,7 +918,10 @@ class DataSourceRecipe(BaseRecipe):
     @staticmethod
     @telemetry.trace
     def _fetch_tables(
-        user_id: str, data_store_obj: DataStore, cred: Credential
+        user_id: str,
+        data_store_obj: DataStore,
+        cred: Credential,
+        executor: concurrent.futures.ThreadPoolExecutor,
     ) -> list[ExternalDataSource] | None:
         logger.debug(
             "Listing schemas for datastore.",
@@ -870,9 +983,9 @@ class DataSourceRecipe(BaseRecipe):
             },
         )
 
-        for payload in tables_payloads:
+        def _retrieve_tables(payload: dict[str, Any]) -> list[dict[str, Any]] | None:
             with handle_datarobot_error(
-                f"POST /externalDataStores/{data_store_obj}/tables/"
+                f"POST /externalDataStores/{data_store_obj.id}/tables/"
             ):
                 response = dr.client.get_client().post(
                     f"externalDataStores/{data_store_obj.id}/tables/", payload
@@ -887,14 +1000,23 @@ class DataSourceRecipe(BaseRecipe):
                             "user_id": user_id,
                         },
                     )
-                    continue
+                    return None
                 elif response.status_code == 200:
-                    pass
+                    return cast(list[dict[str, Any]], response.json().get("tables", []))
                 else:
                     response.raise_for_status()
+            return None
 
-            tables = response.json()["tables"]
+        futures = [
+            executor.submit(_retrieve_tables, payload) for payload in tables_payloads
+        ]
+        all_tables = []
+        for fut in concurrent.futures.as_completed(futures):
+            tables = fut.result()
+            if tables:
+                all_tables.append(tables)
 
+        for tables in all_tables:
             for table in tables:
                 if "name" not in table:
                     logger.warning(
@@ -918,15 +1040,23 @@ class DataSourceRecipe(BaseRecipe):
 
     @staticmethod
     @default_retry
-    @lru_cache(128)
     @telemetry.trace
-    def get_id_for_data_store_canonical_name(data_store_name: str) -> str | None:
+    async def get_id_for_data_store_canonical_name(data_store_name: str) -> str | None:
+        data_store_name = data_store_name.lower().strip()
+        if data_store_name in DataSourceRecipe.DATA_STORE_NAME_TO_ID_CACHE:
+            return DataSourceRecipe.DATA_STORE_NAME_TO_ID_CACHE[data_store_name]
         logger.debug(
             "Searching for datastore with name",
             extra={"data_store_canonical_name": data_store_name},
         )
+        loop = asyncio.get_running_loop()
         with handle_datarobot_error(f"DataStore.list({data_store_name})"):
-            stores = DataStore.list(typ=DataStoreListTypes.ALL, name=data_store_name)
+            stores = await loop.run_in_executor(
+                None,
+                lambda: DataStore.list(
+                    typ=DataStoreListTypes.ALL, name=data_store_name
+                ),
+            )
 
         for store in stores:
             if (
@@ -938,10 +1068,9 @@ class DataSourceRecipe(BaseRecipe):
         return None
 
     @staticmethod
-    @lru_cache(128)
     @default_retry
     @telemetry.trace
-    def get_canonical_name_for_datastore_id(data_store_id: str) -> str | None:
+    async def get_canonical_name_for_datastore_id(data_store_id: str) -> str | None:
         """Return the canonical name of a given data store.
 
         Args:
@@ -950,13 +1079,20 @@ class DataSourceRecipe(BaseRecipe):
         Returns:
             str | None: The canonical name, or None if there's no such datastore.
         """
+        if data_store_id in DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE:
+            return DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE[data_store_id]
         logger.debug(
             "Searching for datastore with name",
             extra={"data_store_id": data_store_id},
         )
+        loop = asyncio.get_running_loop()
         with handle_datarobot_error(f"DataStore.get({data_store_id})"):
             try:
-                store = DataStore.get(data_store_id)
+                store = await loop.run_in_executor(None, DataStore.get, data_store_id)
+                if store and store.canonical_name and store.id:
+                    DataSourceRecipe.DATA_STORE_ID_TO_NAME_CACHE[store.id] = (
+                        store.canonical_name.lower().strip()
+                    )
             except ClientError as e:
                 if e.status_code in [404, 410]:
                     store = None
@@ -1308,24 +1444,13 @@ class DataSourceRecipe(BaseRecipe):
         return
 
     @property
-    def catalog(self) -> str | None:
-        for ds in self._data_store.defined_data_sources:
-            if ds.database_catalog:
-                return ds.database_catalog
-
-        return None
-
-    @property
-    def schema(self) -> str | None:
-        for ds in self._data_store.defined_data_sources:
-            if ds.database_schema:
-                return ds.database_schema
-
-        return None
-
-    @property
-    def prompt(self) -> QueryPromptFactory:
+    def prompt(self) -> str:
         return DataSourceRecipe.PROMPTS[self._data_store.driver_class_type]
+
+    def query_friendly_name(self, dataset_name: str) -> str:
+        return DataSourceRecipe.FORMAT_TABLE_NAME[self._data_store.driver_class_type](
+            dataset_name.split(".")
+        )
 
     @property
     def data_store(self) -> ExternalDataStore:
@@ -1333,7 +1458,7 @@ class DataSourceRecipe(BaseRecipe):
 
     async def preview_datasource(
         self, dataset: ExternalDataSource, preview_limit: int = 1000
-    ) -> DataFrameWrapper:
+    ) -> RunSqlResponse:
         """Preview the first `preview_limit` rows of a datasource (behind the hood queries and previews data.)
 
         Args:
@@ -1341,11 +1466,11 @@ class DataSourceRecipe(BaseRecipe):
             preview_limit (int, optional): The maximum number of rows to return. Defaults to 1000.
 
         Returns:
-            DataFrameWrapper: The first preview_limit rows.
+            RetrievePreviewResponse: The first preview_limit rows.
         """
         await self._ensure_recipe_initialized()
 
-        dataset_identifier = self.prompt.adapt_table_path(dataset.path)
+        dataset_identifier = self.query_friendly_name(dataset.path)
         await self.set_query(
             f"SELECT * FROM {dataset_identifier} LIMIT {preview_limit}"
         )
@@ -1530,12 +1655,15 @@ class DatasetSparkRecipe(BaseRecipe):
         await self._set_large_spark_instance_size()
 
     @property
-    def prompt(self) -> QueryPromptFactory:
-        return SparkPromptFactory()
+    def prompt(self) -> str:
+        return SYSTEM_PROMPT_SPARK_SQL
+
+    def query_friendly_name(self, dataset_name: str) -> str:
+        return f"`{dataset_name}`"
 
     async def preview_dataset(
         self, dataset: Dataset, preview_limit: int = 1000
-    ) -> DataFrameWrapper:
+    ) -> RunSqlResponse:
         """Preview the first `preview_limit` rows of a dataset (behind the hood queries and previews data.)
 
         Args:
@@ -1543,7 +1671,7 @@ class DatasetSparkRecipe(BaseRecipe):
             preview_limit (int, optional): The maximum number of rows to return. Defaults to 1000.
 
         Returns:
-            DataFrameWrapper: The first preview_limit rows.
+            RetrievePreviewResponse: The first preview_limit rows.
         """
         await self.set_query(f"SELECT * FROM `{dataset.name}` LIMIT {preview_limit}")
         return await self.retrieve_preview()
@@ -1569,7 +1697,7 @@ class DataRobotOperator(DatabaseOperator[NoDatabaseCredentials]):
         logger.debug("Running SQL on Recipe.", extra={"sql": sql_query})
         await self.recipe.set_query(sql_query)
         logger.debug("Set query SQL, awaiting results.", extra={"sql": sql_query})
-        return await self.recipe.retrieve_preview(timeout_seconds=timeout)
+        return (await self.recipe.retrieve_preview(timeout_seconds=timeout)).response
 
     async def execute_query(
         self,
@@ -1620,10 +1748,8 @@ class DataRobotOperator(DatabaseOperator[NoDatabaseCredentials]):
     def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
         return ChatCompletionSystemMessageParam(
             role="system",
-            content=self.recipe.prompt.prompt_for_datasource(
-                catalog=self.recipe.catalog, schema=self.recipe.schema
-            ),
+            content=self.recipe.prompt,
         )
 
     def query_friendly_name(self, dataset_name: str) -> str:
-        return self.recipe.prompt.adapt_table_path(dataset_name)
+        return self.recipe.query_friendly_name(dataset_name)

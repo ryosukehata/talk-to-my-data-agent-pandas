@@ -82,6 +82,29 @@ app_source_args = {
 app_resource_name: str = f"Data Analyst Application [{PROJECT_NAME}]"
 
 
+def _deduplicate_files_by_destination(
+    source_files: Sequence[Tuple[str, str]],
+) -> List[Tuple[str, str]]:
+    unique_files: dict[str, Tuple[str, str]] = {}
+    conflicting_destinations: set[str] = set()
+
+    for source_path, destination_path in source_files:
+        existing_file = unique_files.get(destination_path)
+        if existing_file is None:
+            unique_files[destination_path] = (source_path, destination_path)
+            continue
+        if existing_file[0] != source_path:
+            conflicting_destinations.add(destination_path)
+
+    if conflicting_destinations:
+        duplicates = ", ".join(sorted(conflicting_destinations))
+        raise ValueError(
+            f"Duplicate application source destination paths: {duplicates}"
+        )
+
+    return list(unique_files.values())
+
+
 def _prep_metadata_yaml(
     runtime_parameter_values: Sequence[
         datarobot.ApplicationSourceRuntimeParameterValueArgs
@@ -126,13 +149,8 @@ def get_app_files(
 
     # Get all .py files from utils directory
     utils_files = [
-        (str(PROJECT_ROOT / f"utils/{f.name}"), f"utils/{f.name}")
-        for f in (PROJECT_ROOT / "utils").glob("*.py")
-        if f.is_file()
-    ]
-    utils_files += [
-        (str(f), f"utils/customize/{f.relative_to(PROJECT_ROOT / 'utils/customize')}")
-        for f in (PROJECT_ROOT / "utils/customize").glob("**/*.py")
+        (f.as_posix(), f.relative_to(PROJECT_ROOT).as_posix())
+        for f in (PROJECT_ROOT / "utils").glob("**/*.py")
         if f.is_file()
     ]
 
@@ -188,4 +206,4 @@ def get_app_files(
             )
         )
 
-    return source_files
+    return _deduplicate_files_by_destination(source_files)

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import copy
 import functools
 import inspect
 import json
@@ -30,6 +31,7 @@ from typing import (
     Any,
     AsyncGenerator,
     Callable,
+    Literal,
     TypeVar,
     cast,
 )
@@ -368,13 +370,14 @@ async def register_remote_datasets(
     for dataset in datasets:
         with use_user_token(request):
             preview = await recipe.preview_dataset(dataset)
-        analyst_dataset = AnalystDataset(name=dataset.name, data=preview)
+        analyst_dataset = AnalystDataset(name=dataset.name, data=preview.response)
 
         await analyst_db.register_dataset(
             analyst_dataset,
             InternalDataSourceType.REMOTE_REGISTRY,
             file_size=0,
             external_id=dataset.id,
+            original_column_types=preview.original_types,
             clobber=True,
         )
 
@@ -460,7 +463,7 @@ async def register_datasource(
         recipe = await DataSourceRecipe.load_or_create(analyst_db, data_store_id)
         for ds in datasources:
             preview = await recipe.preview_datasource(ds)
-            analyst_dataset = AnalystDataset(name=ds.path, data=preview)
+            analyst_dataset = AnalystDataset(name=ds.path, data=preview.response)
 
             await analyst_db.register_dataset(
                 analyst_dataset,
@@ -470,6 +473,7 @@ async def register_datasource(
                 file_size=0,
                 external_id=None,
                 clobber=True,
+                original_column_types=preview.original_types,
             )
 
 
@@ -1340,9 +1344,20 @@ async def run_charts(
             request, token_tracker=token_tracker, telemetry_json=telemetry_json
         )
         return chart_result
-    except ValidationError:
+    except ValidationError as e:
+        logger.error(f"Failed to parse LLM response for charts: {e}")
+        user_friendly_error = ValueError(
+            "Unable to generate charts for this analysis. "
+            "The data structure may not be suitable for visualization. "
+            "The analysis results are still available."
+        )
         return RunChartsResult(
-            status="error", metadata=RunAnalysisResultMetadata(duration=0, attempts=1)
+            status="error",
+            metadata=RunAnalysisResultMetadata(
+                duration=0,
+                attempts=1,
+                exception=AnalysisError.from_value_error(user_friendly_error),
+            ),
         )
     except MaxReflectionAttempts as e:
         return RunChartsResult(
@@ -1446,6 +1461,33 @@ async def get_business_analysis(
             metadata=metadata,
         )
 
+    except ValidationError as e:
+        logger.error(f"Failed to parse LLM response for business analysis: {e}")
+        user_friendly_error = ValueError(
+            "Unable to generate business insights for this analysis. "
+            "The analysis results are still available. "
+            "Try simplifying your question or checking your data."
+        )
+        return GetBusinessAnalysisResult(
+            status="error",
+            metadata=GetBusinessAnalysisMetadata(
+                exception=AnalysisError.from_value_error(user_friendly_error)
+            ),
+            additional_insights="",
+            follow_up_questions=[],
+            bottom_line="",
+        )
+    except ValueError as e:
+        logger.error(f"ValueError during business analysis generation: {e}")
+        return GetBusinessAnalysisResult(
+            status="error",
+            metadata=GetBusinessAnalysisMetadata(
+                exception=AnalysisError.from_value_error(e)
+            ),
+            additional_insights="",
+            follow_up_questions=[],
+            bottom_line="",
+        )
     except Exception as e:
         msg = type(e).__name__ + f": {str(e)}"
         logger.error(f"Error in get_business_analysis: {msg}")
@@ -1462,12 +1504,20 @@ async def get_business_analysis(
 @telemetry.trace
 async def _run_analysis(
     request: RunAnalysisRequest,
-    analyst_db: AnalystDB,
+    analyst_db: AnalystDB | None = None,
     exception_history: list[InvalidGeneratedCode] | None = None,
     token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
+    analysis_context: RunCompleteAnalysisRequestContext | None = None,
 ) -> RunAnalysisResult:
     start_time = datetime.now()
+
+    if analysis_context:
+        analyst_db = analysis_context.analyst_db
+        token_tracker = analysis_context.token_tracker
+
+    if analyst_db is None:
+        raise ValueError("analyst_db is required")
 
     if not request.dataset_names:
         raise ValueError(VALUE_ERROR_MESSAGE)
@@ -1475,6 +1525,16 @@ async def _run_analysis(
     if exception_history is None:
         exception_history = []
     logger.info(f"Running analysis (attempt {len(exception_history)})")
+
+    if (
+        analysis_context
+        and analysis_context.assistant_message_id
+        and analysis_context.assistant_message
+    ):
+        analysis_context.assistant_message.step_value = "GENERATING_QUERY"
+        analysis_context.assistant_message.step_reattempt = len(exception_history)
+        analysis_context.stage_message_update()
+
     code = await _generate_run_analysis_python_code(
         request,
         analyst_db,
@@ -1484,6 +1544,16 @@ async def _run_analysis(
         telemetry_json=telemetry_json,
     )
     logger.info("Code generated, preparing execution")
+
+    if (
+        analysis_context
+        and analysis_context.assistant_message_id
+        and analysis_context.assistant_message
+    ):
+        analysis_context.assistant_message.step_value = "RUNNING_QUERY"
+        analysis_context.assistant_message.step_reattempt = len(exception_history)
+        analysis_context.stage_message_update()
+
     dataframes: dict[str, pd.DataFrame] = {}
 
     for dataset_name in request.dataset_names:
@@ -1552,9 +1622,10 @@ async def _run_analysis(
 @log_api_call
 async def run_analysis(
     request: RunAnalysisRequest,
-    analyst_db: AnalystDB,
+    analyst_db: AnalystDB | None = None,
     token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
+    analysis_context: RunCompleteAnalysisRequestContext | None = None,
 ) -> RunAnalysisResult:
     """Execute analysis workflow on datasets."""
     logger.debug("Entering run_analysis")
@@ -1565,6 +1636,7 @@ async def run_analysis(
             analyst_db=analyst_db,
             token_tracker=token_tracker,
             telemetry_json=telemetry_json,
+            analysis_context=analysis_context,
         )
     except MaxReflectionAttempts as e:
         return RunAnalysisResult(
@@ -1573,6 +1645,21 @@ async def run_analysis(
                 duration=e.duration,
                 attempts=len(e.exception_history) if e.exception_history else 0,
                 exception=AnalysisError.from_max_reflection_exception(e),
+            ),
+        )
+    except ValidationError as e:
+        logger.error(f"Failed to parse LLM response for analysis: {e}")
+        user_friendly_error = ValueError(
+            "Unable to complete the analysis. "
+            "This could be due to data quality issues, complex dataset structure, or the question being too complex. "
+            "Try simplifying your question or verifying your data quality."
+        )
+        return RunAnalysisResult(
+            status="error",
+            metadata=RunAnalysisResultMetadata(
+                duration=0,
+                attempts=1,
+                exception=AnalysisError.from_value_error(user_friendly_error),
             ),
         )
     except ValueError as e:
@@ -1611,12 +1698,25 @@ async def _generate_database_analysis_code(
 
     # Convert dictionary data structure to list of columns for all tables
     dictionaries = [
-        await analyst_db.get_data_dictionary(name) for name in request.dataset_names
+        (
+            await analyst_db.get_data_dictionary(name),
+            await analyst_db.get_dataset_metadata(name),
+        )
+        for name in request.dataset_names
     ]
-    for dictionary in dictionaries:
+
+    for dictionary, metadata in dictionaries:
         if dictionary:
+            if metadata and metadata.original_column_types:
+                for column in dictionary.column_descriptions:
+                    if original_type := metadata.original_column_types.get(
+                        column.column
+                    ):
+                        column.data_type = original_type
             dictionary.name = database.query_friendly_name(dictionary.name)
-    all_tables_info = [d.model_dump(mode="json") for d in dictionaries if d is not None]
+    all_tables_info = [
+        d.model_dump(mode="json") for d, m in dictionaries if d is not None
+    ]
 
     # Get sample data for all tables
     all_samples = []
@@ -1671,15 +1771,23 @@ async def _generate_database_analysis_code(
         with telemetry.time(
             f"{_generate_database_analysis_code.__module__}.{_generate_database_analysis_code.__qualname__}.llm_call"
         ):
-            (
-                completion,
-                completion_org,
-            ) = await client.chat.completions.create_with_completion(
-                response_model=DatabaseAnalysisCodeGeneration,
-                model=ALTERNATIVE_LLM_BIG,
-                temperature=0.1,
-                messages=messages,
-            )
+            try:
+                (
+                    completion,
+                    completion_org,
+                ) = await client.chat.completions.create_with_completion(
+                    response_model=DatabaseAnalysisCodeGeneration,
+                    model=ALTERNATIVE_LLM_BIG,
+                    temperature=0.1,
+                    messages=messages,
+                )
+            except ValidationError as e:
+                logger.error(f"LLM returned invalid database analysis response: {e}")
+                raise ValueError(
+                    "Unable to analyze your data. "
+                    "This could be due to data quality issues, complex dataset structure, or the question being too complex. "
+                    "Try simplifying your question or checking your data."
+                ) from e
     association_id = completion_org.datarobot_moderations["association_id"]
     logger.info(f"Association ID: {association_id}")
 
@@ -1717,7 +1825,6 @@ async def _run_database_analysis(
     )
 
     sql_code = await _generate_database_analysis_code(
-        database,
         database,
         request,
         analyst_db,
@@ -1794,6 +1901,61 @@ class AnalysisGenerationError:
     original_error: BaseException | None = None
 
 
+@dataclass
+class RunCompleteAnalysisRequestContext:
+    chat_request: ChatRequest
+    request: Request | None
+    data_source: DataSourceType
+    dataset_metadata: list[DatasetMetadata]
+    analyst_db: AnalystDB
+    chat_id: str
+    user_message_id: str
+    enable_chart_generation: bool
+    enable_business_insights: bool
+    token_tracker: TokenUsageTracker
+
+    user_message: AnalystChatMessage | None = None
+    assistant_message_id: str | None = None
+    assistant_message: AnalystChatMessage | None = None
+    database: DatabaseOperator[Any] | None = None
+    recipe: BaseRecipe | None = None
+
+    message_update_task: asyncio.Task[Any] | None = None
+
+    def stage_message_update(
+        self, target: Literal["assistant", "user"] = "assistant"
+    ) -> None:
+        target_message_id = (
+            self.assistant_message_id if target == "assistant" else self.user_message_id
+        )
+        target_message = copy.copy(
+            self.assistant_message if target == "assistant" else self.user_message
+        )
+        if target_message:
+            target_message.step = copy.copy(target_message.step)
+
+        if not target_message or not target_message_id:
+            return
+
+        previous_task = self.message_update_task
+
+        async def update_task() -> None:
+            if previous_task:
+                await previous_task
+
+            await self.analyst_db.update_chat_message(
+                message_id=target_message_id,
+                message=target_message,
+            )
+
+        self.message_update_task = asyncio.create_task(update_task())
+
+    async def await_message_update(self) -> None:
+        if self.message_update_task:
+            await self.message_update_task
+            self.message_update_task = None
+
+
 async def execute_business_analysis_and_charts(
     analysis_result: RunAnalysisResult | RunDatabaseAnalysisResult,
     enhanced_message: str,
@@ -1855,8 +2017,22 @@ async def run_complete_analysis(
     telemetry_json: dict[str, Any] | None = None,
 ) -> AsyncGenerator[Component | AnalysisGenerationError, None]:
     datasets_names = [ds.name for ds in dataset_metadata]
+    token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
+    analysis_context = RunCompleteAnalysisRequestContext(
+        chat_request=chat_request,
+        request=request,
+        data_source=data_source,
+        dataset_metadata=dataset_metadata,
+        analyst_db=analyst_db,
+        chat_id=chat_id,
+        user_message_id=message_id,
+        enable_chart_generation=enable_chart_generation,
+        enable_business_insights=enable_business_insights,
+        token_tracker=token_tracker,
+    )
 
     user_message = await analyst_db.get_chat_message(message_id=message_id)
+    analysis_context.user_message = user_message
     if user_message is None or user_message.role != "user":
         yield AnalysisGenerationError("Message not found")
 
@@ -1865,13 +2041,15 @@ async def run_complete_analysis(
     if telemetry_json is not None:
         telemetry_json["chat_id"] = chat_id
         telemetry_json["chat_seq"] = len(chat_request.messages)
-        telemetry_json["data_source"] = data_source.value
+        telemetry_json["data_source"] = (
+            data_source.value
+            if isinstance(data_source, InternalDataSourceType)
+            else data_source.name
+        )
         telemetry_json["datasets_names"] = datasets_names
         telemetry_json["enable_chart_generation"] = enable_chart_generation
         telemetry_json["enable_business_insights"] = enable_business_insights
     try:
-        token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
-
         logger.info("Getting rephrased question...")
         enhanced_message = await rephrase_message(
             chat_request, token_tracker=token_tracker, telemetry_json=telemetry_json
@@ -1898,8 +2076,20 @@ async def run_complete_analysis(
         components=[EnhancedQuestionGeneration(enhanced_user_message=enhanced_message)],
         in_progress=True,
     )
+    should_test_connection = (
+        data_source == InternalDataSourceType.DATABASE
+        or data_source == InternalDataSourceType.REMOTE_REGISTRY
+        or isinstance(data_source, ExternalDataStoreNameDataSourceType)
+    )
+    assistant_message.step_value = (
+        "TESTING_CONNECTION" if should_test_connection else "GENERATING_QUERY"
+    )
+    analysis_context.assistant_message = assistant_message
 
-    await analyst_db.add_chat_message(chat_id=chat_id, message=assistant_message)
+    analysis_context.assistant_message_id = await analyst_db.add_chat_message(
+        chat_id=chat_id,
+        message=assistant_message,
+    )
 
     user_message.in_progress = False
     await analyst_db.update_chat_message(
@@ -1930,7 +2120,7 @@ async def run_complete_analysis(
             )
         elif isinstance(data_source, ExternalDataStoreNameDataSourceType):
             logger.info("Running DataStore DataWrangling analysis")
-            data_store_id = DataSourceRecipe.get_id_for_data_store_canonical_name(
+            data_store_id = await DataSourceRecipe.get_id_for_data_store_canonical_name(
                 data_source.friendly_name
             )
             if not data_store_id:
@@ -1980,6 +2170,7 @@ async def run_complete_analysis(
                 analyst_db,
                 database_override=recipe.as_database_operator(),
                 token_tracker=token_tracker,
+                telemetry_json=telemetry_json,
             )
 
         else:
@@ -2019,6 +2210,7 @@ async def run_complete_analysis(
                     analyst_db,
                     database_override=recipe.as_database_operator(),
                     token_tracker=token_tracker,
+                    telemetry_json=telemetry_json,
                 )
             elif all(m.external_id is None for m in dataset_metadata):
                 logging.info("Running local analysis")
@@ -2027,14 +2219,16 @@ async def run_complete_analysis(
                         dataset_names=datasets_names,
                         question=enhanced_message,
                     ),
-                    analyst_db,
-                    token_tracker,
+                    analysis_context=analysis_context,
+                    token_tracker=token_tracker,
+                    telemetry_json=telemetry_json,
                 )
             else:
                 raise ValueError(
                     "Cannot run analysis on a mix of local and remote datasets."
                 )
 
+        await analysis_context.await_message_update()
         log_memory()
         logger.info("Getting analysis result done")
 

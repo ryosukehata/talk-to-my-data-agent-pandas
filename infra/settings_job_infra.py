@@ -1,5 +1,4 @@
 import hashlib
-import os
 import textwrap
 from pathlib import Path
 from typing import Sequence, Tuple
@@ -15,15 +14,11 @@ from datarobot_pulumi_utils.schema.guardrails import (
 )
 
 from utils.custom_job_helper import (
-    create_or_update_custom_job_schedule,
     poll_custom_job_run_status,
     run_custom_job,
 )
 
 from .settings_main import PROJECT_ROOT
-
-# scheduler configuration
-SCHEDULER_HOUR = int(os.environ.get("SCHEDULER_HOUR", "21"))
 
 # guardrails
 
@@ -159,30 +154,6 @@ def get_job_files(
     ]
 
     return source_files_tuples, content_hash
-
-
-def create_job_schedule(
-    custom_job_id: str,
-) -> str:
-    """
-    Create a schedule for a DataRobot custom job.
-
-    Run at the configured hour on weekdays.
-
-    Args:
-        custom_job_id (str): The ID of the custom job.
-
-    Returns:
-        str: The ID of the created schedule.
-    """
-    return create_or_update_custom_job_schedule(
-        custom_job_id,
-        minute=[0],
-        hour=[SCHEDULER_HOUR],
-        day_of_month=["*"],
-        month=["*"],
-        day_of_week=[0, 1, 2, 3, 4],  # Sunday–Thursday UTC
-    )
 
 
 def run_job_once(custom_job_id: str) -> str:
