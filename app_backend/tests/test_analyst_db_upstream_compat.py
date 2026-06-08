@@ -11,6 +11,7 @@ os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 
 from utils.analyst_db import (
     AnalystDB,
+    BaseDuckDBHandler,
     DatasetMetadata,
     DatasetType,
     InternalDataSourceType,
@@ -140,3 +141,46 @@ async def _assert_get_data_dictionary_missing_dataset_logs_debug(caplog) -> None
         and "Failed to get data dictionary sales" in record.getMessage()
         for record in caplog.records
     )
+
+
+class MinimalDuckDBHandler(BaseDuckDBHandler):
+    async def _initialize_child(self) -> None:
+        pass
+
+
+class FakeDuckDBConnection:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def test_write_connection_closes_connection_on_exception(tmp_path, monkeypatch) -> None:
+    asyncio.run(
+        _assert_write_connection_closes_connection_on_exception(tmp_path, monkeypatch)
+    )
+
+
+async def _assert_write_connection_closes_connection_on_exception(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    connections: list[FakeDuckDBConnection] = []
+
+    def connect(*args, **kwargs) -> FakeDuckDBConnection:
+        connection = FakeDuckDBConnection()
+        connections.append(connection)
+        return connection
+
+    monkeypatch.setattr("utils.analyst_db.duckdb.connect", connect)
+    handler = MinimalDuckDBHandler(db_path=tmp_path)
+
+    try:
+        async with handler._write_connection():
+            raise RuntimeError("write failed")
+    except RuntimeError:
+        pass
+
+    assert len(connections) == 1
+    assert connections[0].closed is True

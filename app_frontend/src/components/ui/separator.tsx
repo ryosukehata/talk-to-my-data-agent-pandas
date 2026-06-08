@@ -25,4 +25,9 @@ function Separator({
   );
 }
 
-export { Separator };
+const ORIENTATIONS = {
+  horizontal: 'horizontal',
+  vertical: 'vertical',
+} as const;
+
+export { Separator, ORIENTATIONS };

@@ -118,7 +118,7 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
                           key={selectedValue}
                           className={cn(singleSelectVariants({ variant }))}
                           style={{ animationDuration: `${animation}s` }}
-                          variant="secondary"
+                          type="outline"
                         >
                           <TruncatedText>{option?.label}</TruncatedText>
                           {option?.postfix && <span className="ml-1">{option?.postfix}</span>}

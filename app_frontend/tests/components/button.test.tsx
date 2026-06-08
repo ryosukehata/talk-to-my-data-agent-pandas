@@ -18,17 +18,28 @@ describe('Button Component', () => {
 
     expect(button).toHaveClass('bg-destructive');
 
-    rerender(<Button variant="outline">Outline</Button>);
-    expect(screen.getByRole('button', { name: /outline/i })).toHaveClass('border-button');
+    rerender(<Button variant="primary">Primary</Button>);
+    expect(screen.getByRole('button', { name: /primary/i })).toHaveClass('bg-primary');
 
     rerender(<Button variant="secondary">Secondary</Button>);
-    expect(screen.getByRole('button', { name: /secondary/i })).toHaveClass('bg-secondary');
+    expect(screen.getByRole('button', { name: /secondary/i })).toHaveClass('bg-background');
 
     rerender(<Button variant="ghost">Ghost</Button>);
-    expect(screen.getByRole('button', { name: /ghost/i })).toHaveClass('hover:bg-accent');
+    expect(screen.getByRole('button', { name: /ghost/i })).toHaveClass('hover:bg-input');
 
     rerender(<Button variant="link">Link</Button>);
     expect(screen.getByRole('button', { name: /link/i })).toHaveClass('text-primary');
+  });
+
+  test('keeps legacy variants as aliases for existing screens', () => {
+    const { rerender } = render(<Button variant="default">Default</Button>);
+    expect(screen.getByRole('button', { name: /default/i })).toHaveClass('bg-primary');
+
+    rerender(<Button variant="outline">Outline</Button>);
+    expect(screen.getByRole('button', { name: /outline/i })).toHaveClass('bg-background');
+
+    rerender(<Button variant="secondary-round">Round</Button>);
+    expect(screen.getByRole('button', { name: /round/i })).toHaveClass('rounded-full');
   });
 
   test('renders different sizes correctly', () => {
@@ -44,7 +55,10 @@ describe('Button Component', () => {
     expect(screen.getByRole('button', { name: /large/i })).toHaveClass('h-10');
 
     rerender(<Button size="icon">Icon</Button>);
-    expect(screen.getByRole('button', { name: /icon/i })).toHaveClass('size-9');
+    expect(screen.getByRole('button', { name: /icon/i })).toHaveClass('h-9 w-9');
+
+    rerender(<Button size="icon-sm">Icon Small</Button>);
+    expect(screen.getByRole('button', { name: /icon small/i })).toHaveClass('h-5 w-5');
   });
 
   test('applies custom className', () => {

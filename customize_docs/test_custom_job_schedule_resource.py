@@ -11,6 +11,7 @@ import pytest
 def settings_job_infra(monkeypatch: pytest.MonkeyPatch):
     from datarobot_pulumi_utils.schema import exec_envs
 
+    monkeypatch.setenv("PULUMI_STACK_CONTEXT", "test-stack")
     monkeypatch.setattr(
         exec_envs.RuntimeEnvironment,
         "id",
