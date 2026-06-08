@@ -42,7 +42,7 @@
 | `v0.3.22` | `codex/upstream-sync-v0.3.22` | 取り込む | frontend select UI, `utils/base_telemetry.py` | 実マージでは競合なし。UI差分のためfrontend検証を実施。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped; `npm --prefix app_frontend test`: 103 passed; `npm --prefix app_frontend run lint`: passed |
 | `v0.3.23` | `codex/upstream-sync-v0.3.23` | 取り込む | `infra/__main__.py`, `requirements.txt`, dataset handling | 実マージでは競合なし。`pulumi-datarobot>=0.10.22` 前提の `app_source.resources` 参照へ変更。ローカル解決で `ApplicationSource.resources` が存在することを確認。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped; `uv run ruff check infra/__main__.py utils/datarobot_dataset_handler.py`: passed |
 | `v0.4.24` | `codex/upstream-sync-v0.4.24` | 一部取り込む | data connection層の土台、React chat message metadata、依存関係、schema補助差分 | `git merge --no-commit --no-ff v0.4.24` で `frontend/01_connect_and_explore.py`, `frontend/02_chat_with_data.py`, `utils/analyst_db.py`, `utils/api.py`, `utils/data_connections/database/database_implementations.py`, `utils/rest_api.py` が競合。Streamlit は破棄方針のため `frontend/*` 差分は除外。自動適用できた差分から、既存importを壊す `utils/database_helpers.py` 削除、`utils/datarobot_dataset_handler.py` 移動、`notebooks/testing.ipynb` 削除も除外。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped; `npm --prefix app_frontend test`: 103 passed; `npm --prefix app_frontend run lint`: passed; `uv run ruff check utils/data_connections utils/schema.py utils/credentials.py infra/settings_app_infra.py`: passed |
-| `v0.5.0` 以降 | 未作成 | 別判断 | `v0.4.24` の再編後に積まれた追加差分 | `v0.4.24` の手動移植が完了してから、タグ単位で再評価する。 | 未実行 |
+| `v0.5.1` | `codex/upstream-sync-v0.5.1` | 取り込む | DataRobot CLI設定、Taskfile、quickstartのstack名省略対応、READMEのCLI quickstart化、DataSourceSelectorの説明文改善 | `v0.4.24` タグは履歴上の祖先ではないため、`v0.4.24..v0.5.1` の差分を手動適用。polars移植なし。upstream READMEの未閉じコードフェンスは本PRで補正する。 | `npm --prefix app_frontend test`: 104 passed; `npm --prefix app_frontend run lint`: passed; `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 43 passed, 2 skipped; `uv run ruff check quickstart.py`: passed; YAML parse + `task --list --sort none`: passed |
 
 ## `v0.4.24` の次アクション
 
@@ -90,3 +90,64 @@
 - Direct database経路は既に `telemetry_json` を渡していたため、External Data Store と Remote Registry の `database_override` 経路に追加する。
 - External Data Store は `ExternalDataStoreNameDataSourceType` で `.value` を持たないため、telemetryの `data_source` には `.name` を使う。Internal sourceは従来どおり `.value` を使う。
 - 2026-06-08: `run_database_analysis()` の内側も確認し、`_run_database_analysis()` から `_generate_database_analysis_code()` への呼び出しで `database` が余分に1つ渡されていた問題を修正する。`run_database_analysis` / `_run_database_analysis` / `_generate_database_analysis_code` の全呼び出しに `telemetry_json` keyword があることをASTテストで固定する。
+
+## v0.5.x 以降の更新計画
+
+### 確認日
+
+- 2026-06-08
+- `git ls-remote --tags --refs upstream 'refs/tags/v*'` で、`v0.4.24` の次は `v0.5.0`、0系の最新は `v0.5.3`。
+- `v11.5.0` は upstream CHANGELOG 上で「validated DataRobot platform versions に合わせる」ための採番変更。`v0.5.3` までを先に取り込み、その後 `v11.5.0+` は別フェーズで評価する。
+
+### 履歴上の注意点
+
+- 現在のこちら側の履歴では `v0.4.24` タグ自体は祖先に含まれていない。`v0.4.24` は pandas 前提を維持するために必要差分のみ手動移植している。
+- この状態で `git merge v0.5.0` を直接実行すると、`v0.4.24` で見送った polars 化、Streamlit 変更、`utils` 全面置換が再び衝突する。
+- `v0.4.24` の全PRが `dev` に入った後、次のどちらかを選ぶ。
+  - 推奨: `dev` から `v0.4.24` に対する ours merge ベースラインを1PRで作り、履歴上も「v0.4.24 までは判断済み」とする。その後 `v0.5.0` 以降をタグ単位で通常マージする。
+  - 代替: `v0.4.24..v0.5.0` の差分を cherry-pick / patch 移植する。履歴は単純だが、以降のタグでも同じ問題が残るため、継続同期には不向き。
+
+### pandas 維持ルール
+
+- upstream の polars 移植は pandas に再移植しない。
+- `utils/api.py`, `utils/rest_api.py`, `utils/analyst_db.py`, `utils/data_cleansing_helpers.py`, `utils/schema.py` の公開挙動は `pd.DataFrame` 前提を維持する。
+- upstream の修正が polars 実装に含まれる場合は、挙動だけを pandas 実装へ手動移植する。
+- `execute_python` の allowed modules に `polars` を追加しない。既存テスト `test_run_analysis_updates_execution_steps_and_preserves_pandas` の検証を継続する。
+
+### PR分割案
+
+| フェーズ | タグ/範囲 | 取り込み方針 | 主な対象 | 注意点 |
+| --- | --- | --- | --- | --- |
+| 0 | baseline | `v0.4.24` ours merge または同等の履歴整理 | `CHANGELOG.md`, docs only | `v0.4.24` の未採用差分を再混入させない。 |
+| 1 | `v0.5.0` | 取り込む | `DataSourceSelector.tsx`, `CHANGELOG.md`, `README.md` | UI文言改善のみ。polars対象なし。 |
+| 2 | `v0.5.1` | 原則取り込むが設定系を確認 | `.datarobot/cli/*`, `Taskfile.yaml`, `quickstart.py`, `README.md` | CLI/Taskfile導入が既存Pulumi/CI/ローカル運用と衝突しないか確認。 |
+| 3 | `v0.5.2` | 分割して評価 | frontend theme/ui, `utils/analyst_db.py`, `requirements.txt`, `pytest.ini` | `aiologic.Lock` や DB persist 競合修正は pandas維持で必要部分だけ移植。 |
+| 4 | `v0.5.3` | frontend大変更とbackend小修正を分ける | light theme, sidebar/ui registry, chat persistence, `utils/api.py`, `utils/data_cleansing_helpers.py` | UI刷新は既存カスタムUI/Report Builder/Prompt Template と衝突しやすい。data cleansing の polars 変更は取り込まない。 |
+| 5 | `v11.5.0+` | 別フェーズ | core package再編、FastAPI router分割、PySDK互換、DataBricks/scoped token | `utils -> core/src/core` の大規模移動は単純マージしない。専用設計PRで判断する。 |
+
+### TDD / テスト方針
+
+- 各PRの最初に、取り込む上流挙動を1つ以上の失敗する回帰テストで固定してから実装する。
+- backend 共通テスト:
+  - `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`
+- pandas 維持テスト:
+  - `app_backend/tests/test_analyst_db_upstream_compat.py`
+  - `app_backend/tests/test_rest_api_v0424_compat.py`
+  - `app_backend/tests/test_api_analysis_execution_v0424_compat.py`
+  - `app_backend/tests/test_api_validation_errors_v0424_compat.py`
+- frontend UI差分のあるPR:
+  - `npm --prefix app_frontend test`
+  - `npm --prefix app_frontend run lint`
+  - 必要に応じて `pnpm --dir app_frontend dev` で起動し、ブラウザで Add Data modal / Settings / Chat / Data page を確認する。
+- infra/CLI差分のあるPR:
+  - `uv run ruff check infra quickstart.py`
+  - `task --list` または `task --dry` 相当で Taskfile の構文確認を行う。
+  - `.datarobot/cli/state.yaml` などローカル状態ファイルが追跡対象外であることを確認する。
+
+## v0.5.1 実装メモ
+
+- 2026-06-08: `codex/upstream-sync-v0.5.1` を `dev` (`7a0eb57`) から作成。`v0.4.24` は丸ごとマージせず必要差分のみ移植済みのため、`git merge v0.5.1` は使わず `v0.4.24..v0.5.1` の差分を手動適用する。
+- `DataSourceSelector` は upstream `v0.5.0` の4つの説明文を表示する。先に `app_frontend/tests/components/DataSourceSelector.test.tsx` を追加し、説明文が未表示で失敗することを確認してから実装した。
+- `v0.5.1` の DataRobot CLI quickstart と Taskfile 構成を追加する。`.datarobot/cli/state.yaml` はローカル状態として `.gitignore` に追加する。
+- `quickstart.py` は `stack_name` を任意引数にし、未指定時に対話入力する upstream 挙動を移植する。`app_backend/tests/test_quickstart_v051.py` で引数パースを固定する。
+- READMEは upstream のCLI優先構成へ更新するが、upstream `v0.5.1` にある未閉じコードフェンスはこのリポジトリ側で補正する。
