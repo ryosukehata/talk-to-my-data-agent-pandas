@@ -174,3 +174,12 @@ v0.5.3 全PRが `dev` に入った後に確認する。
 - `core/` package 再編の先行取り込み。
 - upstream #26 の custom dictionary 全面採用。
 - legacy Streamlit の機能改修。
+
+## 実装メモ
+
+- 2026-06-08: `dev` が内容上 `v0.5.2` 済みであるため、`v0.5.2` は `ours` baseline merge として履歴に反映した。その上で upstream `v0.5.3` を通常 merge し、衝突箇所は upstream の light theme/sidebar 実装を優先しながら pandas 実装と既存 custom prompts / reports / templates 導線を維持した。
+- Frontend は v0.5.3 の `SidebarProvider`, `sheet`, `chat-light.svg`, chat draft persistence, UI primitive 更新を採用した。既存 fork 側の `Button` variant (`default`, `outline`, `secondaryRound`) と `testId` prop は互換 API として残した。
+- `AddDataModal` は upstream の `Loader2` loading icon に統一し、古い `loader.svg` 参照を削除した。
+- Backend cleansing は pandas 前提を維持したまま、`cleanse_dataframe()` の sample 上限を 500 行へ更新した。`data_cleansing_helpers` は Polars へ移植せず、先頭列だけ numeric conversion threshold を 100% にする upstream の誤変換対策を pandas 実装として採用した。
+- 追加テスト: `app_backend/tests/test_data_cleansing_v053_compat.py`。先頭列 ID の誤数値化防止と、sample 上限 500 行を検証する。
+- Test setup は v0.5.3 の responsive sidebar が `window.matchMedia` を使うため、`app_frontend/tests/setupTests.ts` に jsdom 用 mock を追加した。

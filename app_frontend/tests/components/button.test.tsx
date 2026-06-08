@@ -22,10 +22,10 @@ describe('Button Component', () => {
     expect(screen.getByRole('button', { name: /primary/i })).toHaveClass('bg-primary');
 
     rerender(<Button variant="secondary">Secondary</Button>);
-    expect(screen.getByRole('button', { name: /secondary/i })).toHaveClass('bg-background');
+    expect(screen.getByRole('button', { name: /secondary/i })).toHaveClass('bg-transparent');
 
     rerender(<Button variant="ghost">Ghost</Button>);
-    expect(screen.getByRole('button', { name: /ghost/i })).toHaveClass('hover:bg-input');
+    expect(screen.getByRole('button', { name: /ghost/i })).toHaveClass('hover:bg-sidebar-primary');
 
     rerender(<Button variant="link">Link</Button>);
     expect(screen.getByRole('button', { name: /link/i })).toHaveClass('text-primary');

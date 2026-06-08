@@ -49,6 +49,7 @@ def try_simple_numeric_conversion(
     series: pd.Series,
     sample_series: pd.Series,
     original_nulls: pd.Series,
+    column_index: int,
 ) -> tuple[bool, pd.Series, list[str]]:
     # 文字列の前後の空白を削除し、特殊文字（引用符や空白）を削除
     simple_cleaned = (
@@ -69,7 +70,10 @@ def try_simple_numeric_conversion(
 
     warnings = []
 
-    if simple_success_rate > 0.8:
+    # First column might be ids with alphanumerics
+    threshold = 1.0 if column_index == 0 else 0.9
+
+    if simple_success_rate >= threshold:
         warnings.append(
             gettext(
                 "Converted to numeric after removing spaces/quotes. Success rate: {simple_success_rate:.1%}"
@@ -169,6 +173,7 @@ def try_unit_conversion(
     series: pd.Series,
     sample_series: pd.Series,
     original_nulls: pd.Series,
+    column_index: int,
 ) -> tuple[bool, pd.Series, list[str]]:
     """
     Try to convert a series with units to numeric values, first testing on a sample.
@@ -211,8 +216,11 @@ def try_unit_conversion(
         sample_result
     )
 
-    if conversion_success_rate > 0.8:
-        # サンプル変換が成功した場合、検出されたパターンを使用して完全なデータセットを変換
+    # First column might be ids with alphanumerics
+    threshold = 1.0 if column_index == 0 else 0.9
+
+    if conversion_success_rate >= threshold:
+        # If sample conversion was successful, convert full dataset using detected patterns
         warnings.append(
             gettext(
                 "Converted to numeric with pattern handling. Success rate: {conversion_success_rate:.1%}"
@@ -235,8 +243,10 @@ def try_datetime_conversion(
     series: pd.Series,
     sample_series: pd.Series,
     original_nulls: pd.Series,
+    column_index: int,
 ) -> tuple[bool, pd.Series, list[str]]:
     # 日付への変換を試みる
+    del column_index
     warnings = []
 
     with suppress_datetime_warnings():
@@ -284,13 +294,17 @@ def try_datetime_conversion(
 
 
 def try_string_trim(
-    series: pd.Series, sample_series: pd.Series, original_nulls: pd.Series
+    series: pd.Series,
+    sample_series: pd.Series,
+    original_nulls: pd.Series,
+    column_index: int,
 ) -> tuple[bool, pd.Series, list[str]]:
     """
     Trim leading and trailing whitespace from string values.
     Only applies if whitespace trimming actually changes the data.
     """
     warnings = []
+    del original_nulls, column_index
 
     # pandasでは、str.strip() を使用して前後の空白を削除します。
     # NoneはNaNとして扱われ、そのまま残ります。
@@ -360,6 +374,9 @@ def process_column(
 
     if pd.api.types.is_string_dtype(df[column_name]):
         column_report.original_dtype = "string"
+
+        column_index = list(df.columns).index(column_name)
+
         conversions = [
             ("simple_clean", try_simple_numeric_conversion),
             ("unit_conversion", try_unit_conversion),
@@ -377,6 +394,7 @@ def process_column(
                     df[column_name],
                     sample_df[column_name],
                     original_nulls,
+                    column_index,
                 )
 
                 logger.debug(

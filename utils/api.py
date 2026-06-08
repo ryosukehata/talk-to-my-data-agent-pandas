@@ -1100,7 +1100,7 @@ async def cleanse_dataframe(dataset: AnalystDataset) -> CleansedDataset:
         raise ValueError(f"Dataset {dataset.name} is empty")
 
     df = dataset.to_df()
-    sample_df = df.sample(n=min(100, len(df)), random_state=42)
+    sample_df = df.sample(n=min(500, len(df)), random_state=42)
 
     results = []
     for col in df.columns:
