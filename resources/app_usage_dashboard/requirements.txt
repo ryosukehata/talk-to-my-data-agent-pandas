@@ -7,6 +7,6 @@ python-i18n==0.3.9
 PyYAML==6.0.2
 requests==2.32.2
 scikit-learn==1.6.1
-streamlit==1.44.1
+streamlit==1.54.0
 tenacity==8.2.3
 wordcloud==1.9.4 
