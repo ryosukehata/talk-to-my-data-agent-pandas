@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 
 import pandas as pd
@@ -29,8 +30,7 @@ def test_process_column_requires_full_numeric_success_for_first_column() -> None
     assert pd.isna(amount_series.iloc[-1])
 
 
-@pytest.mark.asyncio
-async def test_cleanse_dataframe_samples_up_to_500_rows(
+def test_cleanse_dataframe_samples_up_to_500_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DATAROBOT_API_TOKEN", "test-token")
@@ -56,6 +56,6 @@ async def test_cleanse_dataframe_samples_up_to_500_rows(
     df = pd.DataFrame({"value": range(700)})
     dataset = AnalystDataset(name="sample", data=DataFrameWrapper(df))
 
-    await api.cleanse_dataframe(dataset)
+    asyncio.run(api.cleanse_dataframe(dataset))
 
     assert captured_sample_sizes == [500]
