@@ -157,7 +157,9 @@ class FakeDuckDBConnection:
 
 
 def test_write_connection_closes_connection_on_exception(tmp_path, monkeypatch) -> None:
-    asyncio.run(_assert_write_connection_closes_connection_on_exception(tmp_path, monkeypatch))
+    asyncio.run(
+        _assert_write_connection_closes_connection_on_exception(tmp_path, monkeypatch)
+    )
 
 
 async def _assert_write_connection_closes_connection_on_exception(

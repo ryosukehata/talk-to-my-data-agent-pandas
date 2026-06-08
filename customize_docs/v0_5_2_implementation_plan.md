@@ -52,9 +52,27 @@ upstream `datarobot-community/talk-to-my-data-agent` の `v0.5.2` 差分を、pa
 - `npm --prefix app_frontend test`: 17 files / 111 tests passed
 - `npm --prefix app_frontend run lint`: passed with existing Fast Refresh warnings in `badge.tsx` / `button.tsx`
 - `npm --prefix app_frontend run build`: passed with existing `_dr_env.js`, Browserslist, chunk-size warnings
-- `uv run pytest app_backend/tests customize_docs -q`: 57 passed, 2 skipped
-- `uv run ruff check utils/analyst_db.py app_backend/tests/test_analyst_db_upstream_compat.py`: passed
-- `uv run ruff check frontend/01_connect_and_explore.py`: passed
+- `uv run pytest app_backend/tests customize_docs -q`: 59 passed, 2 skipped
+- `uv run ruff format --check .`: passed
+- `uv run ruff check .`: passed
+
+## PR #75 CI対応
+
+2026-06-08 に PR #75 の CI 失敗へ対応した。
+
+- Ruff format check が `app_backend/tests/test_analyst_db_upstream_compat.py` と `frontend/01_connect_and_explore.py` を未整形として検出したため、`ruff format` を適用した。
+- 新規 `python-unit-tests.yml` は frontend build を行わず `pytest app_backend/tests customize_docs -q` を実行する。一方 `app_backend/app/main.py` は `app_backend/static` が存在する前提で `StaticFiles` を無条件 mount していたため、CI の checkout で import 時に失敗していた。
+- FastAPI/Starlette の `StaticFiles` は存在する静的ファイルディレクトリを mount する前提のため、`app_backend/static/index.html` が存在する場合だけ SPA routes と static mount を登録する。`/_dr_env.js` は実際の static 可用性を `IS_STATIC_FRONTEND` に返す。
+- `app_backend/tests/test_main.py` に static build output の有無を判定する回帰テストを追加し、static なしの CI 状態では SPA/static file テストだけ skip する。
+
+検証:
+
+- `uv run pytest app_backend/tests customize_docs -q`: 59 passed, 2 skipped
+- `app_backend/static` を一時退避した CI 再現: 56 passed, 5 skipped
+- `uv run ruff format --check .`: passed
+- `uv run ruff check .`: passed
+- `app_backend` working directory で `uv run ruff format --check .`: passed
+- `app_backend` working directory で `uv run ruff check .`: passed
 
 ## PR分割
 
