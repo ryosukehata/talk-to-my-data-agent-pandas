@@ -64,6 +64,8 @@ upstream `datarobot-community/talk-to-my-data-agent` の `v0.5.2` 差分を、pa
 - 新規 `python-unit-tests.yml` は frontend build を行わず `pytest app_backend/tests customize_docs -q` を実行する。一方 `app_backend/app/main.py` は `app_backend/static` が存在する前提で `StaticFiles` を無条件 mount していたため、CI の checkout で import 時に失敗していた。
 - FastAPI/Starlette の `StaticFiles` は存在する静的ファイルディレクトリを mount する前提のため、`app_backend/static/index.html` が存在する場合だけ SPA routes と static mount を登録する。`/_dr_env.js` は実際の static 可用性を `IS_STATIC_FRONTEND` に返す。
 - `app_backend/tests/test_main.py` に static build output の有無を判定する回帰テストを追加し、static なしの CI 状態では SPA/static file テストだけ skip する。
+- `app_backend-test.yml` は `app_backend/pyproject.toml` と `uv.lock` で依存解決するため、`utils/analyst_db.py` が使う `aiologic` を backend project dependencies にも追加した。
+- `customize_docs` の infra import テストは Pulumi stack が選択済みである前提を持っていたため、テスト内で `PULUMI_STACK_CONTEXT=test-stack` を固定し、CI の非対話環境でも import できるようにした。
 
 検証:
 
@@ -73,6 +75,8 @@ upstream `datarobot-community/talk-to-my-data-agent` の `v0.5.2` 差分を、pa
 - `uv run ruff check .`: passed
 - `app_backend` working directory で `uv run ruff format --check .`: passed
 - `app_backend` working directory で `uv run ruff check .`: passed
+- `app_backend` working directory で `uv sync --all-extras --dev`: passed
+- `app_backend` working directory で `uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml`: 44 passed
 
 ## PR分割
 
