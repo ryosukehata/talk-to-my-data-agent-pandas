@@ -34,6 +34,7 @@ from typing import (
     cast,
 )
 
+import aiologic
 import duckdb
 import langid
 import pandas as pd
@@ -206,7 +207,7 @@ class BaseDuckDBHandler(ABC):
         self.db_path = self.get_db_path(user_id=user_id, db_path=db_path, name=name)
         self._async_path = AsyncPath(self.db_path)
         self._storage = PersistentStorage(user_id) if use_persistent_storage else None
-        self._write_lock = asyncio.Lock()
+        self._write_lock = aiologic.Lock()
 
     async def _create_db_version_table(
         self,
@@ -375,41 +376,34 @@ class BaseDuckDBHandler(ABC):
 
     @asynccontextmanager
     async def _write_connection(self) -> AsyncGenerator[duckdb.DuckDBPyConnection, Any]:
-        async with self._get_connection(write_connection=True) as x:
-            yield x
+        loop = asyncio.get_running_loop()
+        async with self._write_lock:
+            conn = await loop.run_in_executor(None, duckdb.connect, self.db_path, False)
+            try:
+                yield conn
+            finally:
+                await loop.run_in_executor(None, conn.close)
+
+            if self._storage:
+                read_conn = await loop.run_in_executor(
+                    None, duckdb.connect, self.db_path, False
+                )
+                try:
+                    await self._storage.save_to_storage(
+                        self.db_path.name, str(self.db_path.absolute())
+                    )
+                finally:
+                    await loop.run_in_executor(None, read_conn.close)
 
     @asynccontextmanager
     async def _read_connection(self) -> AsyncGenerator[duckdb.DuckDBPyConnection, Any]:
-        async with self._get_connection(write_connection=False) as x:
-            yield x
-
-    @asynccontextmanager
-    async def _get_connection(
-        self, write_connection: bool = True
-    ) -> AsyncGenerator[duckdb.DuckDBPyConnection, Any]:
-        """Async context manager for database connections."""
         loop = asyncio.get_running_loop()
 
-        if write_connection:
-            async with self._save_to_storage():
-                conn = await loop.run_in_executor(
-                    None, duckdb.connect, self.db_path, False
-                )
-                yield conn
-                await loop.run_in_executor(None, conn.close)
-        else:
-            conn = await loop.run_in_executor(None, duckdb.connect, self.db_path, False)
+        conn = await loop.run_in_executor(None, duckdb.connect, self.db_path, False)
+        try:
             yield conn
+        finally:
             await loop.run_in_executor(None, conn.close)
-
-    @asynccontextmanager
-    async def _save_to_storage(self) -> AsyncGenerator[None, None]:
-        async with self._write_lock:
-            yield
-            if self._storage:
-                await self._storage.save_to_storage(
-                    self.db_path.name, str(self.db_path.absolute())
-                )
 
     @telemetry.meter_and_trace
     async def execute_query(

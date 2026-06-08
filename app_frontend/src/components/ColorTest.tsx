@@ -7,8 +7,8 @@ export const ColorTest: React.FC = () => {
 
       {/* Suggested Prompt Background Test */}
       <div className="flex items-center gap-4">
-        <div className="w-20 h-10 bg-suggested-prompt-bg border rounded"></div>
-        <span>bg-suggested-prompt-bg</span>
+        <div className="w-20 h-10 bg-muted border rounded"></div>
+        <span>bg-muted</span>
       </div>
 
       {/* Original color for comparison */}

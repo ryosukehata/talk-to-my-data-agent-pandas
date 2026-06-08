@@ -36,10 +36,6 @@ export const AppStateProvider: React.FC<{
     dispatch(actions.setExpandGraphsInsightsDefaultOpen(isOpen));
   };
 
-  const setTheme = (theme: 'light' | 'dark') => {
-    dispatch(actions.setTheme(theme));
-  };
-
   const contextValue: AppState = {
     ...state,
     hideWelcomeModal,
@@ -49,7 +45,6 @@ export const AppStateProvider: React.FC<{
     setIncludeCsvBom,
     setDataSource,
     setExpandGraphsInsightsDefaultOpen,
-    setTheme,
   };
 
   return <AppStateContext.Provider value={contextValue}>{children}</AppStateContext.Provider>;

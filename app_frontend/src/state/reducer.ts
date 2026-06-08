@@ -15,7 +15,6 @@ export const createInitialState = (): AppStateData => {
     dataSource: getStorageItem(STORAGE_KEYS.DATA_SOURCE) || DATA_SOURCES.FILE, // Default to FILE
     expandGraphsInsightsDefaultOpen:
       getStorageItem(STORAGE_KEYS.EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN) === 'true',
-    theme: (getStorageItem(STORAGE_KEYS.THEME) as 'light' | 'dark') || 'light', // Default to light theme
   };
 };
 
@@ -69,12 +68,6 @@ export const reducer = (state: AppStateData, action: Action): AppStateData => {
         ...state,
         expandGraphsInsightsDefaultOpen: action.payload,
       };
-    case ACTION_TYPES.SET_THEME:
-      setStorageItem(STORAGE_KEYS.THEME, action.payload);
-      return {
-        ...state,
-        theme: action.payload,
-      };
     default:
       return state;
   }
@@ -107,9 +100,5 @@ export const actions = {
   setExpandGraphsInsightsDefaultOpen: (isOpen: boolean): Action => ({
     type: ACTION_TYPES.SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN,
     payload: isOpen,
-  }),
-  setTheme: (theme: 'light' | 'dark'): Action => ({
-    type: ACTION_TYPES.SET_THEME,
-    payload: theme,
   }),
 };

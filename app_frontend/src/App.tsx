@@ -3,13 +3,12 @@ import { Toaster } from '@/components/ui/sonner';
 import './App.css';
 import Pages from './pages';
 import { useDataRobotInfo } from './api/user/hooks';
-import { useAppState } from '@/state/hooks';
 import i18n, { getSavedLanguage } from './i18n';
 import { CustomPromptStateProvider } from '@/components/custom-prompts';
+import { ThemeProvider } from './theme/theme-provider';
 
 function App() {
   const { data: dataRobotInfo } = useDataRobotInfo();
-  const { theme } = useAppState();
   const [isReady, setIsReady] = useState(false);
 
   useLayoutEffect(() => {
@@ -21,20 +20,15 @@ function App() {
     }
   }, [dataRobotInfo]);
 
-  // Apply theme class to document element
-  useLayoutEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
   return (
-    <CustomPromptStateProvider>
-      {isReady && <Pages />}
-      <Toaster />
-    </CustomPromptStateProvider>
+    <ThemeProvider>
+      <CustomPromptStateProvider>
+        <div className="h-screen">
+          {isReady && <Pages />}
+          <Toaster />
+        </div>
+      </CustomPromptStateProvider>
+    </ThemeProvider>
   );
 }
 
