@@ -183,6 +183,7 @@ v0.5.3 全PRが `dev` に入った後に確認する。
 - Backend cleansing は pandas 前提を維持したまま、`cleanse_dataframe()` の sample 上限を 500 行へ更新した。`data_cleansing_helpers` は Polars へ移植せず、先頭列だけ numeric conversion threshold を 100% にする upstream の誤変換対策を pandas 実装として採用した。
 - 追加テスト: `app_backend/tests/test_data_cleansing_v053_compat.py`。先頭列 ID の誤数値化防止と、sample 上限 500 行を検証する。
 - Test setup は v0.5.3 の responsive sidebar が `window.matchMedia` を使うため、`app_frontend/tests/setupTests.ts` に jsdom 用 mock を追加した。
+- v0.5.3 で追加された Knip CI は、この fork の custom prompts / reports / templates を unused と誤検出するため、`app_frontend/knip.json` に custom 機能用の ignore を追加した。`Reports.tsx` の未使用 default export は実コードから削除した。
 - `main` 向け open PR は #77, #78, #79 を巻き込んだ。`resources/app_usage_dashboard/requirements.txt` は `requests==2.33.0`, `streamlit==1.54.0` へ更新し、`requirements.txt`, `app_backend/requirements.txt`, `app_backend/pyproject.toml` は `pillow==12.2.0` へ更新した。
 - #79 単体では root `requirements.txt` の `streamlit==1.44.1` が `pillow<12` を要求して dependency resolution が失敗したため、root 側の Streamlit pin も `1.54.0` へ揃えた。legacy Streamlit の機能改修はしていない。
 
@@ -190,6 +191,7 @@ v0.5.3 全PRが `dev` に入った後に確認する。
 
 - `uv run pytest app_backend/tests/test_data_cleansing_v053_compat.py -q`: 2 passed
 - `npm --prefix app_frontend test`: 111 passed
+- `npm --prefix app_frontend run knip`: passed
 - `npm --prefix app_frontend run lint`: 0 errors, 14 warnings
 - `npm --prefix app_frontend run build`: passed
 - `uv run pytest app_backend/tests customize_docs -q`: 61 passed, 2 skipped

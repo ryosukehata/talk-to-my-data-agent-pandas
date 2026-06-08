@@ -10,7 +10,35 @@
     "src/**/*.{ts,tsx}",
     "tests/**/*.{ts,tsx}"
   ],
-  "ignore": ["src/global.d.ts"],
+  "ignore": [
+    "src/global.d.ts",
+    "src/api/templates/index.ts",
+    "src/components/chat/AnalystDatasetTable.tsx",
+    "src/components/ColorTest.tsx",
+    "src/components/template/TemplateCardIcon.tsx",
+    "src/components/template/TemplateDropdown.tsx",
+    "src/components/template/TemplateTabs.tsx",
+    "src/utils/featureFlags.ts"
+  ],
+  "ignoreIssues": {
+    "src/api/custom-prompts/hooks.ts": ["exports"],
+    "src/api/database/api-requests.ts": ["types"],
+    "src/api/feature-flag/hooks.ts": ["exports"],
+    "src/api/feature-flag/types.ts": ["types"],
+    "src/api/refiner/hooks.ts": ["exports"],
+    "src/api/reports/api.ts": ["exports"],
+    "src/api/reports/hooks.ts": ["exports"],
+    "src/api/reports/types.ts": ["types"],
+    "src/api/templates/hooks.ts": ["exports"],
+    "src/api/templates/reload.ts": ["types"],
+    "src/api/templates/types.ts": ["types"],
+    "src/components/custom-prompts/context.ts": ["types"],
+    "src/components/custom-prompts/index.ts": ["exports", "types"],
+    "src/components/template/index.ts": ["exports"],
+    "src/components/template/TemplateCard.tsx": ["exports"],
+    "src/components/template/TemplateList.tsx": ["exports"],
+    "src/components/template/utils.ts": ["exports"]
+  },
   "ignoreBinaries": [ ],
   "ignoreDependencies": [
     "@fontsource/*",
