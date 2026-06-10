@@ -59,7 +59,7 @@ dependencies = [
     "typing-extensions>=4.12.2,<5.0",
     "uvicorn==0.34.0,<1",
     "langid==1.1.6",
-    "pillow==11.3.0",
+    "pillow==12.2.0",
     "babel>=2.16,<3",
     "chardet>=5.0.0,<6.0",
 ]

@@ -24,6 +24,7 @@ export const UserPrompt = ({
   activeChat?: IChat;
 }) => {
   const { t } = useTranslation();
+
   const {
     enableChartGeneration,
     enableBusinessInsights,
@@ -131,6 +132,7 @@ export const UserPrompt = ({
       {/* Prompt input */}
       <PromptInput
         ref={promptInputRef}
+        chatId={chatId}
         sendButtonArrangement="append"
         onSend={handleSend}
         initialValue={selectedTemplateText}

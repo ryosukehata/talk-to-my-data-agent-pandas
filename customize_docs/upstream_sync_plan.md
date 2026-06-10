@@ -230,6 +230,15 @@
 - `v0.5.3` の backend差分は `utils/api.py` の cleansing sample size と `utils/data_cleansing_helpers.py` の first-column threshold だが、upstream側は Polars 前提。Polars を pandas に移植しないため、現行pandas実装へ同等ロジックを写す作業は原則しない。
 - `v0.5.3` まで完了後、`v11.5.0+` は package再編と router分割を含む別フェーズとして設計レビューから始める。
 
+### v0.5.3 実行プラン
+
+詳細な実装計画は `customize_docs/v0_5_3_integration_plan.md` を参照する。
+
+- 2026-06-08: `codex/v0.5.3-integration-plan` を `origin/dev` (`7e994ec`) から作成。
+- `v0.5.2..v0.5.3` の upstream 差分は 64 files, 1810 insertions, 588 deletions。主差分は frontend sidebar / UI registry component / chat persistence / cleansing sample size。
+- `main` 向け open PR は #77 (`requests`), #78 (`streamlit`), #79 (`pillow`) を確認済み。v0.5.3 本体PRとは別の dependency rollup PR として巻き込む。
+- upstream main 向け open PR は #14 を採用候補、#26 と upstream Dependabot PR は見送り寄りとして記録した。
+
 ### v0.5.2 実装メモ
 
 - 2026-06-08: `codex/upstream-sync-v0.5.2-frontend` で `v0.5.2` までの差分を実装。`dev` がすぐ `v0.5.3` へ進む前提に変更されたため、upstream `ThemeProvider` / `theme/*` / `preset.css` も採用し、独自 AppState theme 管理は削除した。
