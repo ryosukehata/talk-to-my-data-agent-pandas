@@ -7,8 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import loader from '@/assets/loader.svg';
-import { useTranslation } from '@/i18n';
+import { Loader2 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 
 interface ConfirmDialogProps {
@@ -20,7 +19,7 @@ interface ConfirmDialogProps {
   onCancel?: () => void;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'default' | 'destructive';
+  variant?: 'primary' | 'secondary' | 'destructive';
   isLoading?: boolean;
 }
 
@@ -36,8 +35,6 @@ export function ConfirmDialog({
   isLoading,
   variant,
 }: ConfirmDialogProps) {
-  const { t } = useTranslation();
-
   const handleCancel = () => {
     onCancel?.();
     onOpenChange(false);
@@ -52,7 +49,7 @@ export function ConfirmDialog({
           <DialogDescription className="mb-2">{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel} testId="confirm-dialog-cancel">
+          <Button variant="secondary" onClick={handleCancel} testId="confirm-dialog-cancel">
             {cancelText}
           </Button>
           <Button
@@ -61,9 +58,7 @@ export function ConfirmDialog({
             disabled={isLoading}
             testId="confirm-dialog-confirm"
           >
-            {isLoading && (
-              <img src={loader} alt={t('processing')} className="w-4 h-4 animate-spin" />
-            )}
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             {confirmText}
           </Button>
         </DialogFooter>

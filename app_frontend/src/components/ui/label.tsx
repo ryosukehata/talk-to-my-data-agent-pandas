@@ -1,8 +1,18 @@
 import * as React from 'react';
 import * as LabelPrimitive from '@radix-ui/react-label';
+import { cva, type VariantProps } from 'class-variance-authority';
+
 import { cn } from '@/lib/utils';
 
-function Label({ className, htmlFor, ...props }: React.ComponentProps<typeof LabelPrimitive.Root>) {
+const labelVariants = cva(
+  'text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:text-muted-foreground inline-flex'
+);
+
+function Label({
+  className,
+  htmlFor,
+  ...props
+}: React.ComponentProps<typeof LabelPrimitive.Root> & VariantProps<typeof labelVariants>) {
   const isForEnabledRadio = React.useMemo(() => {
     if (typeof document !== 'undefined' && htmlFor) {
       const element = document.getElementById(htmlFor);
@@ -18,7 +28,8 @@ function Label({ className, htmlFor, ...props }: React.ComponentProps<typeof Lab
       data-slot="label"
       htmlFor={htmlFor}
       className={cn(
-        'text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50',
+        labelVariants(),
+        'font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:opacity-50',
         !isForEnabledRadio && 'cursor-pointer',
         className
       )}

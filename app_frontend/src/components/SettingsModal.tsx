@@ -19,6 +19,8 @@ import { Input } from './ui/input';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useReloadTemplates } from '@/api/templates/reloadHooks';
 import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useTheme } from '@/theme/theme-provider';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -36,9 +38,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
     setEnableBusinessInsights,
     includeCsvBom,
     setIncludeCsvBom,
-    theme,
-    setTheme,
   } = useAppState();
+  const { theme, setTheme } = useTheme();
 
   const {
     data: dataRobotInfo,
@@ -60,14 +61,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
   const [localEnableBusinessInsights, setLocalEnableBusinessInsights] =
     useState(enableBusinessInsights);
   const [localIncludeCsvBom, setLocalIncludeCsvBom] = useState(includeCsvBom);
-  const [localTheme, setLocalTheme] = useState(theme);
 
   const handleSaveSettings = () => {
     setCollapsiblePanelDefaultOpen(localCollapsiblePanelDefaultOpen);
     setEnableChartGeneration(localEnableChartGeneration);
     setEnableBusinessInsights(localEnableBusinessInsights);
     setIncludeCsvBom(localIncludeCsvBom);
-    setTheme(localTheme);
     onOpenChange(false);
   };
 
@@ -83,25 +82,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
         <div className="overflow-y-auto flex-1 pr-2">
           {/* スクロール可能なコンテンツエリア */}
           <div className="flex items-center justify-between gap-4 py-2">
-            <Label htmlFor="theme-toggle" className="cursor-pointer">
-              Dark theme
-            </Label>
-            <Switch
-              id="theme-toggle"
-              checked={localTheme === 'dark'}
-              onCheckedChange={checked => setLocalTheme(checked ? 'dark' : 'light')}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-4 py-2">
             <Label htmlFor="collapsible-default-open" className="cursor-pointer">
               {t('Expand data panels by default')}
             </Label>
-            <input
+            <Checkbox
               id="collapsible-default-open"
-              type="checkbox"
-              className="h-4 w-4"
               checked={localCollapsiblePanelDefaultOpen}
-              onChange={e => setLocalCollapsiblePanelDefaultOpen(e.target.checked)}
+              onCheckedChange={value => setLocalCollapsiblePanelDefaultOpen(value === true)}
             />
           </div>
 
@@ -129,8 +116,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
           <>
             <Separator className="border-t my-2" />
             <div className="my-4 space-y-4 flex justify-between items-center">
-              <h3 className="font-semibold m-0">{t('Language')}</h3>
+              <p className="mn-label">{t('Language')}</p>
               <LanguageSwitcher />
+            </div>
+            <div className="my-4 space-y-4 flex justify-between items-center">
+              <p className="mn-label">{t('Dark Theme')}</p>
+              <Switch
+                id="theme"
+                checked={theme === 'dark'}
+                onCheckedChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              />
             </div>
             <div
               className="flex items-center justify-between gap-4 py-2"
@@ -185,9 +180,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
 
           <div className="mt-4 space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="font-semibold">{t('DataRobot Connection')}</h3>
+              <h3 className="mn-label">{t('DataRobot Connection')}</h3>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 disabled={isRefreshingConnection}
                 onClick={async () => {
@@ -210,7 +205,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
               </Button>
             </div>
             {isLoadingDataRobotInfo || isRefreshingConnection ? (
-              <p className="text-sm">{t('Loading DataRobot info...')}</p>
+              <p className="body">{t('Loading DataRobot info...')}</p>
             ) : dataRobotInfo?.datarobot_account_info ? (
               <div className="space-y-1">
                 <p>
@@ -271,7 +266,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
                 />
                 <div className="flex justify-end">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     disabled={updateApiTokenMutation.isPending || !apiToken.trim()}
                     onClick={() => {
@@ -306,7 +301,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
                   </p>
                 )}
 
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="body-secondary mt-1">
                   {t('Manually enter your DataRobot API token to authenticate with the service.')}
                 </p>
               </div>
@@ -317,7 +312,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
         <Separator className="border-t mt-2" />
         <DialogFooter className="mt-4 flex-shrink-0">
           {/* フッター固定 */}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
             {t('Cancel')}
           </Button>
           <Button onClick={handleSaveSettings}>{t('Save changes')}</Button>

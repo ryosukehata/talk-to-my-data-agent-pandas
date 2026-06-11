@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-01-12
+
+### Added
+
+- Light theme support
+- Chat message persistence across app restarts
+
+### Changed
+
+- Improved numeric type inference for better data type detection
+- Added data type editing warning to prevent accidental changes
+- Replaced custom UI components with registry components for better maintainability
+- Replaced custom loading components with standardized versions
+
+### Fixed
+
+- Fixed DuckDB file length changing during upload causing "Too much data for declared Content-Length" errors
+- Fixed Python 3.10 and 3.11 compatibility issues with enum features
+
+## [0.5.2] - 2025-12-16
+
+### Fixes
+- Fixed data loading bug affecting Python version <3.12.
+- Fixed intermittent concurrency-related failures in persisting DB.
+
+### Deprecated
+
+- **Streamlit frontend is deprecated and will be removed March 20th, 2026**
+  - The React frontend (now default) provides enhanced UI features and better performance
+  - Migration: Remove `FRONTEND_TYPE="streamlit"` from your `.env` file to use the React frontend
+  - The React frontend is already the default; this only affects users who explicitly configured Streamlit
+  - See [React Frontend Development Guide](app_frontend/README.md) for more information
+  - Support and bug fixes for Streamlit will be limited during the deprecation period
+
 ## [0.5.1] - 2025-12-10
 
 ### Added

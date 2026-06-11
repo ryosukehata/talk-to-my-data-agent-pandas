@@ -11,6 +11,7 @@ import pulumi_datarobot as datarobot
 
 def test_app_source_file_destinations_are_unique(monkeypatch) -> None:
     monkeypatch.setenv("APP_ENVIRONMENT_ID", "test-env")
+    monkeypatch.setenv("PULUMI_STACK_CONTEXT", "test-stack")
     monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "infra"))
     monkeypatch.setattr(
         datarobot.ExecutionEnvironment,

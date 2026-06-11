@@ -8,19 +8,22 @@
 ## 現在地
 
 - 取り込み元: `upstream/main`
-- fetch確認日: 2026-06-04
-- upstream最新: `5abdbe1` (`v11.8.1` 後の追加修正を含む)
-- `dev` 最新: `c4d6152` (`v0.3.20` から `v0.3.23` まで取り込み済み)
-- 現在の `dev` と `v0.4.24` の共通祖先: `v0.3.23`
+- fetch確認日: 2026-06-08
+- upstream次候補: `v0.5.2`
+- upstream 0系最新: `v0.5.3`
+- upstream最新タグ: `v11.8.1`
+- `origin/dev` 最新: `b424579` (`v0.5.1` 取り込みPR #74 merge済み)
+- `origin/dev` は内容上 `v0.5.1` 済みだが、履歴上は `v0.5.1` タグを祖先に持たない。
 - 退避ブランチ: `backup/dev-before-upstream-sync-20260604`, `backup/dev-before-v0.4.24-sync-20260604`
 
 ## 方針
 
-1. `dev` を起点に、まず `v0.3.20` からタグ単位で取り込む。
+1. `dev` を起点に、タグ単位で小さいPRとして取り込む。
 2. 競合が軽微な場合はPR内で解消し、判断が必要な競合は作業を止めて確認する。
 3. `utils/customize/*` を守るため、各PRで backend の characterization test を実行する。
 4. `utils -> core/src/core` の構成変更は、タグ同期PRとは分離して専用PRで移植する。
 5. 各段階で「取り込む / 見送る / 手動移植する」をこのファイルへ記録する。
+6. すでに手動移植済みの upstream タグは、内容差分なしの `ours` baseline merge で履歴上も取り込み済みにする。
 
 ## テスト方針
 
@@ -118,11 +121,11 @@
 
 | フェーズ | タグ/範囲 | 取り込み方針 | 主な対象 | 注意点 |
 | --- | --- | --- | --- | --- |
-| 0 | baseline | `v0.4.24` ours merge または同等の履歴整理 | `CHANGELOG.md`, docs only | `v0.4.24` の未採用差分を再混入させない。 |
-| 1 | `v0.5.0` | 取り込む | `DataSourceSelector.tsx`, `CHANGELOG.md`, `README.md` | UI文言改善のみ。polars対象なし。 |
-| 2 | `v0.5.1` | 原則取り込むが設定系を確認 | `.datarobot/cli/*`, `Taskfile.yaml`, `quickstart.py`, `README.md` | CLI/Taskfile導入が既存Pulumi/CI/ローカル運用と衝突しないか確認。 |
-| 3 | `v0.5.2` | 分割して評価 | frontend theme/ui, `utils/analyst_db.py`, `requirements.txt`, `pytest.ini` | `aiologic.Lock` や DB persist 競合修正は pandas維持で必要部分だけ移植。 |
-| 4 | `v0.5.3` | frontend大変更とbackend小修正を分ける | light theme, sidebar/ui registry, chat persistence, `utils/api.py`, `utils/data_cleansing_helpers.py` | UI刷新は既存カスタムUI/Report Builder/Prompt Template と衝突しやすい。data cleansing の polars 変更は取り込まない。 |
+| 0 | `v0.5.1` baseline | 先に入れる | Git履歴のみ | `origin/dev` から `git merge -s ours --no-ff v0.5.1^{commit}`。内容差分は出さず、以降の `v0.5.2` merge-base を正常化する。 |
+| 1 | `v0.5.2` frontend | 取り込む | theme provider, UI primitives, `DataSourceSelector`, frontend tests | 既存の custom prompt / report builder / template UI と衝突しないか重点確認する。 |
+| 2 | `v0.5.2` backend/infra | 一部取り込む | `utils/analyst_db.py`, `requirements.txt`, `pytest.ini`, Python unit workflow | `utils/analyst_db.py` の Polars 型変更は pandas へ移植しない。DB lock/storageなど、現在の pandas 実装に必要な挙動だけ別途判断する。 |
+| 3 | `v0.5.3` frontend | 分割して評価 | sidebar刷新, light asset, chat UI, component registry | 変更量が大きいため `v0.5.2` 完了後に専用PRで扱う。 |
+| 4 | `v0.5.3` backend | 原則見送り寄り | `utils/api.py`, `utils/data_cleansing_helpers.py` | upstream差分は Polars cleansing 前提。Polars を pandas に移植しないため、明確なバグ修正だけ別PRで採否判断する。 |
 | 5 | `v11.5.0+` | 別フェーズ | core package再編、FastAPI router分割、PySDK互換、DataBricks/scoped token | `utils -> core/src/core` の大規模移動は単純マージしない。専用設計PRで判断する。 |
 
 ### TDD / テスト方針
@@ -151,3 +154,98 @@
 - `v0.5.1` の DataRobot CLI quickstart と Taskfile 構成を追加する。`.datarobot/cli/state.yaml` はローカル状態として `.gitignore` に追加する。
 - `quickstart.py` は `stack_name` を任意引数にし、未指定時に対話入力する upstream 挙動を移植する。`app_backend/tests/test_quickstart_v051.py` で引数パースを固定する。
 - READMEは upstream のCLI優先構成へ更新するが、upstream `v0.5.1` にある未閉じコードフェンスはこのリポジトリ側で補正する。
+
+## v0.5.2 実行プラン
+
+詳細な実装計画は `customize_docs/v0_5_2_implementation_plan.md` を参照する。
+
+### 事前確認
+
+- 2026-06-08: `git ls-remote --refs --tags upstream 'refs/tags/v*'` で、`v0.5.1` の次は `v0.5.2`、0系最新は `v0.5.3`、最新タグは `v11.8.1` と確認した。
+- `git merge-base --is-ancestor v0.5.1 origin/dev` は `1`。つまり `v0.5.1` は履歴上まだ `origin/dev` の祖先ではない。
+- baseline なしで `v0.5.2` を merge すると、`CHANGELOG.md`, `README.md`, `app_frontend/*`, `frontend/*`, `pytest.ini`, `utils/api.py`, `utils/rest_api.py`, `utils/data_connections/*` まで過去差分が再衝突する。
+- 仮想 `v0.5.1` ours baseline 後の `v0.5.2` merge-tree では、主な衝突候補は `app_frontend/package.json`, `app_frontend/src/App.tsx`, `app_frontend/src/components/SettingsModal.tsx`, `frontend/01_connect_and_explore.py`, `pytest.ini`, `utils/analyst_db.py` に縮小する。
+
+### PR0: v0.5.1 baseline
+
+- `origin/dev` から `codex/upstream-sync-v0.5.1-baseline` を作る。
+- `git merge -s ours --no-ff v0.5.1^{commit}` で内容差分なしの merge commit を作る。
+- 確認:
+  - `git merge-base --is-ancestor v0.5.1 HEAD`
+  - `git diff --stat HEAD^1..HEAD` が空、またはドキュメント更新のみ
+  - `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`
+
+### PR1: v0.5.2 frontend/UI
+
+- `codex/upstream-sync-v0.5.2-frontend` を baseline 後の `dev` から作る。
+- `v0.5.1..v0.5.2` の frontend UI primitive / screen integration 差分を取り込む。
+- upstream `ThemeProvider`, `app_frontend/src/theme/*`, `app_frontend/src/index.css` を採用し、ライトテーマは upstream token/preset 構成へ合わせる。
+- 対象:
+  - `app_frontend/src/App.tsx`
+  - `app_frontend/src/index.css`
+  - `app_frontend/src/theme/*`
+  - `app_frontend/src/components/ui/*`
+  - `app_frontend/src/components/DataSourceSelector.tsx`
+  - `app_frontend/src/components/SettingsModal.tsx`
+  - `app_frontend/package.json`
+- 既存のカスタム画面に影響しやすい箇所:
+  - custom prompts
+  - report builder
+  - template selector
+  - chat / data source selector
+- 先に追加・更新するテスト:
+  - `app_frontend/tests/components/button.test.tsx`
+  - `app_frontend/tests/components/input.test.tsx`
+  - 必要なら `DataSourceSelector` / `SettingsModal` の表示回帰テスト
+- 実行テスト:
+  - `npm --prefix app_frontend test`
+  - `npm --prefix app_frontend run lint`
+  - UI差分が大きい場合は `pnpm --dir app_frontend dev` で Add Data modal / Settings / Chat / Data page をブラウザ確認する。
+
+### PR2: v0.5.2 backend/infra
+
+- `codex/upstream-sync-v0.5.2-backend` を PR1 後の `dev` から作る。
+- 対象:
+  - `.github/workflows/python-unit-tests.yml`
+  - `requirements.txt`
+  - `pytest.ini`
+  - `utils/analyst_db.py`
+- Polars 方針:
+  - `utils/analyst_db.py` の `pl.DataFrame` 化は pandas に移植しない。
+  - `execute_python` の allowed modules に `polars` を追加しない。
+  - 現在の pandas `AnalystDataset.to_df()` 公開挙動を維持する。
+  - DB write lock / storage save / enum判定など、pandas実装でも必要な非Polars挙動だけをテスト付きで採用する。
+- 先に追加・更新するテスト:
+  - `app_backend/tests/test_analyst_db_upstream_compat.py`
+  - `app_backend/tests/test_api_analysis_execution_v0424_compat.py`
+  - 必要なら `pytest.ini` の `pythonpath` / marker 設定が壊れないことを固定する小テスト
+- 実行テスト:
+  - `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`
+  - `uv run ruff check utils/analyst_db.py`
+
+### PR3以降
+
+- `v0.5.2` が `dev` に入ったら、同じ手順で `v0.5.2` の ours baseline が不要か確認する。通常 merge で `v0.5.2` タグが祖先になっていれば追加baselineは不要。
+- 次に `v0.5.3` を frontend と backend に分ける。
+- `v0.5.3` の backend差分は `utils/api.py` の cleansing sample size と `utils/data_cleansing_helpers.py` の first-column threshold だが、upstream側は Polars 前提。Polars を pandas に移植しないため、現行pandas実装へ同等ロジックを写す作業は原則しない。
+- `v0.5.3` まで完了後、`v11.5.0+` は package再編と router分割を含む別フェーズとして設計レビューから始める。
+
+### v0.5.3 実行プラン
+
+詳細な実装計画は `customize_docs/v0_5_3_integration_plan.md` を参照する。
+
+- 2026-06-08: `codex/v0.5.3-integration-plan` を `origin/dev` (`7e994ec`) から作成。
+- `v0.5.2..v0.5.3` の upstream 差分は 64 files, 1810 insertions, 588 deletions。主差分は frontend sidebar / UI registry component / chat persistence / cleansing sample size。
+- `main` 向け open PR は #77 (`requests`), #78 (`streamlit`), #79 (`pillow`) を確認済み。v0.5.3 本体PRとは別の dependency rollup PR として巻き込む。
+- upstream main 向け open PR は #14 を採用候補、#26 と upstream Dependabot PR は見送り寄りとして記録した。
+
+### v0.5.2 実装メモ
+
+- 2026-06-08: `codex/upstream-sync-v0.5.2-frontend` で `v0.5.2` までの差分を実装。`dev` がすぐ `v0.5.3` へ進む前提に変更されたため、upstream `ThemeProvider` / `theme/*` / `preset.css` も採用し、独自 AppState theme 管理は削除した。
+- `DataSourceSelector` は説明文を常時表示から tooltip 表示へ変更し、`app_frontend/tests/components/DataSourceSelector.test.tsx` で hover 後に説明文へアクセスできることを固定した。
+- `utils/analyst_db.py` は pandas 公開挙動を維持したまま、`_write_connection()` の例外時 close と storage save 順序を v0.5.2 に合わせた。`pl.DataFrame` 化と `DatasetMetadata.created_at` serializer変更は採用していない。
+- `.github/workflows/python-unit-tests.yml` は upstream の `pytest tests -q` ではなく、このリポジトリの `pytest app_backend/tests customize_docs -q` に合わせた。
+- `CHANGELOG.md`, `README.md`, `frontend/01_connect_and_explore.py` に v0.5.2 の Streamlit 非推奨案内を追加した。Streamlit の機能改修はしていない。
+- PR #75 の CI 対応として、`app_backend/static/index.html` がない checkout では SPA routes と `StaticFiles` mount を登録しないようにした。`python-unit-tests.yml` は frontend build をしないため、API import と customize tests が static build output に依存しないようにする。
+- `app_backend/pyproject.toml` に `aiologic` を追加し、`customize_docs` の infra import テストは `PULUMI_STACK_CONTEXT=test-stack` を固定する。
+- 検証: `npm --prefix app_frontend test` 111 passed, `npm --prefix app_frontend run lint` passed with Fast Refresh warnings, `npm --prefix app_frontend run build` passed, `uv run pytest app_backend/tests customize_docs -q` 59 passed / 2 skipped, `app_backend/static` 一時退避時 `56 passed / 5 skipped`, `uv run ruff format --check .` passed, `uv run ruff check .` passed, `app_backend` working directory で `uv sync --all-extras --dev` passed, `uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml` 44 passed。

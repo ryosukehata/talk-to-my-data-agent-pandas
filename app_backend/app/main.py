@@ -42,6 +42,30 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 base_router = APIRouter()
 
 
+def is_static_frontend_available(
+    static_dir: str | os.PathLike[str],
+    serve_static_frontend: bool,
+) -> bool:
+    if not serve_static_frontend:
+        return False
+
+    return os.path.isdir(static_dir) and os.path.isfile(
+        os.path.join(static_dir, "index.html")
+    )
+
+
+STATIC_FRONTEND_AVAILABLE = is_static_frontend_available(
+    STATIC_DIR,
+    SERVE_STATIC_FRONTEND,
+)
+
+if SERVE_STATIC_FRONTEND and not STATIC_FRONTEND_AVAILABLE:
+    logging.getLogger(__name__).warning(
+        "Static frontend build output not found at %s; skipping static frontend mount.",
+        STATIC_DIR,
+    )
+
+
 @base_router.get("/_dr_env.js")
 async def get_env() -> Response:
     NOTEBOOK_ID = os.getenv("NOTEBOOK_ID", "")
@@ -53,7 +77,7 @@ async def get_env() -> Response:
         "APP_BASE_URL": app_base_url,
         "API_PORT": os.getenv("PORT"),
         "DATAROBOT_ENDPOINT": os.getenv("DATAROBOT_ENDPOINT", ""),
-        "IS_STATIC_FRONTEND": SERVE_STATIC_FRONTEND,
+        "IS_STATIC_FRONTEND": STATIC_FRONTEND_AVAILABLE,
         "USE_DATAROBOT_LLM_GATEWAY": os.getenv("USE_DATAROBOT_LLM_GATEWAY", "false"),
     }
     js = f"window.ENV = {json.dumps(env_vars)};"
@@ -67,7 +91,7 @@ async def get_env_catch_all(tail: str) -> Response:
 
 
 # Serve SPA index.html for known app routes (deep reload support)
-if SERVE_STATIC_FRONTEND:
+if STATIC_FRONTEND_AVAILABLE:
 
     @base_router.get(f"{SCRIPT_NAME}/")
     @base_router.get(f"{SCRIPT_NAME}/data")
@@ -84,7 +108,7 @@ if SERVE_STATIC_FRONTEND:
 
 app.include_router(base_router)
 
-if SERVE_STATIC_FRONTEND:
+if STATIC_FRONTEND_AVAILABLE:
     # Normalize '/assets/' from deep routes (e.g., /data/...) back to '/assets/...'
     # because built HTML uses relative asset URLs.
     def create_static_path_middleware() -> Callable[

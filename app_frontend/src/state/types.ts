@@ -8,7 +8,6 @@ export interface AppStateData {
   includeCsvBom: boolean;
   dataSource: string;
   expandGraphsInsightsDefaultOpen: boolean;
-  theme: 'light' | 'dark';
 }
 
 interface AppStateActions {
@@ -19,7 +18,6 @@ interface AppStateActions {
   setIncludeCsvBom: (enabled: boolean) => void;
   setDataSource: (source: string) => void;
   setExpandGraphsInsightsDefaultOpen: (isOpen: boolean) => void;
-  setTheme: (theme: 'light' | 'dark') => void;
 }
 
 export type AppState = AppStateData & AppStateActions;
@@ -31,5 +29,4 @@ export type Action =
   | { type: 'SET_ENABLE_BUSINESS_INSIGHTS'; payload: boolean }
   | { type: 'SET_INCLUDE_CSV_BOM'; payload: boolean }
   | { type: 'SET_DATA_SOURCE'; payload: string }
-  | { type: 'SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN'; payload: boolean }
-  | { type: 'SET_THEME'; payload: 'light' | 'dark' };
+  | { type: 'SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN'; payload: boolean };
