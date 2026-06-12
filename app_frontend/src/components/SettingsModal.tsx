@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useAppState } from '@/state';
 import { useDataRobotInfo, useUpdateApiToken } from '@/api/user/hooks';
-import { fetchAndStoreDataRobotToken } from '@/api/user/api-requests';
 import { Input } from './ui/input';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useReloadTemplates } from '@/api/templates/reloadHooks';
@@ -189,7 +188,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
                   try {
                     setIsRefreshingConnection(true);
                     setRefreshError(null);
-                    await fetchAndStoreDataRobotToken();
                     await refetchDataRobotInfo();
                   } catch (error) {
                     console.error('Failed to refresh connection:', error);
@@ -221,11 +219,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
                     <span className="py-0.5 rounded">{dataRobotInfo.datarobot_api_token}</span>
                   </p>
                 )}
-                {dataRobotInfo.datarobot_api_skoped_token && (
+                {dataRobotInfo.datarobot_api_scoped_token && (
                   <p>
                     <span className="mr-1">{t('Scoped Token:')}</span>
                     <span className="py-0.5 rounded">
-                      {dataRobotInfo.datarobot_api_skoped_token}
+                      {dataRobotInfo.datarobot_api_scoped_token}
                     </span>
                   </p>
                 )}

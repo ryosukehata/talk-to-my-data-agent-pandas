@@ -322,6 +322,7 @@ app_source = datarobot.ApplicationSource(
         replicas=1,
         session_affinity=True,
     ),
+    required_key_scope_level="admin",
     opts=pulumi.ResourceOptions(retain_on_delete=True),
     **settings_app_infra.app_source_args,
 )
