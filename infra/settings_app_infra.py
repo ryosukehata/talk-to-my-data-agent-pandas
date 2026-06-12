@@ -153,9 +153,15 @@ def get_app_files(
         for f in (PROJECT_ROOT / "utils").glob("**/*.py")
         if f.is_file()
     ]
+    core_files = [
+        (f.as_posix(), f.relative_to(PROJECT_ROOT).as_posix())
+        for f in (PROJECT_ROOT / "core").glob("**/*.py")
+        if f.is_file()
+    ]
 
     # Add the metadata.yaml file
     source_files.extend(utils_files)
+    source_files.extend(core_files)
     source_files.append(
         ((application_path / "metadata.yaml").as_posix(), "metadata.yaml")
     )
