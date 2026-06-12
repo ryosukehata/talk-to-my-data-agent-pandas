@@ -17,6 +17,7 @@ from pathlib import Path
 from core.customize.cache import NullPersistentStorage, atomic_write_json
 from core.customize.domain.report.domain import Report
 from core.customize.domain.report.repository_interface import IReportRepository
+
 from utils.logging_helper import get_logger
 from utils.persistent_storage import PersistentStorage
 

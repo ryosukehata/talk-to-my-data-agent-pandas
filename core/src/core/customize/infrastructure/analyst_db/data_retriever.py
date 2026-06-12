@@ -1,11 +1,11 @@
 import json
 
+from core.customize.usecase.prompt.builder import IRefinerDataInfoMessageFactory
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
 
-from core.customize.usecase.prompt.builder import IRefinerDataInfoMessageFactory
 from utils.analyst_db import AnalystDB, InternalDataSourceType, get_data_source_type
 
 

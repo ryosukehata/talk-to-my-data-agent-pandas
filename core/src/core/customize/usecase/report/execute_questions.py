@@ -16,6 +16,7 @@ from core.customize.domain.report.domain import (
 )
 from core.customize.domain.report.repository_interface import IReportRepository
 from core.customize.infrastructure.chat.chat_executor import ChatExecutor
+
 from utils.logging_helper import get_logger
 
 if TYPE_CHECKING:

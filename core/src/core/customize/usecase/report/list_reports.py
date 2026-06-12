@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from core.customize.domain.report.domain import Report
 from core.customize.domain.report.repository_interface import IReportRepository
+
 from utils.logging_helper import get_logger
 
 logger = get_logger("ListReportsUseCase")

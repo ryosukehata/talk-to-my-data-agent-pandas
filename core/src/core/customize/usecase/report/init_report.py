@@ -20,6 +20,7 @@ from core.customize.domain.report.domain import (
 )
 from core.customize.domain.report.repository_interface import IReportRepository
 from core.customize.usecase.report.generate_questions import GenerateQuestionsUseCase
+
 from utils.logging_helper import get_logger
 
 if TYPE_CHECKING:

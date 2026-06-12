@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-
 from core.customize.domain.question_refiner.domain import (
     RefinedQuestion,
 )
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+
 from utils.token_tracking import TokenUsageTracker
 
 

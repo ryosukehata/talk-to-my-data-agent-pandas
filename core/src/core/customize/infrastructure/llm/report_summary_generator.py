@@ -12,6 +12,7 @@ from core.customize.domain.report.service_interface import (
     IReportSummaryService,
     ReportGeneratedSummary,
 )
+
 from utils.constants import ALTERNATIVE_LLM_BIG
 from utils.llm_client import AsyncLLMClient
 from utils.logging_helper import get_logger

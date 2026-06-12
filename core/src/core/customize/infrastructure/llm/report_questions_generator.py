@@ -10,12 +10,12 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import cast
 
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-
 from core.customize.domain.report.domain import (
     ReportQuestionsGenerationResult,
 )
 from core.customize.infrastructure.llm.timeout import get_llm_timeout_seconds
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+
 from utils.constants import ALTERNATIVE_LLM_BIG
 from utils.llm_client import AsyncLLMClient
 from utils.logging_helper import get_logger

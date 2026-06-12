@@ -8,14 +8,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-from openai.types.chat.chat_completion_system_message_param import (
-    ChatCompletionSystemMessageParam,
-)
-from openai.types.chat.chat_completion_user_message_param import (
-    ChatCompletionUserMessageParam,
-)
-
 from core.customize import prompts
 from core.customize.domain.report.domain import (
     GeneratedQuestion,
@@ -26,6 +18,14 @@ from core.customize.infrastructure.llm.report_questions_generator import (
     IReportQuestionsGenerationService,
 )
 from core.customize.usecase.prompt.builder import IRefinerDataInfoMessageFactory
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+from openai.types.chat.chat_completion_system_message_param import (
+    ChatCompletionSystemMessageParam,
+)
+from openai.types.chat.chat_completion_user_message_param import (
+    ChatCompletionUserMessageParam,
+)
+
 from utils.logging_helper import get_logger
 
 if TYPE_CHECKING:
