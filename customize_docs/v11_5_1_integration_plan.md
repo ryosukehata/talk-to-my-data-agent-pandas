@@ -85,9 +85,14 @@ core/src/core/customize/
 
 ### import 書き換え方針
 
-移動した `core/src/core/customize/*` 内部では、原則 `core.*` import に統一する。
+移動した `core/src/core/customize/*` 内部では、段階的に `core.*` import へ統一する。
+
+PR1 では、移動済みの customize 内 self-import を先に切り替える。
 
 - `from utils.customize...` -> `from core.customize...`
+
+PR2 の core package mechanical migration で、top-level 依存も切り替える。
+
 - `from utils.analyst_db...` -> `from core.analyst_db...`
 - `from utils.schema...` -> `from core.schema...`
 - `from utils.llm_client...` -> `from core.llm_client...`
@@ -178,6 +183,16 @@ core/src/core/customize/
 - `uv run pytest app_backend/tests/test_v1151_core_import_compat.py app_backend/tests/test_feature_flag_config.py app_backend/tests/test_llm_timeout.py -q`
 - `uv run pytest customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py -q`
 - `uv run ruff check core/src/core/customize utils/customize`
+
+実装メモ:
+
+- 2026-06-12: `utils/customize/*` の実装本体を `core/src/core/customize/*` へ移動した。
+- 旧 `utils.customize.*` は各ファイル単位の shim として残した。通常モジュールは `sys.modules` alias にし、旧 import への monkeypatch が新 canonical module に届くようにした。
+- `utils/customize/__init__.py` は eager import しない互換 package にした。`utils.database_helpers -> utils.customize.prompts` の循環 import を避けるため。
+- root の `core/__init__.py` で `core/src/core` を package path に追加し、editable install なしでも `core.customize` を import できるようにした。
+- ApplicationSource の file manifest に `core/**/*.py` を追加し、`core/src/core/customize/**/*.py` が DataRobot app source に含まれることをテストで固定した。
+- `core.customize.domain.report.__all__` から存在しない `ReportCreateRequest` を削除した。移動で package shim の `import *` がこの既存不整合を検出したため。
+- PR1 時点では `core.customize` 内の top-level 依存 (`utils.analyst_db`, `utils.schema`, `utils.llm_client` など) は維持する。これらは PR2 の core package mechanical migration で `core.*` へ切り替える。
 
 ### PR2: core package mechanical migration
 
