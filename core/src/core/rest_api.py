@@ -374,6 +374,11 @@ def custom_openapi() -> dict[str, Any]:
 app.openapi = custom_openapi  # type: ignore[method-assign]
 
 
+def create_app() -> FastAPI:
+    """Return the configured FastAPI application singleton."""
+    return app
+
+
 class SessionState(object):
     _state: dict[str, Any]
 

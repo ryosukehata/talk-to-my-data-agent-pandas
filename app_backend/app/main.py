@@ -17,11 +17,11 @@ import logging
 import os
 from typing import Awaitable, Callable
 
+from core.data_analyst_telemetry import telemetry
+from core.rest_api import create_app
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from utils.data_analyst_telemetry import telemetry
-from utils.rest_api import app
 
 # Configure logging to filter out the health check logs
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
@@ -40,6 +40,7 @@ SERVE_STATIC_FRONTEND = os.getenv("SERVE_STATIC_FRONTEND", "True").casefold() ==
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 base_router = APIRouter()
+app = create_app()
 
 
 def is_static_frontend_available(
