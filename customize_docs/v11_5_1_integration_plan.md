@@ -255,6 +255,12 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - `uv run pytest app_backend/tests/test_main.py app_backend/tests/test_v1150_compat.py app_backend/tests/test_rest_api_v0424_compat.py -q`
 - `uv run pytest app_backend/tests customize_docs -q`
 
+実装メモ:
+
+- 2026-06-12: `core.rest_api.create_app()` を追加し、既存の configured singleton `app` を返す app factory 境界を導入した。
+- `app_backend/app/main.py` は `utils.rest_api.app` の直接 import から `core.rest_api.create_app()` 呼び出しへ切り替えた。
+- このPRでは router 分割や deps/middleware の本格移植は行わない。customize routes、static frontend fallback、既存 session middleware を保ったまま、後続PRで `app_backend/app/__init__.py` に upstream の thin app 構成を取り込める入口だけ固定する。
+
 ### PR4: LLM configuration / LiteLLM integration
 
 目的: upstream `v11.5.1` の柔軟な LLM 設定を、既存 customize LLM と token tracking を壊さず取り込む。
