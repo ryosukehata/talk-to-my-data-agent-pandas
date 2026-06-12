@@ -7,8 +7,7 @@ Report Builder - UseCase: レポート削除
 from __future__ import annotations
 
 from core.customize.domain.report.repository_interface import IReportRepository
-
-from utils.logging_helper import get_logger
+from core.logging_helper import get_logger
 
 logger = get_logger("DeleteReportUseCase")
 

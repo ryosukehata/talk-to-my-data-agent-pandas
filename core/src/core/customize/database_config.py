@@ -21,7 +21,7 @@ from typing import Dict, Tuple
 import pandas as pd
 
 from core.customize.api import download_registry_dataset_as_dataframe
-from utils.resources import DatabaseDescription
+from core.resources import DatabaseDescription
 
 
 class SchemaTableConfigManager:

@@ -8,15 +8,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.constants import ALTERNATIVE_LLM_BIG
 from core.customize.domain.report.service_interface import (
     IReportSummaryService,
     ReportGeneratedSummary,
 )
-
-from utils.constants import ALTERNATIVE_LLM_BIG
-from utils.llm_client import AsyncLLMClient
-from utils.logging_helper import get_logger
-from utils.token_tracking import TokenUsageTracker
+from core.llm_client import AsyncLLMClient
+from core.logging_helper import get_logger
+from core.token_tracking import TokenUsageTracker
 
 logger = get_logger("LLMReportSummaryService")
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from core.analyst_db import AnalystDB
 from core.customize.domain.question_refiner.domain import (
     QuestionRefinementRequest,
     QuestionRefinementResult,
@@ -16,9 +17,8 @@ from core.customize.usecase.question_refiner.refiner import (
     RefineQuestionUseCase,
     RefineUserPromptBuilder,
 )
-from utils.analyst_db import AnalystDB
-from utils.logging_helper import get_logger
-from utils.rest_api import get_initialized_db
+from core.logging_helper import get_logger
+from core.rest_api import get_initialized_db
 
 logger = get_logger(__name__)
 

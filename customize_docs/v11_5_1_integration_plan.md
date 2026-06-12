@@ -222,6 +222,15 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - `uv run pytest customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py -q`
 - `uv run ruff check core utils app_backend/tests customize_docs`
 
+実装メモ:
+
+- 2026-06-12: top-level `utils/*.py` と `utils/data_connections/**/*.py` の実装本体を `core/src/core/*` へ移動した。
+- 旧 `utils.*` は通常モジュールを `sys.modules` alias shim、package `__init__.py` を eager import しない互換 package として残した。
+- `core/src/core/**/*.py` 内の import は `core.*` に切り替えた。`openpyxl.utils` のような外部 package 名はそのまま維持した。
+- `core.*` と `utils.*` の主要 export が同一 object になることを `app_backend/tests/test_upstream_compat_imports.py` で固定した。
+- ApplicationSource manifest は PR1 の `core/**/*.py` 収集で top-level core 実装も同梱される。`core/src/core/rest_api.py` と `utils/rest_api.py` がそれぞれ1件ずつ含まれることをテストで固定した。
+- pandas 公開挙動は変更しない。`AnalystDataset.to_df()` と `execute_python` の `polars` 非許可は既存互換テストで確認する。
+
 ### PR3: FastAPI router / middleware integration
 
 目的: `app_backend` を upstream の thin FastAPI app 構成に近づける。

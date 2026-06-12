@@ -7,6 +7,7 @@ Question Refiner Module - Facade
 
 from __future__ import annotations
 
+from core.analyst_db import AnalystDB
 from core.customize.domain.question_refiner.domain import (
     QuestionRefinementRequest,
     QuestionRefinementResult,
@@ -20,8 +21,7 @@ from core.customize.infrastructure.llm.llm import (
 from core.customize.usecase.question_refiner.refiner import (
     RefineQuestionUseCase,
 )
-from utils.analyst_db import AnalystDB
-from utils.token_tracking import TokenUsageTracker
+from core.token_tracking import TokenUsageTracker
 
 
 class QuestionRefiner:

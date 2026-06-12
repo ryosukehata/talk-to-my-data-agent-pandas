@@ -18,8 +18,7 @@ from core.customize.usecase.prompt.builder import (
     MessageFactory,
     RefineUserPromptBuilder,
 )
-
-from utils.logging_helper import get_logger
+from core.logging_helper import get_logger
 
 logger = get_logger(__name__)
 

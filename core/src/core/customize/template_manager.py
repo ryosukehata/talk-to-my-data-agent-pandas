@@ -17,9 +17,9 @@ from core.customize.cache import (
     PersistentCache,
     atomic_write_csv,
 )
-from utils.logging_helper import get_logger
-from utils.persistent_storage import PersistentStorage
-from utils.resources import PromptsTemplateAICatalog
+from core.logging_helper import get_logger
+from core.persistent_storage import PersistentStorage
+from core.resources import PromptsTemplateAICatalog
 
 
 class TemplateManager:

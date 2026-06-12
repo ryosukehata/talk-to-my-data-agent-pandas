@@ -16,15 +16,14 @@ from core.customize.domain.report.service_interface import (
     ReportSectionData,
 )
 from core.customize.usecase.prompt.builder import ISummarySectionDataFactory
+from core.logging_helper import get_logger
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
 
-from utils.logging_helper import get_logger
-
 if TYPE_CHECKING:
-    from utils.analyst_db import AnalystDB
+    from core.analyst_db import AnalystDB
 
 logger = get_logger("AnalystDBSectionDataRetriever")
 
@@ -149,7 +148,7 @@ class AnalystDBSectionDataRetriever(
                 chart_paths.append(str(path))
 
         try:
-            from utils.schema import RunChartsResult
+            from core.schema import RunChartsResult
         except ImportError:
             RunChartsResult = None  # type: ignore[assignment]
 
