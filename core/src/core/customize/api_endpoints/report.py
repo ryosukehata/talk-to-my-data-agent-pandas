@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from starlette.requests import Request
 
+from core.analyst_db import AnalystDB
 from core.customize.domain.report.domain import (
     QuestionStatus,
     Report,
@@ -45,9 +46,8 @@ from core.customize.usecase.report import (
     ListReportsUseCase,
 )
 from core.customize.usecase.report.generate_questions import GenerateQuestionsUseCase
-from utils.analyst_db import AnalystDB
-from utils.logging_helper import get_logger
-from utils.rest_api import get_initialized_db
+from core.logging_helper import get_logger
+from core.rest_api import get_initialized_db
 
 logger = get_logger("ReportRouter")
 

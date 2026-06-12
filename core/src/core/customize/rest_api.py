@@ -17,7 +17,7 @@ from core.customize.database_helpers import (
 )
 from core.customize.feature_flag_config import get_feature_flags
 from core.customize.template_manager import get_template_manager
-from utils.database_helpers import get_external_database
+from core.database_helpers import get_external_database
 
 # カスタマイズ用のルーター
 router = APIRouter()

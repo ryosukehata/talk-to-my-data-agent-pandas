@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import os
 
-from utils.logging_helper import get_logger
+from core.logging_helper import get_logger
 
 logger = get_logger(__name__)
 

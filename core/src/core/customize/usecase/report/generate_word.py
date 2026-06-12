@@ -24,8 +24,7 @@ from core.customize.infrastructure.word.word_generator import (
     WordGenerator,
 )
 from core.customize.usecase.prompt.builder import SummaryPromptBuilder
-
-from utils.logging_helper import get_logger
+from core.logging_helper import get_logger
 
 logger = get_logger("GenerateWordUseCase")
 

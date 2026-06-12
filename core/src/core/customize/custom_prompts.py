@@ -3,8 +3,8 @@ from core.customize.cache import (
     PersistentCache,
     atomic_write_json,
 )
-from utils.logging_helper import get_logger
-from utils.persistent_storage import PersistentStorage
+from core.logging_helper import get_logger
+from core.persistent_storage import PersistentStorage
 
 
 class UserPrompts:

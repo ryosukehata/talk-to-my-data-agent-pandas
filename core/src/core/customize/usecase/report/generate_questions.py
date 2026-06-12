@@ -18,6 +18,7 @@ from core.customize.infrastructure.llm.report_questions_generator import (
     IReportQuestionsGenerationService,
 )
 from core.customize.usecase.prompt.builder import IRefinerDataInfoMessageFactory
+from core.logging_helper import get_logger
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
@@ -25,8 +26,6 @@ from openai.types.chat.chat_completion_system_message_param import (
 from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
-
-from utils.logging_helper import get_logger
 
 if TYPE_CHECKING:
     pass

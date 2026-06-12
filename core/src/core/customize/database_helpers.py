@@ -19,7 +19,7 @@
 """
 
 from core.customize.database_config import SchemaTableConfigManager
-from utils.database_helpers import get_external_database
+from core.database_helpers import get_external_database
 
 
 def get_schemas_with_descriptions() -> dict[str, str]:

@@ -16,13 +16,11 @@ from core.customize.domain.report.domain import (
 )
 from core.customize.domain.report.repository_interface import IReportRepository
 from core.customize.infrastructure.chat.chat_executor import ChatExecutor
-
-from utils.logging_helper import get_logger
+from core.logging_helper import get_logger
 
 if TYPE_CHECKING:
+    from core.analyst_db import AnalystDB
     from starlette.requests import Request
-
-    from utils.analyst_db import AnalystDB
 
 logger = get_logger("ExecuteQuestionsUseCase")
 

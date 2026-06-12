@@ -9,13 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from utils.logging_helper import get_logger
-from utils.schema import AnalystChatMessage, ChatRequest
+from core.logging_helper import get_logger
+from core.schema import AnalystChatMessage, ChatRequest
 
 if TYPE_CHECKING:
+    from core.analyst_db import AnalystDB
     from starlette.requests import Request
-
-    from utils.analyst_db import AnalystDB
 
 logger = get_logger("ChatExecutor")
 
@@ -43,7 +42,7 @@ class ChatExecutor:
         logger.info(f"Executing chat for question: {question[:50]}...")
 
         try:
-            from utils.rest_api import run_complete_analysis_task
+            from core.rest_api import run_complete_analysis_task
 
             created_chat_id = await analyst_db.create_chat(
                 chat_name=f"Report Question: {question[:30]}...",
