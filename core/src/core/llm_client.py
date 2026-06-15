@@ -37,6 +37,7 @@ _MODEL_ALIASES_FOR_CONFIG_DEFAULT = {
     "unknown",
     "",
 }
+_DEFAULT_DEPLOYED_LLM_MODEL = "datarobot/datarobot-deployed-llm"
 _DEFAULT_REQUEST_TIMEOUT_SECONDS = 180.0
 _DEFAULT_MAX_RETRIES = 2
 
@@ -82,6 +83,15 @@ def _env_int(
     return parsed_value
 
 
+def _normalize_deployment_chat_url(base_url: str | None) -> str | None:
+    if not base_url:
+        return None
+    normalized_url = base_url.rstrip("/")
+    if normalized_url.endswith("/chat/completions"):
+        return normalized_url
+    return f"{normalized_url}/chat/completions"
+
+
 @dataclass(frozen=True)
 class LLMClientConfig:
     """Runtime LLM settings resolved without opening external connections."""
@@ -105,7 +115,9 @@ class LLMClientConfig:
                 "USE_DATAROBOT_LLM_GATEWAY",
             ),
             llm_deployment_id=(
-                env.get("LLM_DEPLOYMENT_ID") or env.get("TEXTGEN_DEPLOYMENT_ID")
+                env.get("LLM_DEPLOYMENT_ID")
+                or env.get("MLOPS_RUNTIME_PARAM_LLM_DEPLOYMENT_ID")
+                or env.get("TEXTGEN_DEPLOYMENT_ID")
             ),
             datarobot_endpoint=env.get("DATAROBOT_ENDPOINT") or None,
             datarobot_api_token=env.get("DATAROBOT_API_TOKEN") or None,
@@ -143,9 +155,18 @@ class LLMClientConfig:
     def resolve_model(self, requested_model: str | None) -> str | None:
         """Map generic model aliases to the configured runtime model."""
         if requested_model is None:
-            return self.default_model
+            if self.default_model:
+                return self.default_model
+            if self.llm_deployment_id:
+                return _DEFAULT_DEPLOYED_LLM_MODEL
+            return None
         if self.default_model and requested_model in _MODEL_ALIASES_FOR_CONFIG_DEFAULT:
             return self.default_model
+        if (
+            self.llm_deployment_id
+            and requested_model in _MODEL_ALIASES_FOR_CONFIG_DEFAULT
+        ):
+            return _DEFAULT_DEPLOYED_LLM_MODEL
         if (
             self.use_datarobot_llm_gateway
             and "/" not in requested_model
@@ -393,10 +414,29 @@ class AsyncLLMClient:
             )
 
         llm_config = self._llm_config
+        if llm_config.llm_deployment_id and (
+            self._dr_client is None
+            or (
+                llm_config.deployment_api_base is None
+                and self._deployment_base_url is None
+            )
+        ):
+            from core.api import initialize_deployment
+
+            dr_client, deployment_base_url = initialize_deployment()
+            self._dr_client = dr_client
+            self._deployment_base_url = deployment_base_url
+
         if self._dr_client is not None and llm_config.datarobot_api_token is None:
             dr_token = getattr(self._dr_client, "token", None)
             if dr_token:
                 llm_config = replace(llm_config, datarobot_api_token=dr_token)
+
+        api_base = None
+        if llm_config.llm_deployment_id:
+            api_base = llm_config.deployment_api_base or _normalize_deployment_chat_url(
+                self._deployment_base_url
+            )
 
         self._instructor_client = instructor.from_litellm(
             litellm.acompletion,
@@ -406,7 +446,7 @@ class AsyncLLMClient:
             self._instructor_client,
             self.token_tracker,
             llm_config,
-            llm_config.deployment_api_base,
+            api_base,
         )
 
     async def __aexit__(
