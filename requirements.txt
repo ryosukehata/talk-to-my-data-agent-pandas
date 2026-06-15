@@ -66,10 +66,11 @@ python-docx>=1.1.0,<2.0  # For Word document generation
 
 # genai
 openai>=1.60.0,<2
-instructor>=1.3.4,<2.0
+instructor[litellm]>=1.3.4,<2.0
 boto3>=1.36.2,<2.0
 janome>=0.5.0,<1.0 # For Japanese NLP
 tiktoken>=0.11.0,<1.0
+litellm>=1.72.1
 
 # frontend
 streamlit==1.54.0
