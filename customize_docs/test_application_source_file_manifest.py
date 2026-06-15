@@ -39,5 +39,7 @@ def test_app_source_file_destinations_are_unique(monkeypatch) -> None:
     assert duplicate_destinations == []
     assert destination_counts["core/src/core/rest_api.py"] == 1
     assert destination_counts["core/src/core/customize/api_endpoints/report.py"] == 1
+    assert destination_counts["core/src/core/locale/ja_JP/LC_MESSAGES/base.mo"] == 1
+    assert destination_counts["utils/locale/ja_JP/LC_MESSAGES/base.mo"] == 0
     assert destination_counts["utils/rest_api.py"] == 1
     assert destination_counts["utils/customize/api_endpoints/report.py"] == 1

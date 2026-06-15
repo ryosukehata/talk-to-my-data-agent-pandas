@@ -230,6 +230,7 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - `core.*` と `utils.*` の主要 export が同一 object になることを `app_backend/tests/test_upstream_compat_imports.py` で固定した。
 - ApplicationSource manifest は PR1 の `core/**/*.py` 収集で top-level core 実装も同梱される。`core/src/core/rest_api.py` と `utils/rest_api.py` がそれぞれ1件ずつ含まれることをテストで固定した。
 - pandas 公開挙動は変更しない。`AnalystDataset.to_df()` と `execute_python` の `polars` 非許可は既存互換テストで確認する。
+- 2026-06-15: `utils.i18n` を `core.i18n` shim にした後も locale 資産が旧 `utils/locale` に残っていたため、Pulumi deploy の `LocaleSettings().setup_locale()` が `core/src/core/locale/ja_JP/LC_MESSAGES` 不在で失敗した。`base.po` の canonical location を `core/src/core/locale/ja_JP/LC_MESSAGES/base.po` に移し、ApplicationSource も `core/src/core/locale/.../base.mo` を同梱するよう更新した。
 
 ### PR3: FastAPI router / middleware integration
 
