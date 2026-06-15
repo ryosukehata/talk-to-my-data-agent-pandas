@@ -93,4 +93,21 @@ def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
         assert step["env"]["SKIP_PULUMI_FRONTEND_BUILD"] == "true"
         assert step["env"]["SKIP_PULUMI_CUSTOM_JOBS"] == "true"
         assert step["env"]["DISALLOW_MONITORING_RESOURCES"] == "true"
+        assert "VITE_ENABLE_REPORT_BUILDER" in step["env"]
         assert "SCHEDULER_HOUR" not in step["env"]
+
+
+def test_python_unit_workflow_runs_backend_and_customize_docs_tests() -> None:
+    workflow_path = (
+        Path(__file__).parents[1] / ".github" / "workflows" / "python-unit-tests.yml"
+    )
+    workflow = yaml.safe_load(workflow_path.read_text())
+
+    steps = workflow["jobs"]["test"]["steps"]
+    run_tests_step = next(
+        (step for step in steps if step.get("name") == "Run tests"),
+        None,
+    )
+
+    assert run_tests_step is not None
+    assert "pytest app_backend/tests customize_docs -q" in run_tests_step["run"]

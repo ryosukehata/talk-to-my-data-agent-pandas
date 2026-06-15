@@ -332,6 +332,14 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - `uv run ruff check infra`
 - `task --list --sort none`
 
+実装メモ:
+
+- 2026-06-15: PR5 用ブランチ `codex/pr5-infra-taskfile-deployment-dx` を `origin/dev` から作成した。
+- 2026-06-15: RED として `customize_docs/test_taskfile_deployment_dx.py` を追加し、root `Taskfile.yaml` の `infra` include、`deploy` / `deploy-dev`、既存 root `Pulumi.yaml` を使う `infra/Taskfile.yaml`、CLI の `DATABASE_CONNECTION_TYPE` 選択を固定した。
+- 2026-06-15: upstream `v11.5.1` の `infra/Pulumi.yaml` / `infra/infra/*` への大移動は、現行 `pulumi-up.yml` と既存 `infra/settings_*` 構成への影響が大きいためこの PR では見送る。代わりに `infra/Taskfile.yaml` の各 Pulumi タスクを `dir: ..` で実行し、既存 root Pulumi project を維持する。
+- 2026-06-15: `.datarobot/cli/base.yml` は実際の infra が読む `DATABASE_CONNECTION_TYPE` を選択式にし、既存 use case を使う `DATAROBOT_DEFAULT_USE_CASE` を追加した。Snowflake / BigQuery / SAP の個別設定ブロックは維持する。
+- 2026-06-15: workflow と Pulumi optional resource の回帰として、`python-unit-tests.yml` が `app_backend/tests customize_docs` を実行すること、report builder flag / monitoring / cleanup job guard が消えていないことをテストで固定した。
+
 ### PR6: React frontend small changes
 
 目的: `v11.5.1` の React 側小差分を取り込み、custom UI を壊していないことを確認する。
