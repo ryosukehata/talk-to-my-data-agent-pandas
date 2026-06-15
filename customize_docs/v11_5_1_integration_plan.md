@@ -85,9 +85,14 @@ core/src/core/customize/
 
 ### import 書き換え方針
 
-移動した `core/src/core/customize/*` 内部では、原則 `core.*` import に統一する。
+移動した `core/src/core/customize/*` 内部では、段階的に `core.*` import へ統一する。
+
+PR1 では、移動済みの customize 内 self-import を先に切り替える。
 
 - `from utils.customize...` -> `from core.customize...`
+
+PR2 の core package mechanical migration で、top-level 依存も切り替える。
+
 - `from utils.analyst_db...` -> `from core.analyst_db...`
 - `from utils.schema...` -> `from core.schema...`
 - `from utils.llm_client...` -> `from core.llm_client...`
@@ -179,6 +184,16 @@ core/src/core/customize/
 - `uv run pytest customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py -q`
 - `uv run ruff check core/src/core/customize utils/customize`
 
+実装メモ:
+
+- 2026-06-12: `utils/customize/*` の実装本体を `core/src/core/customize/*` へ移動した。
+- 旧 `utils.customize.*` は各ファイル単位の shim として残した。通常モジュールは `sys.modules` alias にし、旧 import への monkeypatch が新 canonical module に届くようにした。
+- `utils/customize/__init__.py` は eager import しない互換 package にした。`utils.database_helpers -> utils.customize.prompts` の循環 import を避けるため。
+- root の `core/__init__.py` で `core/src/core` を package path に追加し、editable install なしでも `core.customize` を import できるようにした。
+- ApplicationSource の file manifest に `core/**/*.py` を追加し、`core/src/core/customize/**/*.py` が DataRobot app source に含まれることをテストで固定した。
+- `core.customize.domain.report.__all__` から存在しない `ReportCreateRequest` を削除した。移動で package shim の `import *` がこの既存不整合を検出したため。
+- PR1 時点では `core.customize` 内の top-level 依存 (`utils.analyst_db`, `utils.schema`, `utils.llm_client` など) は維持する。これらは PR2 の core package mechanical migration で `core.*` へ切り替える。
+
 ### PR2: core package mechanical migration
 
 目的: behavior change を最小化して、upstream の `core/src/core` 構成を取り込む。PR1 で移動済みの `core.customize` と統合する。
@@ -207,6 +222,15 @@ core/src/core/customize/
 - `uv run pytest customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py -q`
 - `uv run ruff check core utils app_backend/tests customize_docs`
 
+実装メモ:
+
+- 2026-06-12: top-level `utils/*.py` と `utils/data_connections/**/*.py` の実装本体を `core/src/core/*` へ移動した。
+- 旧 `utils.*` は通常モジュールを `sys.modules` alias shim、package `__init__.py` を eager import しない互換 package として残した。
+- `core/src/core/**/*.py` 内の import は `core.*` に切り替えた。`openpyxl.utils` のような外部 package 名はそのまま維持した。
+- `core.*` と `utils.*` の主要 export が同一 object になることを `app_backend/tests/test_upstream_compat_imports.py` で固定した。
+- ApplicationSource manifest は PR1 の `core/**/*.py` 収集で top-level core 実装も同梱される。`core/src/core/rest_api.py` と `utils/rest_api.py` がそれぞれ1件ずつ含まれることをテストで固定した。
+- pandas 公開挙動は変更しない。`AnalystDataset.to_df()` と `execute_python` の `polars` 非許可は既存互換テストで確認する。
+
 ### PR3: FastAPI router / middleware integration
 
 目的: `app_backend` を upstream の thin FastAPI app 構成に近づける。
@@ -215,9 +239,11 @@ core/src/core/customize/
 
 - `app_backend/app/__init__.py`
 - `app_backend/app/main.py`
+- `app_backend/app/config.py`
 - `app_backend/app/deps.py`
-- `app_backend/app/middleware.py`
-- `app_backend/app/routers/*`
+- `app_backend/app/telemetry/*`
+- `core/src/core/rest_api.py`
+- `core/src/core/middleware.py`
 
 先に追加・更新するテスト:
 
@@ -230,6 +256,20 @@ core/src/core/customize/
 
 - `uv run pytest app_backend/tests/test_main.py app_backend/tests/test_v1150_compat.py app_backend/tests/test_rest_api_v0424_compat.py -q`
 - `uv run pytest app_backend/tests customize_docs -q`
+
+実装メモ:
+
+- 2026-06-12: `core.rest_api.create_app()` を追加し、既存の configured singleton `app` を返す app factory 境界を導入した。
+- `app_backend/app/main.py` は `utils.rest_api.app` の直接 import から `core.rest_api.create_app()` 呼び出しへ切り替えた。
+- このPRでは router 分割や deps/middleware の本格移植は行わない。customize routes、static frontend fallback、既存 session middleware を保ったまま、後続PRで `app_backend/app/__init__.py` に upstream の thin app 構成を取り込める入口だけ固定する。
+- 2026-06-12: static frontend / runtime env script / telemetry setup を `app_backend/app/__init__.py` の `create_app()` に移し、`app_backend/app/main.py` を `from app import create_app; app = create_app()` の thin entrypoint にした。
+- 2026-06-12 時点では `create_app()` が既存の `core.rest_api` singleton を再利用し、重複 mount を避けるため app_backend 側でも configured app を cache していた。upstream の deps/lifespan と DataRobot ASGI middleware は、既存 session middleware と conflict しない形を確認してから後続で取り込む前提だった。
+- 2026-06-15: `dev` 向けまとめPRの `FastAPI: app_backend` CI は `app_backend/` を cwd として実行するため、entrypoint 構造テストの source file path を `__file__` 起点に変更した。
+- 2026-06-15: upstream `v11.5.1` の `Config` / `Deps` / lifespan 初期化を `app_backend/app` に追加した。`create_app(deps=...)` で injected deps を `app.state.deps` に設定できる。
+- 2026-06-15: `/health` と DataRobot ASGI middleware 境界を `app_backend/app/__init__.py` に追加した。ローカルの未同期環境でも backend import が失敗しないよう、`datarobot-asgi-middleware` がない場合は警告に留める。
+- 2026-06-15: session middleware を `core/src/core/middleware.py` に分離し、`utils.rest_api` / `core.rest_api` からの既存参照は re-export で維持した。upstream の `TEST_USER_EMAIL` 対応を取り込みつつ、`DEV_MODE` 時の `DATAROBOT_API_TOKEN` scoped token 互換は残した。
+- 2026-06-15: `core.rest_api.create_app(lifespan=..., title=...)` は fresh FastAPI app を作れるようにし、引数なしでは従来どおり `core.rest_api.app` singleton を返す。backend 側 `create_app()` は lifespan 付き configured app を cache する。
+- 2026-06-15: upstream `v11.5.1` の router split は実ファイル上 `core/src/core/routers/*` だが、既存 customize import (`get_initialized_db`, `run_complete_analysis_task`) と backend monkeypatch テストを壊さないため、今回のPRでは既存 monolithic router を factory に載せ替える形で統合した。
 
 ### PR4: LLM configuration / LiteLLM integration
 
