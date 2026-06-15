@@ -12,7 +12,9 @@ from infra.configurations.llm import (
 )
 
 
-def get_configuration(env: Mapping[str, str] | None = None) -> LLMConfigurationDefinition:
+def get_configuration(
+    env: Mapping[str, str] | None = None,
+) -> LLMConfigurationDefinition:
     resolved_env = resolve_env(env)
     default_model = configured_model(resolved_env, DEFAULT_GATEWAY_MODEL)
     deployment_id = resolved_env.get("LLM_DEPLOYMENT_ID") or "${LLM_DEPLOYMENT_ID}"
