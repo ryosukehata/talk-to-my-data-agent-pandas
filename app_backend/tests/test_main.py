@@ -22,7 +22,8 @@ os.environ.setdefault("DATAROBOT_API_TOKEN", "test-token")
 os.environ.setdefault("DATAROBOT_ENDPOINT", "https://example.com")
 os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 
-from app.main import STATIC_FRONTEND_AVAILABLE, app, is_static_frontend_available
+from app import STATIC_FRONTEND_AVAILABLE, is_static_frontend_available
+from app.main import app
 
 client = TestClient(app)
 
