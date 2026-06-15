@@ -296,6 +296,16 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - `uv run pytest customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py -q`
 - `uv run ruff check utils/customize core/src/core infra`
 
+実装メモ:
+
+- 2026-06-15: PR4 用ブランチ `codex/pr4-llm-litellm-integration` を `origin/dev` から作成した。
+- 2026-06-15: RED として `app_backend/tests/test_llm_client.py` に `AsyncLLMClient` の既存 OpenAI timeout 互換、LiteLLM Gateway 経路、deployed LLM `api_base` 注入、token tracking 互換テストを追加した。
+- 2026-06-15: RED として `app_backend/tests/test_llm_configuration.py` を追加し、`infra.configurations.llm.*` が外部接続なしで import/evaluate できること、`.datarobot/cli/llm.yml` と `.env.template` が upstream v11.5.1 相当の LLM 選択肢を持つことを固定した。
+- 2026-06-15: `core/src/core/llm_client.py` に `LLMClientConfig` を追加した。既定では既存の `AsyncOpenAI(timeout=180, max_retries=2)` 経路を維持し、`USE_DATAROBOT_LLM_GATEWAY` / `LLM_DEFAULT_MODEL` / `LLM_DEPLOYMENT_ID` / `TEXTGEN_DEPLOYMENT_ID` がある場合だけ `instructor.from_litellm(litellm.acompletion)` を使う。
+- 2026-06-15: LiteLLM 経路では generic model alias (`datarobot-deployed-llm`, `custom-model`) を `LLM_DEFAULT_MODEL` に解決し、既存の `max_tokens` -> `max_completion_tokens` 変換、明示 timeout の尊重、token tracking を維持する。
+- 2026-06-15: `infra/configurations/llm/*` は Pulumi resource を作らない import-safe 定義として追加した。実際の resource 統合は PR5 以降で行い、この PR では LLM Gateway / deployed LLM / registered model / external LLM の runtime parameter 定義を評価可能にする。
+- 2026-06-15: `instructor[litellm]` と `litellm>=1.72.1` を root / backend dependencies に追加した。`uv lock` は実行したが、このリポジトリの lock file には差分が出なかった。
+
 ### PR5: Infra / Taskfile / deployment DX
 
 目的: `quickstart.py` 中心から `task dev` / `task deploy` 中心へ寄せる。ただし既存運用を急に壊さない。
