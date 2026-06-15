@@ -9,8 +9,6 @@ from __future__ import annotations
 import asyncio
 from typing import cast
 
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-
 from core.constants import ALTERNATIVE_LLM_BIG
 from core.customize.domain.question_refiner.domain import (
     RefinedQuestion,
@@ -24,6 +22,7 @@ from core.logging_helper import get_logger
 from core.token_tracking import (
     TokenUsageTracker,
 )
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
 logger = get_logger(__name__)
 QUESTION_REFINER_TIMEOUT_ENV = "QUESTION_REFINER_LLM_TIMEOUT_SECONDS"

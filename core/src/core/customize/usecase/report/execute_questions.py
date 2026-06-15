@@ -19,9 +19,8 @@ from core.customize.infrastructure.chat.chat_executor import ChatExecutor
 from core.logging_helper import get_logger
 
 if TYPE_CHECKING:
-    from starlette.requests import Request
-
     from core.analyst_db import AnalystDB
+    from starlette.requests import Request
 
 logger = get_logger("ExecuteQuestionsUseCase")
 
