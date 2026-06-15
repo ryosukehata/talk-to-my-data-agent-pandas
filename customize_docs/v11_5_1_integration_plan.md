@@ -262,6 +262,7 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - このPRでは router 分割や deps/middleware の本格移植は行わない。customize routes、static frontend fallback、既存 session middleware を保ったまま、後続PRで `app_backend/app/__init__.py` に upstream の thin app 構成を取り込める入口だけ固定する。
 - 2026-06-12: static frontend / runtime env script / telemetry setup を `app_backend/app/__init__.py` の `create_app()` に移し、`app_backend/app/main.py` を `from app import create_app; app = create_app()` の thin entrypoint にした。
 - `create_app()` は既存の `core.rest_api` singleton を再利用し、重複 mount を避けるため app_backend 側でも configured app を cache する。upstream の deps/lifespan と DataRobot ASGI middleware は、既存 session middleware と conflict しない形を確認してから別PRで取り込む。
+- 2026-06-15: `dev` 向けまとめPRの `FastAPI: app_backend` CI は `app_backend/` を cwd として実行するため、entrypoint 構造テストの source file path を `__file__` 起点に変更した。
 
 ### PR4: LLM configuration / LiteLLM integration
 

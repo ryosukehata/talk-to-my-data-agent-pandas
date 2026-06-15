@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+APP_MAIN_PATH = Path(__file__).resolve().parents[1] / "app" / "main.py"
+
 
 def _set_required_import_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATAROBOT_API_TOKEN", "test-token")
@@ -27,8 +29,7 @@ def test_core_rest_api_exposes_app_factory(
 
 
 def test_backend_main_starts_from_core_app_factory() -> None:
-    source_path = Path("app_backend/app/main.py")
-    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    tree = ast.parse(APP_MAIN_PATH.read_text(encoding="utf-8"))
 
     imported_from_app_package = False
     imported_from_legacy_utils = False
@@ -50,8 +51,7 @@ def test_backend_main_starts_from_core_app_factory() -> None:
 
 
 def test_backend_main_is_thin_factory_entrypoint() -> None:
-    source_path = Path("app_backend/app/main.py")
-    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    tree = ast.parse(APP_MAIN_PATH.read_text(encoding="utf-8"))
 
     top_level_definitions = [
         node
