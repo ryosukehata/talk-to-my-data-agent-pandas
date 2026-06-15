@@ -202,13 +202,15 @@ def get_app_files(
             (
                 str(
                     PROJECT_ROOT
-                    / "utils"
+                    / "core"
+                    / "src"
+                    / "core"
                     / "locale"
                     / application_locale
                     / "LC_MESSAGES"
                     / "base.mo"
                 ),
-                f"utils/locale/{application_locale}/LC_MESSAGES/base.mo",
+                f"core/src/core/locale/{application_locale}/LC_MESSAGES/base.mo",
             )
         )
 
