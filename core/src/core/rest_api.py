@@ -14,19 +14,14 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import io
 import json
 import os
 import sys
 import tempfile
-import uuid
-from copy import deepcopy
-from pathlib import Path
 from typing import Any, Iterable, List, Union, cast
 
 import chardet
-import datarobot as dr
 import pandas as pd
 from fastapi import (
     APIRouter,
@@ -50,7 +45,9 @@ from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils.dataframe import dataframe_to_rows
 from starlette.background import BackgroundTask
+from starlette.types import Lifespan
 
+from core import middleware as core_middleware
 from core.analyst_db import (
     AnalystDB,
     DatasetMetadata,
@@ -118,6 +115,13 @@ from core.token_tracking import (
 logger = get_logger()
 
 MAX_EXCEL_ROWS = 50000  # Maximum rows to export to Excel to prevent memory issues
+
+# Backward-compatible exports for utils.rest_api/core.rest_api consumers.
+SessionState = core_middleware.SessionState
+_initialize_session = core_middleware._initialize_session
+get_database = core_middleware.get_database
+session_middleware = core_middleware.session_middleware
+session_store = core_middleware.session_store
 
 
 def detect_and_decode_csv(raw_bytes: bytes, filename: str) -> str:
@@ -276,19 +280,6 @@ def _chart_trace_to_dataframe(trace: dict[str, Any]) -> pd.DataFrame:
     return df
 
 
-async def get_database(user_id: str) -> AnalystDB:
-    analyst_db = await AnalystDB.create(
-        user_id=user_id,
-        db_path=Path("/tmp"),
-        dataset_db_name="datasets.db",
-        chat_db_name="chat.db",
-        data_source_db_name="datasources.db",
-        user_recipe_db_name="recipe.db",
-        use_persistent_storage=bool(os.environ.get("APPLICATION_ID")),
-    )
-    return analyst_db
-
-
 # Dependency to provide the initialized database
 async def get_initialized_db(request: Request) -> AnalystDB:
     if (
@@ -305,53 +296,76 @@ async def get_initialized_db(request: Request) -> AnalystDB:
     return cast(AnalystDB, request.state.session.analyst_db)
 
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Data Analyst API",
-    description="""
-    An intelligent API for data analysis that provides capabilities including:
-    - Dataset management (upload CSV/Excel files, connect to databases, access the Data Registry)
-    - Data cleansing and standardization
-    - Data dictionary creation and management
-    - Chat-based data analysis conversations
-    - Python code generation
-    - Chart creation
-    - Business insights generation
-
-    Available endpoint groups:
-    - /api/v1/registry: Access Data Registry datasets
-    - /api/v1/database: Database connection and table management
-    - /api/v1/datasets: Upload, retrieve, and manage datasets
-    - /api/v1/dictionaries: Manage data dictionaries
-    - /api/v1/chats: Create and manage chat conversations for data analysis
-
-    The API uses OpenAI's GPT models for intelligent analysis and response generation.
-    """,
-    version="1.0.0",
-    contact={"name": "API Support", "email": "support@example.com"},
-    license_info={
-        "name": "Apache 2.0",
-        "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
-    },
-    debug=True,  # Stack traces will be exposed for 500 responses
-)
-
-
 script_name = os.environ.get("SCRIPT_NAME", "")
 router = APIRouter(prefix=f"{script_name}/api/v1")
+_app_singleton: FastAPI | None = None
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
+
+def _create_fastapi_app(
+    lifespan: Lifespan[FastAPI] | None = None,
+    title: str = "Data Analyst API",
+) -> FastAPI:
+    created_app = FastAPI(
+        title=title,
+        description="""
+        An intelligent API for data analysis that provides capabilities including:
+        - Dataset management (upload CSV/Excel files, connect to databases, access the Data Registry)
+        - Data cleansing and standardization
+        - Data dictionary creation and management
+        - Chat-based data analysis conversations
+        - Python code generation
+        - Chart creation
+        - Business insights generation
+
+        Available endpoint groups:
+        - /api/v1/registry: Access Data Registry datasets
+        - /api/v1/database: Database connection and table management
+        - /api/v1/datasets: Upload, retrieve, and manage datasets
+        - /api/v1/dictionaries: Manage data dictionaries
+        - /api/v1/chats: Create and manage chat conversations for data analysis
+
+        The API uses OpenAI's GPT models for intelligent analysis and response generation.
+        """,
+        version="1.0.0",
+        contact={"name": "API Support", "email": "support@example.com"},
+        license_info={
+            "name": "Apache 2.0",
+            "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
+        },
+        lifespan=lifespan,
+        debug=True,  # Stack traces will be exposed for 500 responses
+    )
+
+    created_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    created_app.middleware("http")(session_middleware)
+    created_app.openapi = lambda: custom_openapi(created_app)  # type: ignore[method-assign]
+    created_app.include_router(router)
+
+    try:
+        from core.customize.rest_api import router as customize_router
+
+        created_app.include_router(customize_router, prefix=f"{script_name}/api/v1")
+        logger.info("Customize API endpoints mounted")
+    except ImportError as e:
+        logger.warning("Customize module was not found: %s", e)
+    except Exception as e:
+        logger.exception("Failed to load customize API endpoints: %s", e)
+
+    telemetry.log_application_start()
+    telemetry.instrument_fastapi_app(created_app)
+
+    return created_app
 
 
 # Add custom OpenAPI schema
-def custom_openapi() -> dict[str, Any]:
+def custom_openapi(app: FastAPI) -> dict[str, Any]:
     if app.openapi_schema:
         return app.openapi_schema
 
@@ -371,163 +385,19 @@ def custom_openapi() -> dict[str, Any]:
     return app.openapi_schema
 
 
-app.openapi = custom_openapi  # type: ignore[method-assign]
+def create_app(
+    lifespan: Lifespan[FastAPI] | None = None,
+    title: str = "Data Analyst API",
+) -> FastAPI:
+    """Create a configured FastAPI app, preserving the default singleton."""
+    global _app_singleton
 
+    if lifespan is None and title == "Data Analyst API":
+        if _app_singleton is None:
+            _app_singleton = _create_fastapi_app()
+        return _app_singleton
 
-def create_app() -> FastAPI:
-    """Return the configured FastAPI application singleton."""
-    return app
-
-
-class SessionState(object):
-    _state: dict[str, Any]
-
-    def __init__(self, state: dict[str, Any] | None = None):
-        if state is None:
-            state = {}
-        super().__setattr__("_state", state)
-
-    def __setattr__(self, key: Any, value: Any) -> None:
-        self._state[key] = value
-
-    def __getattr__(self, key: Any) -> Any:
-        try:
-            return self._state[key]
-        except KeyError:
-            message = "'{}' object has no attribute '{}'"
-            raise AttributeError(message.format(self.__class__.__name__, key))
-
-    def __delattr__(self, key: Any) -> None:
-        del self._state[key]
-
-    def update(self, state: dict[str, Any]) -> None:
-        self._state.update(state)
-
-
-session_store: dict[str, SessionState] = {}
-session_lock = asyncio.Lock()
-
-
-@app.middleware("http")
-async def add_session_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
-    request_methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
-    if request.method in request_methods:
-        # Initialize the session
-        session_state, session_id, user_id = await _initialize_session(request)
-        request.state.session = session_state
-
-        if not request.state.session.datarobot_account_info:
-            request.state.session.datarobot_account_info = {}
-            try:
-                if request.headers.get("x-user-email"):
-                    # do not try to fetch user info for prob requests
-                    with use_user_token(request):
-                        reply = dr.client.get_client().get("account/info/")
-                        account_info = reply.json()
-                    request.state.session.datarobot_account_info = account_info
-            except Exception as e:
-                logger.info(f"Error fetching account info: {e}")
-
-        dr_uid = request.state.session.datarobot_account_info.get("uid")
-        if session_id is None and dr_uid is not None:
-            session_id = base64.b64encode(dr_uid.encode()).decode()
-            user_id = dr_uid
-
-        # Initialize database in the session
-        if user_id:
-            await _initialize_database(request, user_id)
-
-    # Process the request
-    response: Response = await call_next(request)
-
-    if request.method in request_methods:
-        # Set session cookie if needed
-        if session_id:
-            _set_session_cookie(
-                response, user_id, session_id, request.cookies.get("session_fastapi")
-            )
-
-    return response
-
-
-@telemetry.trace
-@telemetry.meter
-async def _initialize_session(
-    request: Request,
-) -> tuple[
-    SessionState,
-    str | None,
-    str | None,
-]:
-    """Initialize the session state and return the session ID and user ID."""
-    # Create a new session state with default values
-    is_local_dev = os.environ.get("DEV_MODE", False)
-    session_state = SessionState()
-    empty_session_state: dict[str, Any] = {
-        "datarobot_account_info": None,
-        "datarobot_api_scoped_token": os.environ.get("DATAROBOT_API_TOKEN")
-        if is_local_dev
-        else None,
-        "analyst_db": None,
-    }
-    session_state.update(deepcopy(empty_session_state))
-
-    # Try to get user ID from cookie
-    user_id = None
-    session_fastapi_cookie = request.cookies.get("session_fastapi")
-    if session_fastapi_cookie:
-        try:
-            user_id = base64.b64decode(session_fastapi_cookie.encode()).decode()
-        except Exception:
-            pass  # If decoding fails, continue without user_id
-
-    # Generate a new user ID if needed
-    new_user_id = None
-    email_header = request.headers.get("x-user-email")
-    if email_header:
-        new_user_id = str(uuid.uuid5(uuid.NAMESPACE_OID, email_header))[:36]
-
-    # Determine session ID
-    session_id = None
-    if session_fastapi_cookie:
-        session_id = session_fastapi_cookie
-    elif new_user_id:
-        session_id = base64.b64encode(new_user_id.encode()).decode()
-
-    # Get or create session in store
-    if session_id:
-        async with session_lock:
-            existing_session = session_store.get(session_id)
-            if existing_session:
-                return existing_session, session_id, user_id or new_user_id
-            else:
-                session_store[session_id] = session_state
-
-    return session_state, session_id, user_id or new_user_id
-
-
-async def _initialize_database(request: Request, user_id: str) -> None:
-    """Initialize per-user database in the session if not already initialized."""
-    if (
-        not hasattr(request.state.session, "analyst_db")
-        or request.state.session.analyst_db is None
-    ):
-        async with session_lock:
-            request.state.session.analyst_db = await get_database(user_id)
-
-
-def _set_session_cookie(
-    response: Response,
-    user_id: str | None,
-    session_id: str,
-    session_fastapi_cookie: str | None,
-) -> None:
-    """Set the session cookie if needed."""
-    if user_id and not session_fastapi_cookie:
-        encoded_uid = base64.b64encode(user_id.encode()).decode()
-        response.set_cookie(key="session_fastapi", value=encoded_uid, httponly=True)
-    elif not session_fastapi_cookie and not user_id:
-        response.set_cookie(key="session_fastapi", value=session_id, httponly=True)
+    return _create_fastapi_app(lifespan=lifespan, title=title)
 
 
 # Make this sync as the DR requests are synchronous, if async this would block.
@@ -2010,16 +1880,4 @@ async def store_datarobot_account(
     return {"success": True}
 
 
-# メインルーターの追加
-app.include_router(router)
-
-# カスタマイズAPIの統合
-try:
-    from core.customize.rest_api import router as customize_router
-
-    app.include_router(customize_router, prefix="/api/v1")
-    print("✅ カスタマイズAPIエンドポイントを追加しました")
-except ImportError as e:
-    print(f"⚠️ カスタマイズモジュールが見つかりません: {e}")
-except Exception as e:
-    print(f"❌ カスタマイズモジュールの読み込みに失敗しました: {e}")
+app = create_app()

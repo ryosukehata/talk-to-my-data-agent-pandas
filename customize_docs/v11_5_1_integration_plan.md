@@ -239,9 +239,11 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 
 - `app_backend/app/__init__.py`
 - `app_backend/app/main.py`
+- `app_backend/app/config.py`
 - `app_backend/app/deps.py`
-- `app_backend/app/middleware.py`
-- `app_backend/app/routers/*`
+- `app_backend/app/telemetry/*`
+- `core/src/core/rest_api.py`
+- `core/src/core/middleware.py`
 
 先に追加・更新するテスト:
 
@@ -261,8 +263,13 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - `app_backend/app/main.py` は `utils.rest_api.app` の直接 import から `core.rest_api.create_app()` 呼び出しへ切り替えた。
 - このPRでは router 分割や deps/middleware の本格移植は行わない。customize routes、static frontend fallback、既存 session middleware を保ったまま、後続PRで `app_backend/app/__init__.py` に upstream の thin app 構成を取り込める入口だけ固定する。
 - 2026-06-12: static frontend / runtime env script / telemetry setup を `app_backend/app/__init__.py` の `create_app()` に移し、`app_backend/app/main.py` を `from app import create_app; app = create_app()` の thin entrypoint にした。
-- `create_app()` は既存の `core.rest_api` singleton を再利用し、重複 mount を避けるため app_backend 側でも configured app を cache する。upstream の deps/lifespan と DataRobot ASGI middleware は、既存 session middleware と conflict しない形を確認してから別PRで取り込む。
+- 2026-06-12 時点では `create_app()` が既存の `core.rest_api` singleton を再利用し、重複 mount を避けるため app_backend 側でも configured app を cache していた。upstream の deps/lifespan と DataRobot ASGI middleware は、既存 session middleware と conflict しない形を確認してから後続で取り込む前提だった。
 - 2026-06-15: `dev` 向けまとめPRの `FastAPI: app_backend` CI は `app_backend/` を cwd として実行するため、entrypoint 構造テストの source file path を `__file__` 起点に変更した。
+- 2026-06-15: upstream `v11.5.1` の `Config` / `Deps` / lifespan 初期化を `app_backend/app` に追加した。`create_app(deps=...)` で injected deps を `app.state.deps` に設定できる。
+- 2026-06-15: `/health` と DataRobot ASGI middleware 境界を `app_backend/app/__init__.py` に追加した。ローカルの未同期環境でも backend import が失敗しないよう、`datarobot-asgi-middleware` がない場合は警告に留める。
+- 2026-06-15: session middleware を `core/src/core/middleware.py` に分離し、`utils.rest_api` / `core.rest_api` からの既存参照は re-export で維持した。upstream の `TEST_USER_EMAIL` 対応を取り込みつつ、`DEV_MODE` 時の `DATAROBOT_API_TOKEN` scoped token 互換は残した。
+- 2026-06-15: `core.rest_api.create_app(lifespan=..., title=...)` は fresh FastAPI app を作れるようにし、引数なしでは従来どおり `core.rest_api.app` singleton を返す。backend 側 `create_app()` は lifespan 付き configured app を cache する。
+- 2026-06-15: upstream `v11.5.1` の router split は実ファイル上 `core/src/core/routers/*` だが、既存 customize import (`get_initialized_db`, `run_complete_analysis_task`) と backend monkeypatch テストを壊さないため、今回のPRでは既存 monolithic router を factory に載せ替える形で統合した。
 
 ### PR4: LLM configuration / LiteLLM integration
 

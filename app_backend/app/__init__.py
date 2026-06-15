@@ -15,13 +15,22 @@
 import json
 import logging
 import os
-from typing import Awaitable, Callable
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Awaitable, Callable
 
-from core.data_analyst_telemetry import telemetry
 from core.rest_api import create_app as create_core_app
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+
+from app.config import Config
+from app.deps import Deps, create_deps
+from app.telemetry import configure_uvicorn_logging, init_logging
+
+try:
+    from datarobot_asgi_middleware import DataRobotASGIMiddleware
+except ImportError:
+    DataRobotASGIMiddleware = None  # type: ignore[assignment, misc]
 
 # Configure logging to filter out the health check logs
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
@@ -41,6 +50,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 base_router = APIRouter()
 _configured_app: FastAPI | None = None
+
+
+@base_router.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "healthy"}
 
 
 def is_static_frontend_available(
@@ -126,13 +140,44 @@ def create_static_path_middleware() -> Callable[
     return static_path_normalize
 
 
-def create_app() -> FastAPI:
+def _add_datarobot_asgi_middleware(app: FastAPI) -> None:
+    if DataRobotASGIMiddleware is None:
+        logging.getLogger(__name__).warning(
+            "datarobot-asgi-middleware is not installed; skipping DataRobot ASGI middleware."
+        )
+        return
+
+    app.add_middleware(DataRobotASGIMiddleware, health_endpoint="/health")
+
+
+def create_app(
+    title: str = "Data Analyst API",
+    config: Config | None = None,
+    deps: Deps | None = None,
+) -> FastAPI:
     global _configured_app
 
-    if _configured_app is not None:
+    cacheable = title == "Data Analyst API" and config is None and deps is None
+    if cacheable and _configured_app is not None:
         return _configured_app
 
-    app = create_core_app()
+    if config is None:
+        config = Config()
+
+    init_logging(level=config.log_level, format_type=config.log_format)
+    configure_uvicorn_logging(
+        log_format=config.log_format,
+        log_level=config.log_level.value,
+    )
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        async with create_deps(config, deps) as dependencies:
+            app.state.deps = dependencies
+            yield
+
+    app = create_core_app(lifespan=lifespan, title=title)
+    _add_datarobot_asgi_middleware(app)
     app.include_router(base_router)
 
     if STATIC_FRONTEND_AVAILABLE:
@@ -141,12 +186,6 @@ def create_app() -> FastAPI:
         # Important to be last so that we fall back to the static files if the route is not found
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
-    # Initialize telemetry on application startup
-    telemetry.log_application_start()
-
-    # Setup auto-instrumentation for FastAPI
-    # This will automatically trace all incoming HTTP requests
-    telemetry.instrument_fastapi_app(app)
-
-    _configured_app = app
+    if cacheable:
+        _configured_app = app
     return app

@@ -80,11 +80,16 @@ def test_backend_package_exposes_app_factory(
 ) -> None:
     _set_required_import_env(monkeypatch)
 
-    from core.rest_api import app as core_app
-
     from app import create_app
 
-    assert create_app() is core_app
+    created_app = create_app()
+
+    assert created_app is create_app()
+    assert any(
+        getattr(route, "path", "") == "/api/v1/config/feature-flags"
+        for route in created_app.routes
+    )
+    assert any(getattr(route, "path", "") == "/health" for route in created_app.routes)
 
 
 def test_backend_main_app_uses_core_factory(
