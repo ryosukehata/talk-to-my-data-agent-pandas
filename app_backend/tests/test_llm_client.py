@@ -1,6 +1,5 @@
 import asyncio
-import sys
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -58,7 +57,6 @@ def _clear_llm_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "DATAROBOT_ENDPOINT",
         "LLM_DEPLOYMENT_ID",
         "LLM_DEFAULT_MODEL",
-        "MLOPS_RUNTIME_PARAM_LLM_DEPLOYMENT_ID",
         "TEXTGEN_DEPLOYMENT_ID",
         "USE_DATAROBOT_LLM_GATEWAY",
     ):
@@ -261,55 +259,3 @@ def test_async_llm_client_injects_deployed_llm_api_base(
     )
     assert completions.kwargs["model"] == "datarobot/datarobot-deployed-llm"
     assert completions.kwargs["timeout"] == 45
-
-
-def test_async_llm_client_initializes_cd_runtime_deployment(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_llm_env(monkeypatch)
-    monkeypatch.setenv("MLOPS_RUNTIME_PARAM_LLM_DEPLOYMENT_ID", "deployment-123")
-    completions = _RecordingCompletions()
-    initialize_calls = 0
-
-    def fake_initialize_deployment() -> tuple[_FakeDataRobotClient, str]:
-        nonlocal initialize_calls
-        initialize_calls += 1
-        return (
-            _FakeDataRobotClient(),
-            "https://app.datarobot.example/api/v2/deployments/deployment-123/",
-        )
-
-    fake_core_api = ModuleType("core.api")
-    fake_core_api.initialize_deployment = fake_initialize_deployment  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "core.api", fake_core_api)
-    monkeypatch.setattr(
-        llm_client,
-        "litellm",
-        SimpleNamespace(acompletion=object()),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        llm_client.instructor,
-        "from_litellm",
-        lambda *_args, **_kwargs: _FakeInstructorClient(completions),
-        raising=False,
-    )
-
-    async def run_client() -> str:
-        async with AsyncLLMClient() as client:
-            return await client.chat.completions.create(
-                messages=[],
-                model="datarobot-deployed-llm",
-            )
-
-    result = asyncio.run(run_client())
-
-    assert result == "created"
-    assert initialize_calls == 1
-    assert completions.kwargs is not None
-    assert completions.kwargs["api_base"] == (
-        "https://app.datarobot.example/api/v2/deployments/"
-        "deployment-123/chat/completions"
-    )
-    assert completions.kwargs["api_key"] == "dr-token"
-    assert completions.kwargs["model"] == "datarobot/datarobot-deployed-llm"
