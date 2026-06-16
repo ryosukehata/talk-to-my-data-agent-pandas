@@ -9,9 +9,7 @@ from opentelemetry import context as otel_context
 
 class _ContextAttachingSpan:
     def __enter__(self) -> "_ContextAttachingSpan":
-        self._token = otel_context.attach(
-            otel_context.set_value("test-span", object())
-        )
+        self._token = otel_context.attach(otel_context.set_value("test-span", object()))
         return self
 
     def __exit__(self, *_args: Any) -> None:
