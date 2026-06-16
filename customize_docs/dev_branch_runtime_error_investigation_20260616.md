@@ -5,6 +5,7 @@
 - `AttributeError: 'coroutine' object has no attribute '_raw_response'`
 - `RuntimeWarning: coroutine 'acompletion' was never awaited`
 - `opentelemetry.context: Failed to detach context`
+- `litellm.BadRequestError: LLM Provider NOT provided`
 
 ## 調査方針
 
@@ -26,6 +27,14 @@
 
 現行の Instructor ドキュメントでは LiteLLM の async 利用は `from_provider(..., async_client=True)` が推奨されているが、固定版 `1.3.4` では既存構成との互換を優先し、`AsyncInstructor` と `instructor.patch(create=litellm.acompletion, ...)` を明示的に組み立てる。
 
+### DataRobot deployed LLM model name
+
+upstream v11.5.1 / v11.8.2 は `LLM_DEFAULT_MODEL` を app runtime parameter に渡し、`core.constants.get_llm_model()` で `datarobot/` provider prefix を補完する。
+fork 側の旧 `infra/__main__.py` では app runtime parameter に `LLM_DEFAULT_MODEL` が含まれていなかったため、`TEXTGEN_DEPLOYMENT_ID` / `LLM_DEPLOYMENT_ID` のみがある環境では generic alias の `datarobot-deployed-llm` が LiteLLM にそのまま渡る可能性があった。
+LiteLLM の DataRobot provider は provider prefix 付き model 名を routing に使うため、`model=datarobot-deployed-llm` のままだと以下が発生する。
+
+- `litellm.BadRequestError: LLM Provider NOT provided`
+
 ### OpenTelemetry
 
 `BaseTelemetry.trace()` の async generator ラッパーが `with tracer.start_as_current_span(...):` を開いたまま `yield` していた。
@@ -40,6 +49,11 @@ HTTP streaming やクライアント切断などで async generator が別の as
   - LiteLLM 経路では `from_litellm()` を使わず、`instructor.AsyncInstructor` を明示構築する。
   - `instructor.patch(create=litellm.acompletion, mode=Mode.MD_JSON)` により、LiteLLM coroutine を await する adapter を使う。
   - LiteLLM 経路の `AsyncLLMClient.__aexit__()` で `close_litellm_async_clients()` を await し、DataRobot deployment 呼び出し後の async HTTP client cleanup warning を防ぐ。
+  - `LLM_DEFAULT_MODEL` が未設定の既存環境でも DataRobot deployment alias を `datarobot/datarobot-deployed-llm` に解決する。
+- `core/src/core/constants.py`
+  - upstream と同様に `get_llm_model()` を追加し、`LLM_DEFAULT_MODEL` または既定 alias に `datarobot/` provider prefix を補完する。
+- `infra/__main__.py`
+  - 旧 infra 構成でも app runtime parameter に `LLM_DEFAULT_MODEL` を渡す。
 - `core/src/core/base_telemetry.py`
   - async generator の span は `tracer.start_span()` で作成する。
   - `trace.use_span(..., end_on_exit=False)` は `__anext__()` 実行中だけ有効にし、`yield` をまたいで OpenTelemetry context を保持しない。
@@ -53,7 +67,12 @@ HTTP streaming やクライアント切断などで async generator が別の as
   - LiteLLM Gateway 経路で `from_litellm()` に戻らないこと。
   - `create_with_completion()` が async adapter 経由で `_raw_response` を取得できること。
   - model 解決、timeout、retry、token 引数変換、DataRobot deployment `api_base` 注入が維持されること。
+  - `LLM_DEFAULT_MODEL` 未設定でも deployed LLM alias が provider prefix 付きに正規化されること。
   - ローカルの OpenAI 互換 HTTP server を DataRobot deployment に見立て、`AsyncLLMClient` が `/api/v2/deployments/{id}/chat/completions/` に bearer token 付きで POST し、structured response を返せること。
+- `app_backend/tests/test_llm_model_constants.py`
+  - `get_llm_model()` が upstream と同じ `datarobot/` provider prefix 補完を行うこと。
+- `customize_docs/test_llm_runtime_parameters.py`
+  - `infra/__main__.py` の app runtime parameter に `LLM_DEFAULT_MODEL` が含まれること。
 - `app_backend/tests/test_base_telemetry.py`
   - async generator を別 context で close しても `Failed to detach context` が出ないこと。
 - `app_backend/tests/test_api_analysis_execution_v0424_compat.py`
@@ -71,6 +90,11 @@ HTTP streaming やクライアント切断などで async generator が別の as
 - `uv run pytest app_backend/tests/test_llm_client.py app_backend/tests/test_llm_timeout.py app_backend/tests/test_api_analysis_execution_v0424_compat.py -q`
   - 25 passed
   - DataRobot deployment 互換 endpoint への round-trip smoke を含む。
+- `uv run pytest app_backend/tests/test_llm_model_constants.py app_backend/tests/test_llm_client.py::test_async_llm_client_deployed_llm_uses_provider_when_default_model_missing customize_docs/test_llm_runtime_parameters.py -q`
+  - RED: 5 failed
+  - GREEN: 5 passed
+- `uv run pytest app_backend/tests/test_llm_client.py app_backend/tests/test_llm_model_constants.py app_backend/tests/test_llm_configuration.py app_backend/tests/test_api_analysis_execution_v0424_compat.py app_backend/tests/test_llm_timeout.py app_backend/tests/test_base_telemetry.py customize_docs/test_llm_runtime_parameters.py -q`
+  - 34 passed
 - `uv run pytest app_backend/tests customize_docs -q`
   - 108 passed, 2 skipped
 

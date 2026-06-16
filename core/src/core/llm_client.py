@@ -23,6 +23,7 @@ from typing import Any, Type
 import instructor
 from openai import AsyncOpenAI
 
+from core.constants import get_llm_model
 from core.token_tracking import TokenUsageTracker
 
 try:
@@ -144,15 +145,24 @@ class LLMClientConfig:
     def resolve_model(self, requested_model: str | None) -> str | None:
         """Map generic model aliases to the configured runtime model."""
         if requested_model is None:
-            return self.default_model
+            if self.default_model:
+                return get_llm_model(self.default_model)
+            if self.deployment_api_base:
+                return get_llm_model()
+            return None
         if self.default_model and requested_model in _MODEL_ALIASES_FOR_CONFIG_DEFAULT:
-            return self.default_model
+            return get_llm_model(self.default_model)
+        if (
+            self.deployment_api_base
+            and requested_model in _MODEL_ALIASES_FOR_CONFIG_DEFAULT
+        ):
+            return get_llm_model(requested_model)
         if (
             self.use_datarobot_llm_gateway
             and "/" not in requested_model
             and requested_model
         ):
-            return f"datarobot/{requested_model}"
+            return get_llm_model(requested_model)
         return requested_model
 
 
