@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from contextlib import suppress
 from dataclasses import dataclass, replace
 from types import TracebackType
 from typing import Any, Type
@@ -435,12 +434,5 @@ class AsyncLLMClient:
         exc_tb: TracebackType | None,
     ) -> None:
         """Clean up clients on context exit."""
-        if self._llm_config.should_use_litellm and litellm is not None:
-            with suppress(Exception):
-                from litellm.llms.custom_httpx.async_client_cleanup import (
-                    close_litellm_async_clients,
-                )
-
-                await close_litellm_async_clients()
         if self._openai_client:
             await self._openai_client.close()

@@ -6,6 +6,7 @@
 - `RuntimeWarning: coroutine 'acompletion' was never awaited`
 - `opentelemetry.context: Failed to detach context`
 - `litellm.BadRequestError: LLM Provider NOT provided`
+- `litellm.APIConnectionError: DatarobotException - Cannot send a request, as the client has been closed`
 
 ## 調査方針
 
@@ -35,6 +36,14 @@ LiteLLM の DataRobot provider は provider prefix 付き model 名を routing �
 
 - `litellm.BadRequestError: LLM Provider NOT provided`
 
+### LiteLLM async client lifecycle
+
+upstream v11.5.1 / v11.8.2 は `AsyncLLMClient.__aexit__()` で LiteLLM の async HTTP client を明示 close しない。
+fork 側では `close_litellm_async_clients()` を context exit ごとに呼んでいたため、初期分析などで複数の LLM 呼び出しが連続・並行すると、別の LiteLLM リクエストが使う共有 client を先に閉じる可能性があった。
+その場合、以下が発生する。
+
+- `litellm.APIConnectionError: DatarobotException - Cannot send a request, as the client has been closed`
+
 ### OpenTelemetry
 
 `BaseTelemetry.trace()` の async generator ラッパーが `with tracer.start_as_current_span(...):` を開いたまま `yield` していた。
@@ -48,8 +57,8 @@ HTTP streaming やクライアント切断などで async generator が別の as
 - `core/src/core/llm_client.py`
   - LiteLLM 経路では `from_litellm()` を使わず、`instructor.AsyncInstructor` を明示構築する。
   - `instructor.patch(create=litellm.acompletion, mode=Mode.MD_JSON)` により、LiteLLM coroutine を await する adapter を使う。
-  - LiteLLM 経路の `AsyncLLMClient.__aexit__()` で `close_litellm_async_clients()` を await し、DataRobot deployment 呼び出し後の async HTTP client cleanup warning を防ぐ。
   - `LLM_DEFAULT_MODEL` が未設定の既存環境でも DataRobot deployment alias を `datarobot/datarobot-deployed-llm` に解決する。
+  - upstream と同様に、context exit では LiteLLM の共有 async client を閉じない。OpenAI legacy 経路の `AsyncOpenAI.close()` のみ維持する。
 - `core/src/core/constants.py`
   - upstream と同様に `get_llm_model()` を追加し、`LLM_DEFAULT_MODEL` または既定 alias に `datarobot/` provider prefix を補完する。
 - `infra/__main__.py`
@@ -68,6 +77,7 @@ HTTP streaming やクライアント切断などで async generator が別の as
   - `create_with_completion()` が async adapter 経由で `_raw_response` を取得できること。
   - model 解決、timeout、retry、token 引数変換、DataRobot deployment `api_base` 注入が維持されること。
   - `LLM_DEFAULT_MODEL` 未設定でも deployed LLM alias が provider prefix 付きに正規化されること。
+  - LiteLLM 経路の context exit で `close_litellm_async_clients()` に戻らないこと。
   - ローカルの OpenAI 互換 HTTP server を DataRobot deployment に見立て、`AsyncLLMClient` が `/api/v2/deployments/{id}/chat/completions/` に bearer token 付きで POST し、structured response を返せること。
 - `app_backend/tests/test_llm_model_constants.py`
   - `get_llm_model()` が upstream と同じ `datarobot/` provider prefix 補完を行うこと。
@@ -95,6 +105,9 @@ HTTP streaming やクライアント切断などで async generator が別の as
   - GREEN: 5 passed
 - `uv run pytest app_backend/tests/test_llm_client.py app_backend/tests/test_llm_model_constants.py app_backend/tests/test_llm_configuration.py app_backend/tests/test_api_analysis_execution_v0424_compat.py app_backend/tests/test_llm_timeout.py app_backend/tests/test_base_telemetry.py customize_docs/test_llm_runtime_parameters.py -q`
   - 34 passed
+- `uv run pytest app_backend/tests/test_llm_client.py::test_async_llm_client_litellm_exit_does_not_close_shared_async_clients -q`
+  - RED: `close_litellm_async_clients()` が呼ばれて失敗。
+  - GREEN: context exit で LiteLLM の共有 async client を閉じず、1 passed。
 - `uv run pytest app_backend/tests customize_docs -q`
   - 108 passed, 2 skipped
 
