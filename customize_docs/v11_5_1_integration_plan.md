@@ -392,6 +392,14 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - `uv run ruff format --check .`
 - `uv run ruff check .`
 
+実装メモ:
+
+- 2026-06-16: PR3 相当の FastAPI integration は PR #90 (`codex/v1151-complete-fastapi-integration`) として `codex/v1151-fastapi-app-factory` に merge 済みで、PR #89 により `dev` へ取り込み済みであることを確認した。
+- 2026-06-16: PR4 は PR #92、PR5 は PR #93、PR6 は PR #94 として `dev` に merge 済み。残作業は `v11.5.1` を履歴上の祖先にする baseline のみと判断した。
+- 2026-06-16: `codex/v1151-history-baseline` を最新 `origin/dev` から作成し、`git merge -s ours --no-ff --no-commit v11.5.1^{commit}` で内容差分なしの history baseline を作成する。
+- 2026-06-16: `v11.5.1` に残る差分は、upstream の router split、infra package 大移動、lock file / workflow 再編、Polars 前提差分、legacy Streamlit 寄りの配置など、PR1-PR6 で採用または見送り判断済みの差分として扱う。
+- 2026-06-16: 検証は `git merge-base --is-ancestor v11.5.1 HEAD`, `uv run pytest app_backend/tests customize_docs -q` (105 passed, 2 skipped), `npm --prefix app_frontend test` (123 passed), `npm --prefix app_frontend run lint` (0 errors, 15 existing warnings), `npm --prefix app_frontend run build`, `uv run ruff format --check .`, `uv run ruff check .` が成功。
+
 ## pandas 維持ルール
 
 - `AnalystDataset.to_df()` は `pd.DataFrame` を返す。
