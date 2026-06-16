@@ -354,6 +354,52 @@ def test_async_llm_client_injects_deployed_llm_api_base(
     assert completions.kwargs["timeout"] == 45
 
 
+def test_async_llm_client_deployed_llm_uses_provider_when_default_model_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.example/api/v2")
+    monkeypatch.setenv("TEXTGEN_DEPLOYMENT_ID", "deployment-123")
+    completions = _RecordingCompletions()
+
+    async def fake_acompletion(**_kwargs: Any) -> Any:
+        return "raw"
+
+    def fake_patch(*_args: Any, **kwargs: Any) -> Any:
+        assert kwargs["create"] is llm_client.litellm.acompletion
+        assert kwargs["mode"] is llm_client.instructor.Mode.MD_JSON
+        return completions.create
+
+    monkeypatch.setattr(
+        llm_client,
+        "litellm",
+        SimpleNamespace(acompletion=fake_acompletion),
+        raising=False,
+    )
+    monkeypatch.setattr(llm_client.instructor, "patch", fake_patch)
+
+    async def run_client() -> str:
+        async with AsyncLLMClient(
+            dr_client=_FakeDataRobotClient(),
+            deployment_base_url="https://legacy.example.test/chat/completions",
+        ) as client:
+            return await client.chat.completions.create(
+                messages=[],
+                model="datarobot-deployed-llm",
+                response_model=object,
+            )
+
+    result = asyncio.run(run_client())
+
+    assert result == "created"
+    assert completions.kwargs is not None
+    assert completions.kwargs["api_base"] == (
+        "https://app.datarobot.example/api/v2/deployments/"
+        "deployment-123/chat/completions"
+    )
+    assert completions.kwargs["model"] == "datarobot/datarobot-deployed-llm"
+
+
 def test_async_llm_client_deployed_llm_create_round_trips_to_deployment_endpoint() -> (
     None
 ):

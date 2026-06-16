@@ -41,6 +41,7 @@ from infra.components.dr_credential import (
     get_database_credentials,
     get_llm_credentials,
 )
+from infra.configurations.llm import DEFAULT_DEPLOYED_MODEL, configured_model
 from infra.settings_database import DATABASE_CONNECTION_TYPE
 from infra.settings_proxy_llm import CHAT_MODEL_NAME
 from utils.customize.csv_validator import (
@@ -58,6 +59,7 @@ from utils.schema import AppInfra
 
 TEXTGEN_DEPLOYMENT_ID = os.environ.get("TEXTGEN_DEPLOYMENT_ID")
 TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
+LLM_DEFAULT_MODEL = configured_model(os.environ, DEFAULT_DEPLOYED_MODEL)
 USE_DATAROBOT_LLM_GATEWAY = (
     os.environ.get("USE_DATAROBOT_LLM_GATEWAY", "false").lower() == "true"
 )
@@ -212,6 +214,11 @@ app_runtime_parameters = [
         key=llm_deployment_env_name,
         type="deployment",
         value=llm_deployment.id,
+    ),
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="LLM_DEFAULT_MODEL",
+        type="string",
+        value=LLM_DEFAULT_MODEL,
     ),
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
         key="APP_LOCALE", type="string", value=LocaleSettings().app_locale
