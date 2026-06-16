@@ -50,6 +50,47 @@ def test_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path, caplog) -> None
     asyncio.run(_assert_analyst_db_dataset_roundtrip_preserves_pandas(tmp_path, caplog))
 
 
+def test_register_dataset_normalizes_tuple_columns_for_metadata(tmp_path) -> None:
+    asyncio.run(
+        _assert_register_dataset_normalizes_tuple_columns_for_metadata(tmp_path)
+    )
+
+
+async def _assert_register_dataset_normalizes_tuple_columns_for_metadata(
+    tmp_path,
+) -> None:
+    analyst_db = await AnalystDB.create(user_id="user-1", db_path=tmp_path)
+    source_df = pd.DataFrame(
+        [[0, 1, 0, 1]],
+        columns=pd.Index(
+            [
+                ("black_friday", 0.0),
+                ("black_friday", 1.0),
+                ("holiday", 0.0),
+                ("holiday", 1.0),
+            ]
+        ),
+    )
+    dataset = AnalystDataset(name="events", data=source_df)
+
+    result = await analyst_db.register_dataset(
+        dataset,
+        data_source=InternalDataSourceType.FILE,
+    )
+    metadata = await analyst_db.get_dataset_metadata("events")
+    restored = await analyst_db.get_dataset("events")
+
+    assert result == {"success": True, "msg": ""}
+    assert metadata.columns == [
+        "('black_friday', '0.0')",
+        "('black_friday', '1.0')",
+        "('holiday', '0.0')",
+        "('holiday', '1.0')",
+    ]
+    assert all(isinstance(column, str) for column in metadata.columns)
+    assert restored.to_df().columns.tolist() == metadata.columns
+
+
 async def _assert_analyst_db_dataset_roundtrip_preserves_pandas(
     tmp_path,
     caplog,
