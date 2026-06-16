@@ -1,9 +1,13 @@
 import asyncio
+import json
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from core import llm_client
+from pydantic import BaseModel
 from utils.llm_client import (
     AsyncLLMClient,
     CompletionsProxy,
@@ -49,6 +53,10 @@ class _FakeOpenAIClient:
 
 class _FakeDataRobotClient:
     token = "dr-token"
+
+
+class _DeploymentSmokeResponse(BaseModel):
+    answer: str
 
 
 def _clear_llm_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -344,3 +352,88 @@ def test_async_llm_client_injects_deployed_llm_api_base(
     )
     assert completions.kwargs["model"] == "datarobot/datarobot-deployed-llm"
     assert completions.kwargs["timeout"] == 45
+
+
+def test_async_llm_client_deployed_llm_create_round_trips_to_deployment_endpoint() -> (
+    None
+):
+    captured_requests: list[dict[str, Any]] = []
+
+    class DeploymentHandler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            content_length = int(self.headers.get("content-length", "0"))
+            body = self.rfile.read(content_length).decode()
+            captured_requests.append(
+                {
+                    "path": self.path,
+                    "headers": dict(self.headers),
+                    "body": json.loads(body),
+                }
+            )
+            payload = {
+                "id": "chatcmpl-test",
+                "object": "chat.completion",
+                "created": 1,
+                "model": "datarobot-deployed-llm",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": '{"answer":"ok"}'},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 1,
+                    "total_tokens": 2,
+                },
+            }
+            response_body = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(response_body)))
+            self.end_headers()
+            self.wfile.write(response_body)
+
+        def log_message(self, *_args: Any) -> None:
+            return
+
+    server = HTTPServer(("127.0.0.1", 0), DeploymentHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    async def run_client() -> _DeploymentSmokeResponse:
+        from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
+
+        config = llm_client.LLMClientConfig(
+            default_model="datarobot/datarobot-deployed-llm",
+            llm_deployment_id="deployment-123",
+            datarobot_endpoint=f"http://127.0.0.1:{server.server_port}/api/v2",
+            datarobot_api_token="token-123",
+        )
+        async with AsyncLLMClient(llm_config=config) as client:
+            response = await client.chat.completions.create(
+                messages=[{"role": "user", "content": "ping"}],
+                model="datarobot-deployed-llm",
+                max_tokens=16,
+                response_model=_DeploymentSmokeResponse,
+            )
+        await GLOBAL_LOGGING_WORKER.flush()
+        await GLOBAL_LOGGING_WORKER.stop()
+        return response
+
+    try:
+        result = asyncio.run(run_client())
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+    assert result.answer == "ok"
+    assert len(captured_requests) == 1
+    request = captured_requests[0]
+    assert request["path"] == ("/api/v2/deployments/deployment-123/chat/completions/")
+    request_headers = {key.lower(): value for key, value in request["headers"].items()}
+    assert request_headers["authorization"] == "Bearer token-123"
+    assert request["body"]["model"] == "datarobot-deployed-llm"
+    assert request["body"]["max_tokens"] == 16
+    assert any(message["role"] == "user" for message in request["body"]["messages"])

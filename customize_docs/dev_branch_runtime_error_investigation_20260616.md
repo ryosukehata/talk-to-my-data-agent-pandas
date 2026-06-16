@@ -39,9 +39,13 @@ HTTP streaming やクライアント切断などで async generator が別の as
 - `core/src/core/llm_client.py`
   - LiteLLM 経路では `from_litellm()` を使わず、`instructor.AsyncInstructor` を明示構築する。
   - `instructor.patch(create=litellm.acompletion, mode=Mode.MD_JSON)` により、LiteLLM coroutine を await する adapter を使う。
+  - LiteLLM 経路の `AsyncLLMClient.__aexit__()` で `close_litellm_async_clients()` を await し、DataRobot deployment 呼び出し後の async HTTP client cleanup warning を防ぐ。
 - `core/src/core/base_telemetry.py`
   - async generator の span は `tracer.start_span()` で作成する。
   - `trace.use_span(..., end_on_exit=False)` は `__anext__()` 実行中だけ有効にし、`yield` をまたいで OpenTelemetry context を保持しない。
+- `core/src/core/api.py`
+  - `summarize_conversation()` が upstream v11.5.1 では `client.chat.completions.create(..., timeout=900)` を使うのに対し、fork 側では `create_with_completion()` へ変わっていた。
+  - 会話要約の LLM リクエストが成功した直後に tuple を Pydantic model として扱うリスクがあるため、upstream と同じ `create()` 呼び出しへ戻した。
 
 ## 追加テスト
 
@@ -49,14 +53,26 @@ HTTP streaming やクライアント切断などで async generator が別の as
   - LiteLLM Gateway 経路で `from_litellm()` に戻らないこと。
   - `create_with_completion()` が async adapter 経由で `_raw_response` を取得できること。
   - model 解決、timeout、retry、token 引数変換、DataRobot deployment `api_base` 注入が維持されること。
+  - ローカルの OpenAI 互換 HTTP server を DataRobot deployment に見立て、`AsyncLLMClient` が `/api/v2/deployments/{id}/chat/completions/` に bearer token 付きで POST し、structured response を返せること。
 - `app_backend/tests/test_base_telemetry.py`
   - async generator を別 context で close しても `Failed to detach context` が出ないこと。
+- `app_backend/tests/test_api_analysis_execution_v0424_compat.py`
+  - `summarize_conversation()` が upstream と同じ `create()` 呼び出しで summary 文字列を返し、`timeout=900` を渡すこと。
+  - `core/src/core/api.py` 内の `create_with_completion()` 呼び出しがすべて `(response, raw)` 形式で2値 unpack されること。
 
 ## テスト結果
 
 - `uv run pytest app_backend/tests/test_llm_client.py app_backend/tests/test_llm_timeout.py app_backend/tests/test_base_telemetry.py`
   - 14 passed
   - 既存の deprecation warning は今回変更外
+- `uv run pytest app_backend/tests/test_api_analysis_execution_v0424_compat.py -q`
+  - 11 passed
+  - 既存の deprecation warning は今回変更外
+- `uv run pytest app_backend/tests/test_llm_client.py app_backend/tests/test_llm_timeout.py app_backend/tests/test_api_analysis_execution_v0424_compat.py -q`
+  - 25 passed
+  - DataRobot deployment 互換 endpoint への round-trip smoke を含む。
+- `uv run pytest app_backend/tests customize_docs -q`
+  - 108 passed, 2 skipped
 
 ## upstream 取り込み時の注意
 

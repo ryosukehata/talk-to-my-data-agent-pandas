@@ -194,6 +194,96 @@ def test_no_database_operator_supports_noop_warmup() -> None:
     assert asyncio.run(operator.warmup()) is None
 
 
+def test_summarize_conversation_uses_upstream_create_call(monkeypatch) -> None:
+    asyncio.run(_assert_summarize_conversation_uses_upstream_create_call(monkeypatch))
+
+
+async def _assert_summarize_conversation_uses_upstream_create_call(monkeypatch):
+    class FakeCompletion:
+        def __init__(self) -> None:
+            self.kwargs = None
+            self.create_with_completion_called = False
+
+        async def create(self, **kwargs):
+            self.kwargs = kwargs
+            response_model = kwargs["response_model"]
+            return response_model(summary="要約しました")
+
+        async def create_with_completion(self, **kwargs):
+            self.create_with_completion_called = True
+            raise AssertionError(
+                "summarize_conversation should match upstream create()"
+            )
+
+    fake_completion = FakeCompletion()
+
+    class FakeChat:
+        completions = fake_completion
+
+    class FakeLLMClient:
+        async def __aenter__(self):
+            return type("Client", (), {"chat": FakeChat()})()
+
+        async def __aexit__(self, *args):
+            return None
+
+    monkeypatch.setattr(api, "AsyncLLMClient", lambda **_: FakeLLMClient())
+
+    summary = await api.summarize_conversation(
+        [
+            {"role": "user", "content": "売上を集計して"},
+            {"role": "assistant", "content": "集計しました"},
+        ]
+    )
+
+    assert summary == "要約しました"
+    assert fake_completion.kwargs is not None
+    assert fake_completion.kwargs["timeout"] == 900
+    assert fake_completion.create_with_completion_called is False
+
+
+def test_core_api_create_with_completion_calls_unpack_response_and_raw() -> None:
+    tree = ast.parse(Path(api.__file__).read_text(encoding="utf-8"))
+    parents: dict[ast.AST, ast.AST] = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+
+    targets: list[tuple[int, ast.AST | None]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Await):
+            continue
+        call = node.value
+        if not isinstance(call, ast.Call):
+            continue
+        if not (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "create_with_completion"
+        ):
+            continue
+
+        current = node
+        while current in parents and isinstance(
+            parents[current], ast.Tuple | ast.Expr | ast.Await | ast.Call
+        ):
+            current = parents[current]
+        parent = parents.get(current, parents.get(node))
+        target = None
+        if isinstance(parent, ast.Assign):
+            target = parent.targets[0]
+        elif isinstance(parent, ast.AnnAssign):
+            target = parent.target
+        targets.append((node.lineno, target))
+
+    assert targets
+    assert all(
+        isinstance(target, ast.Tuple) and len(target.elts) == 2 for _, target in targets
+    ), [
+        (line_number, ast.unparse(target) if target is not None else None)
+        for line_number, target in targets
+    ]
+
+
 def test_run_complete_analysis_passes_tracker_and_telemetry_to_run_analysis(
     monkeypatch,
 ) -> None:
