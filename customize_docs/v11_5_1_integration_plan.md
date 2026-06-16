@@ -408,6 +408,10 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - upstream の修正が Polars 実装に閉じている場合は移植しない。
 - 同じ不具合が現行 pandas 実装にも存在する場合だけ、pandas 実装として TDD で修正する。
 
+## 今後解決する技術課題
+
+v11.5.1 で意図的に残した router split、infra package 移動、workflow / lock 再編、pandas / Polars 境界の再評価は、完了済み integration plan ではなく `customize_docs/upstream_followup_backlog.md` で継続管理する。
+
 ## 完了条件
 
 - `v11.5.1` が Git 履歴上の祖先になっている。
