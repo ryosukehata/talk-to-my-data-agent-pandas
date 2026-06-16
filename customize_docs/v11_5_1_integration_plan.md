@@ -363,6 +363,15 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - `npm --prefix app_frontend run build`
 - 必要なら `pnpm --dir app_frontend dev` で Add Data modal / Chat / Data / Reports をブラウザ確認する。
 
+実装メモ:
+
+- 2026-06-16: PR6 用ブランチ `codex/pr6-react-frontend-small-changes` を最新 `origin/dev` から作成した。
+- 2026-06-16: RED として AddDataModal の local upload / database schema-table / remote data connection 表示、Markdown summary rendering、custom reports/prompts/template selector 導線、frontend URL helper の回帰テストを追加した。
+- 2026-06-16: `apiClient.ts` の API URL 組み立てを `lib/utils.ts` に集約した。upstream `v11.5.1` の `getApiUrl()` 方針を採用しつつ、既存の `APP_BASE_URL` / `_dr_env.js` / static notebook frontend の `API_PORT` 対応は維持する。
+- 2026-06-16: Summary tab の bottom line を `MarkdownContent` で描画するようにし、太字などの markdown 表示を有効にした。plot rendering は既存通り維持する。
+- 2026-06-16: upstream との差分に含まれる custom reports / custom prompts / template / refiner の削除は採用しない。既存 customize 導線が残ることを frontend tests で固定する。
+- 2026-06-16: Vite config と favicon は現行の `_dr_env.js` proxy / static build / `public/datarobot_favicon.png` 配置を維持する。upstream の `public/assets/datarobot_favicon.png` 追加は現行 `index.html` の参照パスと一致しないため、この PR では採用しない。
+
 ### PR7: v11.5.1 history baseline
 
 目的: 内容差分の採用・見送りを記録し、Git 履歴上も `v11.5.1` を処理済みにする。

@@ -398,8 +398,16 @@ class AsyncLLMClient:
             if dr_token:
                 llm_config = replace(llm_config, datarobot_api_token=dr_token)
 
-        self._instructor_client = instructor.from_litellm(
-            litellm.acompletion,
+        # instructor 1.3.4 checks inspect.isawaitable() in from_litellm(), which
+        # misclassifies coroutine functions such as litellm.acompletion as sync.
+        # Build the AsyncInstructor explicitly so create_with_completion awaits
+        # the LiteLLM coroutine before reading _raw_response.
+        self._instructor_client = instructor.AsyncInstructor(
+            client=None,
+            create=instructor.patch(
+                create=litellm.acompletion,
+                mode=instructor.Mode.MD_JSON,
+            ),
             mode=instructor.Mode.MD_JSON,
         )
         return TokenTrackingProxy(
