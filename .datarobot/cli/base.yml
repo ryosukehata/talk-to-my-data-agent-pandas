@@ -34,9 +34,10 @@ root:
   - env: DATABASE_CONNECTION_TYPE
     type: string
     help: Do you want to enable an external database connection?
-    default: None
+    default: no_database
     options:
       - name: None
+        value: no_database
       - name: Snowflake
         value: snowflake
         requires: snowflake_config
