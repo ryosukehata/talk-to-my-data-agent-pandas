@@ -354,7 +354,7 @@ class DataDictionary(BaseModel):
             name=name,
             column_descriptions=[
                 DataDictionaryColumn(
-                    column=col,
+                    column=str(col),
                     description=column_descriptions,
                     data_type=str(df[col].dtype),
                 )

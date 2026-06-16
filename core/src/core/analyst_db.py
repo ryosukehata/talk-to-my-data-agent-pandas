@@ -536,7 +536,7 @@ class DatasetHandler(BaseDuckDBHandler):
                 external_id=external_id,
                 original_name=original_name or name,
                 created_at=datetime.now(timezone.utc),
-                columns=list(df.columns),
+                columns=list(arrow_table.schema.names),
                 row_count=len(df),
                 data_source=data_source,
                 file_size=file_size,
