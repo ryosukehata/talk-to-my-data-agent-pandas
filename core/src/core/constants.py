@@ -33,6 +33,7 @@ def get_llm_model(preferred_model: str | None = None) -> str:
     )
     return _normalize_model_name(raw_model)
 
+
 # LLM Model Configuration
 ALTERNATIVE_LLM_BIG = get_llm_model()
 ALTERNATIVE_LLM_SMALL = get_llm_model()
