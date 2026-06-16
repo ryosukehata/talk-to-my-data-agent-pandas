@@ -1180,12 +1180,11 @@ async def summarize_conversation(
             with telemetry.time(
                 f"{summarize_conversation.__module__}.{summarize_conversation.__qualname__}.llm_call"
             ):
-                completion: ConversationSummary = (
-                    await client.chat.completions.create_with_completion(
-                        response_model=ConversationSummary,
-                        model=ALTERNATIVE_LLM_SMALL,
-                        messages=prompt_messages,
-                    )
+                completion: ConversationSummary = await client.chat.completions.create(
+                    response_model=ConversationSummary,
+                    model=ALTERNATIVE_LLM_SMALL,
+                    messages=prompt_messages,
+                    timeout=900,
                 )
 
         logger.info(f"Summary created: {len(completion.summary)} characters")
