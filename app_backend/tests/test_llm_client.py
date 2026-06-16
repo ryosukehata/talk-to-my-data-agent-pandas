@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
@@ -398,6 +399,47 @@ def test_async_llm_client_deployed_llm_uses_provider_when_default_model_missing(
         "deployment-123/chat/completions"
     )
     assert completions.kwargs["model"] == "datarobot/datarobot-deployed-llm"
+
+
+def test_async_llm_client_litellm_exit_does_not_close_shared_async_clients(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("USE_DATAROBOT_LLM_GATEWAY", "true")
+    monkeypatch.setenv("LLM_DEFAULT_MODEL", "datarobot/bedrock/test-model")
+    completions = _RecordingCompletions()
+    cleanup_calls = 0
+
+    async def fake_acompletion(**_kwargs: Any) -> Any:
+        return "raw"
+
+    def fake_patch(*_args: Any, **_kwargs: Any) -> Any:
+        return completions.create
+
+    async def fake_close_litellm_async_clients() -> None:
+        nonlocal cleanup_calls
+        cleanup_calls += 1
+
+    monkeypatch.setattr(
+        llm_client,
+        "litellm",
+        SimpleNamespace(acompletion=fake_acompletion),
+        raising=False,
+    )
+    monkeypatch.setattr(llm_client.instructor, "patch", fake_patch)
+    monkeypatch.setitem(
+        sys.modules,
+        "litellm.llms.custom_httpx.async_client_cleanup",
+        SimpleNamespace(close_litellm_async_clients=fake_close_litellm_async_clients),
+    )
+
+    async def run_client() -> None:
+        async with AsyncLLMClient():
+            pass
+
+    asyncio.run(run_client())
+
+    assert cleanup_calls == 0
 
 
 def test_async_llm_client_deployed_llm_create_round_trips_to_deployment_endpoint() -> (
