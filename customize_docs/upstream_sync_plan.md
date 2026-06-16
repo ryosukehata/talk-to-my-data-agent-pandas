@@ -25,6 +25,21 @@
 5. 各段階で「取り込む / 見送る / 手動移植する」をこのファイルへ記録する。
 6. すでに手動移植済みの upstream タグは、内容差分なしの `ours` baseline merge で履歴上も取り込み済みにする。
 
+## upstream 追従時の検証注意点
+
+基本方針は upstream を優先して取り込むこと。以下は「ローカル差分を固定的に維持する」ためのメモではなく、upstream 取り込み時に同種の実行時エラーが再発しないか確認するための注意点。
+
+- `core/src/core/llm_client.py`
+  - 現 dev では `instructor==1.3.4` と `litellm.acompletion` の組み合わせで、`AttributeError: 'coroutine' object has no attribute '_raw_response'` / `coroutine 'acompletion' was never awaited` が発生した。
+  - upstream 取り込み時は upstream 実装を優先する。upstream 側で Instructor / LiteLLM の使い方や依存バージョンが更新されている場合は、その実装を採用する。
+  - 採用後、LiteLLM Gateway 経路の回帰確認として `app_backend/tests/test_llm_client.py::test_async_llm_client_litellm_create_with_completion_uses_async_adapter` または同等の upstream 向けテストを実行する。
+  - テストで同じエラーが再現した場合のみ、現 dev の `AsyncInstructor` 明示構築のような補正を再検討する。
+- `core/src/core/base_telemetry.py`
+  - 現 dev では async generator の tracing で、別 asyncio context から generator が close された場合に `opentelemetry.context: Failed to detach context` が発生した。
+  - upstream 取り込み時は upstream 実装を優先する。upstream 側で telemetry wrapper が整理されている場合は、その実装を採用する。
+  - 採用後、streaming / client disconnect 相当の回帰確認として `app_backend/tests/test_base_telemetry.py::test_trace_async_generator_close_does_not_detach_in_different_context` または同等の upstream 向けテストを実行する。
+  - テストで同じエラーが再現した場合のみ、`yield` をまたいで OpenTelemetry context を保持しない補正を再検討する。
+
 ## テスト方針
 
 各同期PRで最低限以下を実行する。

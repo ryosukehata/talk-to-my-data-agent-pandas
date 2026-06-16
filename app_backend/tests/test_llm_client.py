@@ -169,21 +169,29 @@ def test_async_llm_client_uses_litellm_gateway_configuration(
     completions = _RecordingCompletions()
     litellm_calls: dict[str, Any] = {}
 
-    def fake_from_litellm(completion_fn: Any, **kwargs: Any) -> _FakeInstructorClient:
-        litellm_calls["completion_fn"] = completion_fn
+    async def fake_acompletion(**_kwargs: Any) -> Any:
+        return "raw"
+
+    def fake_patch(*_args: Any, **kwargs: Any) -> Any:
+        litellm_calls["completion_fn"] = kwargs["create"]
         litellm_calls["kwargs"] = kwargs
-        return _FakeInstructorClient(completions)
+        return completions.create
 
     monkeypatch.setattr(
         llm_client,
         "litellm",
-        SimpleNamespace(acompletion=object()),
+        SimpleNamespace(acompletion=fake_acompletion),
         raising=False,
     )
     monkeypatch.setattr(
         llm_client.instructor,
+        "patch",
+        fake_patch,
+    )
+    monkeypatch.setattr(
+        llm_client.instructor,
         "from_litellm",
-        fake_from_litellm,
+        lambda *_args, **_kwargs: pytest.fail("from_litellm should not be used"),
         raising=False,
     )
     monkeypatch.setattr(
@@ -201,12 +209,14 @@ def test_async_llm_client_uses_litellm_gateway_configuration(
                 messages=[],
                 model="datarobot-deployed-llm",
                 max_tokens=128,
+                response_model=object,
             )
 
     result = asyncio.run(run_client())
 
     assert result == "created"
     assert litellm_calls["completion_fn"] is llm_client.litellm.acompletion
+    assert litellm_calls["kwargs"]["mode"] is llm_client.instructor.Mode.MD_JSON
     assert completions.kwargs is not None
     assert completions.kwargs["model"] == "datarobot/bedrock/test-model"
     assert completions.kwargs["timeout"] == 180
@@ -214,6 +224,67 @@ def test_async_llm_client_uses_litellm_gateway_configuration(
     assert "max_tokens" not in completions.kwargs
     assert completions.kwargs["max_completion_tokens"] == 128
     assert "api_base" not in completions.kwargs
+
+
+def test_async_llm_client_litellm_create_with_completion_uses_async_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("USE_DATAROBOT_LLM_GATEWAY", "true")
+    monkeypatch.setenv("LLM_DEFAULT_MODEL", "datarobot/bedrock/test-model")
+    captured: dict[str, Any] = {}
+    raw_response = object()
+    structured_response = SimpleNamespace(_raw_response=raw_response)
+
+    async def fake_acompletion(**kwargs: Any) -> Any:
+        captured["acompletion_kwargs"] = kwargs
+        return raw_response
+
+    async def fake_create_fn(**kwargs: Any) -> Any:
+        captured["create_fn_kwargs"] = kwargs
+        return structured_response
+
+    def fake_patch(*_args: Any, **kwargs: Any) -> Any:
+        captured["patched_create"] = kwargs["create"]
+        captured["patched_mode"] = kwargs["mode"]
+        return fake_create_fn
+
+    monkeypatch.setattr(
+        llm_client,
+        "litellm",
+        SimpleNamespace(acompletion=fake_acompletion),
+        raising=False,
+    )
+    monkeypatch.setattr(llm_client.instructor, "patch", fake_patch)
+    monkeypatch.setattr(
+        llm_client.instructor,
+        "from_litellm",
+        lambda *_args, **_kwargs: pytest.fail(
+            "from_litellm treats coroutine functions as a sync client in instructor 1.3.4"
+        ),
+        raising=False,
+    )
+
+    async def run_client() -> tuple[Any, Any]:
+        async with llm_client.AsyncLLMClient(
+            dr_client=_FakeDataRobotClient(),
+            deployment_base_url="https://legacy.example.test/chat/completions",
+        ) as client:
+            return await client.chat.completions.create_with_completion(
+                messages=[],
+                model="datarobot-deployed-llm",
+                response_model=object,
+            )
+
+    response, raw = asyncio.run(run_client())
+
+    assert response is structured_response
+    assert raw is raw_response
+    assert captured["patched_create"] is fake_acompletion
+    assert captured["patched_mode"] is llm_client.instructor.Mode.MD_JSON
+    assert captured["create_fn_kwargs"]["model"] == "datarobot/bedrock/test-model"
+    assert captured["create_fn_kwargs"]["timeout"] == 180
+    assert captured["create_fn_kwargs"]["max_retries"] == 2
 
 
 def test_async_llm_client_injects_deployed_llm_api_base(
@@ -225,16 +296,29 @@ def test_async_llm_client_injects_deployed_llm_api_base(
     monkeypatch.setenv("LLM_DEFAULT_MODEL", "datarobot/datarobot-deployed-llm")
     completions = _RecordingCompletions()
 
+    async def fake_acompletion(**_kwargs: Any) -> Any:
+        return "raw"
+
+    def fake_patch(*_args: Any, **kwargs: Any) -> Any:
+        assert kwargs["create"] is llm_client.litellm.acompletion
+        assert kwargs["mode"] is llm_client.instructor.Mode.MD_JSON
+        return completions.create
+
     monkeypatch.setattr(
         llm_client,
         "litellm",
-        SimpleNamespace(acompletion=object()),
+        SimpleNamespace(acompletion=fake_acompletion),
         raising=False,
     )
     monkeypatch.setattr(
         llm_client.instructor,
+        "patch",
+        fake_patch,
+    )
+    monkeypatch.setattr(
+        llm_client.instructor,
         "from_litellm",
-        lambda *_args, **_kwargs: _FakeInstructorClient(completions),
+        lambda *_args, **_kwargs: pytest.fail("from_litellm should not be used"),
         raising=False,
     )
 
@@ -247,6 +331,7 @@ def test_async_llm_client_injects_deployed_llm_api_base(
                 messages=[],
                 model="datarobot-deployed-llm",
                 timeout=45,
+                response_model=object,
             )
 
     result = asyncio.run(run_client())
