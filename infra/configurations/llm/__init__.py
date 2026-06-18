@@ -15,6 +15,7 @@ DEFAULT_DEPLOYED_MODEL = "datarobot/datarobot-deployed-llm"
 DEFAULT_EXTERNAL_MODEL = "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0"
 DEFAULT_EXTERNAL_LLM_ID = "amazon-anthropic-claude-sonnet-4-5-20250929-v1"
 DEFAULT_EXTERNAL_LLM_NAME = "Claude Sonnet 4.5"
+DEFAULT_USE_BUILDER_API_TOKEN = "false"
 
 REQUIRED_LLM_FEATURE_FLAGS: dict[str, bool] = {
     "ENABLE_MLOPS": True,
@@ -61,3 +62,7 @@ def runtime_parameter(
 
 def configured_model(env: Mapping[str, str], default: str) -> str:
     return env.get("LLM_DEFAULT_MODEL") or default
+
+
+def configured_builder_api_token(env: Mapping[str, str]) -> str:
+    return env.get("USE_BUILDER_API_TOKEN") or DEFAULT_USE_BUILDER_API_TOKEN

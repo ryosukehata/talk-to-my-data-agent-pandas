@@ -8,6 +8,7 @@ from infra.configurations.llm import (
     DEFAULT_EXTERNAL_MODEL,
     REQUIRED_LLM_FEATURE_FLAGS,
     LLMConfigurationDefinition,
+    configured_builder_api_token,
     configured_model,
     resolve_env,
     runtime_parameter,
@@ -31,6 +32,7 @@ def get_configuration(
             "LLM_DEFAULT_MODEL_FRIENDLY_NAME",
             resolved_env.get("LLM_DEFAULT_LLM_NAME") or DEFAULT_EXTERNAL_LLM_NAME,
         ),
+        runtime_parameter("USE_BUILDER_API_TOKEN", configured_builder_api_token(resolved_env)),
     )
     custom_model_runtime_parameters = (
         runtime_parameter("LLM_DEPLOYMENT_ID", deployment_id),

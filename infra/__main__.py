@@ -60,6 +60,7 @@ from utils.schema import AppInfra
 TEXTGEN_DEPLOYMENT_ID = os.environ.get("TEXTGEN_DEPLOYMENT_ID")
 TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
 LLM_DEFAULT_MODEL = configured_model(os.environ, DEFAULT_DEPLOYED_MODEL)
+USE_BUILDER_API_TOKEN = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 USE_DATAROBOT_LLM_GATEWAY = (
     os.environ.get("USE_DATAROBOT_LLM_GATEWAY", "false").lower() == "true"
 )
@@ -222,6 +223,11 @@ app_runtime_parameters = [
     ),
     datarobot.ApplicationSourceRuntimeParameterValueArgs(
         key="APP_LOCALE", type="string", value=LocaleSettings().app_locale
+    ),
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="USE_BUILDER_API_TOKEN",
+        type="string",
+        value=USE_BUILDER_API_TOKEN,
     ),
 ]
 

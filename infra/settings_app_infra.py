@@ -13,6 +13,7 @@
 # limitations under the License.
 import os
 import re
+import subprocess
 import textwrap
 from pathlib import Path
 from typing import List, Sequence, Tuple
@@ -133,6 +134,28 @@ def _prep_metadata_yaml(
     )
 
 
+def _write_version_file() -> None:
+    version_file = application_path / "VERSION"
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--always"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        pulumi.warn(f"Failed to determine application version via git: {exc}")
+        version_file.unlink(missing_ok=True)
+        return
+
+    if result.returncode != 0:
+        pulumi.warn(f"Failed to determine application version via git: {result.stderr}")
+        version_file.unlink(missing_ok=True)
+        return
+
+    version_file.write_text(result.stdout.strip())
+
+
 def get_app_files(
     runtime_parameter_values: Sequence[
         datarobot.ApplicationSourceRuntimeParameterValueArgs
@@ -140,6 +163,7 @@ def get_app_files(
     ],
 ) -> List[Tuple[str, str]]:
     _prep_metadata_yaml(runtime_parameter_values)
+    _write_version_file()
     # Get all files from application path
     source_files = [
         (f.as_posix(), f.relative_to(application_path).as_posix())

@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 
+export UV_CACHE_DIR=.uv
 export PORT=${PORT:-"8080"}
 DEV_MODE=${DEV_MODE:-false}
 LOG_LEVEL="info"
 EXTRA_OPTS=(--proxy-headers)
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit
 
 if [ "$(echo "$DEV_MODE" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
   EXTRA_OPTS+=("--reload")
@@ -11,4 +15,12 @@ if [ "$(echo "$DEV_MODE" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
   export DISABLE_TELEMETRY=true
 fi
 
-python -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --log-level $LOG_LEVEL "${EXTRA_OPTS[@]}"
+if command -v uv >/dev/null 2>&1; then
+  if [ ! -d ".venv" ]; then
+    uv sync
+  fi
+  exec uv run uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --log-level "$LOG_LEVEL" "${EXTRA_OPTS[@]}"
+else
+  export PYTHONPATH="${SCRIPT_DIR}/core/src:${SCRIPT_DIR}:${PYTHONPATH:-}"
+  exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --log-level "$LOG_LEVEL" "${EXTRA_OPTS[@]}"
+fi

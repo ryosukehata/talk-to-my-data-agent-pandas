@@ -1,0 +1,34 @@
+# v11.5.3 インフラ取り込み計画
+
+## 目的
+
+upstream `v11.5.3` のうち、デプロイ・runtime parameter・起動資材に関わる差分を、このリポジトリの既存Pulumi構成に合わせて取り込む。
+
+## 取り込む範囲
+
+- `.env.template` に `USE_BUILDER_API_TOKEN=false` を追加する。
+- DataRobotアプリケーションのruntime parameterに `USE_BUILDER_API_TOKEN` を渡す。
+- `infra/configurations/llm/*` のimport-safe LLM設定定義にも同じruntime parameterを追加する。
+- デプロイ資材にgit由来の `VERSION` ファイルを含める。
+- `app_backend/start-app.sh` を、`uv` がある環境とprebuilt Python環境の両方で起動できるようにする。
+
+## 今回見送る範囲
+
+- frontend CIの `npm ci` 化とcoverage job追加は見送る。現状の `app_frontend/package.json` と `package-lock.json` が同期しておらず、`npm ci` が失敗するため。
+- upstreamの `tests/e2e/Taskfile.yaml` 前提のTaskfile差分は見送る。このリポジトリには該当ディレクトリがまだ存在しないため。
+- 生成済みlockfile・requirementsの大規模更新は見送る。backend/frontend/infraのPR分割を維持し、今回のruntime parameter取り込みに必要な最小差分へ限定する。
+
+## テスト方針
+
+- `customize_docs/test_v11_5_3_infra_config.py`
+  - `.env.template` がbuilder token toggleを文書化していること。
+  - 全LLM設定定義が `USE_BUILDER_API_TOKEN` をアプリruntime parameterへ渡すこと。
+  - `infra/__main__.py` のPulumi ApplicationSource runtime parameterに同キーが含まれること。
+  - `start-app.sh` が `uv` とprebuilt Python fallbackの両方を持つこと。
+  - `VERSION` ファイル生成処理とgitignoreが揃っていること。
+
+## 検証結果
+
+- `uv run pytest customize_docs/test_v11_5_3_infra_config.py -q`
+- `uv run pytest customize_docs/test_v11_5_3_infra_config.py customize_docs/test_llm_runtime_parameters.py customize_docs/test_application_source_file_manifest.py app_backend/tests/test_llm_configuration.py -q`
+
