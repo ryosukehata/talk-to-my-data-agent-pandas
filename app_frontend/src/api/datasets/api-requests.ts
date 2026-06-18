@@ -1,7 +1,7 @@
 import { AxiosProgressEvent } from 'axios';
 import apiClient from '../apiClient';
 
-type Dataset = {
+export type Dataset = {
   id: string;
   name: string;
   created: string;
@@ -9,7 +9,7 @@ type Dataset = {
   file_size?: number;
 };
 
-type DatasetResponse = {
+export type DatasetResponse = {
   dataset: {
     name: string;
     data_records: Record<string, unknown>[];

@@ -1,5 +1,12 @@
 export type ValueOf<T> = T[keyof T];
 
+export interface ApiError {
+  detail?: {
+    code?: string;
+    message?: string;
+  };
+}
+
 export interface AppStateData {
   showWelcome: boolean;
   collapsiblePanelDefaultOpen: boolean;

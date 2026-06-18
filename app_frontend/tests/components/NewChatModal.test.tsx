@@ -74,4 +74,23 @@ describe('NewChatModal Component', () => {
     expect(createButton).toBeInTheDocument();
     expect(createButton).toBeDisabled();
   });
+
+  test('enforces max length on chat name input', () => {
+    render(<NewChatModal highlight={false} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /new chat/i }));
+
+    expect(screen.getByRole('textbox')).toHaveAttribute('maxLength', '200');
+  });
+
+  test('shows warning when chat name reaches max length', () => {
+    render(<NewChatModal highlight={false} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /new chat/i }));
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'a'.repeat(200) },
+    });
+
+    expect(screen.getByText(/has reached maximum of 200 characters/i)).toBeInTheDocument();
+  });
 });

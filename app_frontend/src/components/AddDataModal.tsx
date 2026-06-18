@@ -28,7 +28,7 @@ import {
 } from '@/api/database/hooks';
 import { useFileUploadMutation, UploadError } from '@/api/datasets/hooks';
 import { Separator } from '@radix-ui/react-separator';
-import { Loader2 } from 'lucide-react';
+import { ExternalLink, Loader2 } from 'lucide-react';
 import { useAppState } from '@/state/hooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AxiosError } from 'axios';
@@ -39,7 +39,7 @@ import { externalDataSourceName, ExternalDataStore } from '@/api/datasources/api
 import { SingleSelect } from './ui-custom/single-select';
 
 export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
-  const { data, isLoading: isLoadingDatasets } = useFetchDatasets();
+  const { data, isLoading: isLoadingDatasets, error: datasetRegistryError } = useFetchDatasets();
   const availableDataStores = useListAvailableDataStores();
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const [selectedSchema, setSelectedSchema] = useState<string>('');
@@ -55,6 +55,13 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation();
+  const accessDenied = useMemo(
+    () => ({
+      datasetRegistry: datasetRegistryError?.response?.data?.detail?.code === 'USER_ACCESS_DENIED',
+      dataStore: availableDataStores.error?.response?.data?.detail?.code === 'USER_ACCESS_DENIED',
+    }),
+    [availableDataStores.error, datasetRegistryError]
+  );
   const selectedAvailableDataStore: ExternalDataStore | null = useMemo(() => {
     if (availableDataStores?.data) {
       for (const store of availableDataStores.data) {
@@ -169,7 +176,11 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
           <Separator className="border-t" />
           <DialogDescription />
         </DialogHeader>
-        <DataSourceSelector value={dataSource} onChange={setDataSource} />
+        <DataSourceSelector
+          accessDenied={accessDenied}
+          value={dataSource}
+          onChange={setDataSource}
+        />
         <Separator className="my-4 border-t" />
         {dataSource == DATA_SOURCES.FILE && (
           <>
@@ -180,26 +191,44 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
               </div>
             </div>
             <FileUploader onFilesChange={setFiles} progress={progress} />
-            <h4>{t('Data Registry')}</h4>
-            <h6>{t('Select one or more catalog items')}</h6>
-            <MultiSelect
-              options={
-                data && data.local
-                  ? data.local.map(i => ({
-                      label: i.name,
-                      value: i.id,
-                      postfix: i.size,
-                    }))
-                  : []
-              }
-              onValueChange={setSelectedDatasets}
-              defaultValue={selectedDatasets}
-              placeholder={t('Select one or more items.')}
-              variant="inverted"
-              modalPopover
-              animation={2}
-              maxCount={3}
-            />
+            <p className="caption-01">
+              {t(
+                'Do not upload datasets containing sensitive personal information such as social security numbers, financial account data, health records, or government IDs.'
+              )}
+              <a
+                href="https://www.datarobot.com/privacy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 anchor text-xs leading-4"
+              >
+                {t('Privacy Policy')}
+                <ExternalLink className="ml-0.5 inline size-2.5 align-[-1px]" />
+              </a>
+            </p>
+            {!accessDenied.datasetRegistry && (
+              <>
+                <h4>{t('Data Registry')}</h4>
+                <h6>{t('Select one or more catalog items')}</h6>
+                <MultiSelect
+                  options={
+                    data && data.local
+                      ? data.local.map(i => ({
+                          label: i.name,
+                          value: i.id,
+                          postfix: i.size,
+                        }))
+                      : []
+                  }
+                  onValueChange={setSelectedDatasets}
+                  defaultValue={selectedDatasets}
+                  placeholder={t('Select one or more items.')}
+                  variant="inverted"
+                  modalPopover
+                  animation={2}
+                  maxCount={3}
+                />
+              </>
+            )}
             {error && (
               <Alert variant="destructive">
                 <AlertDescription className="max-h-[300px] overflow-auto">{error}</AlertDescription>
@@ -272,25 +301,35 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
           <>
             <h4>{t('Data Registry')}</h4>
             <h6>{t('Select one or more catalog items')}</h6>
-            <MultiSelect
-              isLoading={isLoadingDatasets}
-              options={
-                data && data.remote
-                  ? data.remote.map(i => ({
-                      label: i.name,
-                      value: i.id,
-                      postfix: i.size,
-                    }))
-                  : []
-              }
-              onValueChange={setSelectedDatasets}
-              defaultValue={selectedDatasets}
-              placeholder={t('Select one or more items.')}
-              variant="inverted"
-              modalPopover
-              animation={2}
-              maxCount={3}
-            />
+            {accessDenied.datasetRegistry ? (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {t(
+                    'Data Registry is unavailable due to seat license restrictions. Please contact your DataRobot administrator.'
+                  )}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <MultiSelect
+                isLoading={isLoadingDatasets}
+                options={
+                  data && data.remote
+                    ? data.remote.map(i => ({
+                        label: i.name,
+                        value: i.id,
+                        postfix: i.size,
+                      }))
+                    : []
+                }
+                onValueChange={setSelectedDatasets}
+                defaultValue={selectedDatasets}
+                placeholder={t('Select one or more items.')}
+                variant="inverted"
+                modalPopover
+                animation={2}
+                maxCount={3}
+              />
+            )}
             {error && (
               <Alert variant="destructive">
                 <AlertDescription className="max-h-[300px] overflow-auto">{error}</AlertDescription>

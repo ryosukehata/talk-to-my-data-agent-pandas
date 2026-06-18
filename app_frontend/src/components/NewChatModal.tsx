@@ -20,6 +20,7 @@ import { generateChatRoute } from '@/pages/routes';
 import { useAppState } from '@/state/hooks';
 import { cn } from '@/lib/utils';
 import { getChatName } from '@/api/chat-messages/utils';
+import { MAX_CHAT_NAME_LENGTH } from '@/constants/chat';
 
 type NewChatModalType = {
   highlight: boolean;
@@ -70,6 +71,7 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
               id="name"
               value={name}
               onChange={event => setName(event.target.value)}
+              maxLength={MAX_CHAT_NAME_LENGTH}
               className="col-span-3"
               placeholder={t('Enter a name for your chat')}
               disabled={isPending}
@@ -89,6 +91,13 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
                 }
               }}
             />
+            {name.length >= MAX_CHAT_NAME_LENGTH && (
+              <p className="col-span-3 col-start-2 text-xs text-destructive">
+                {t('Chat name has reached maximum of {{max}} characters', {
+                  max: MAX_CHAT_NAME_LENGTH,
+                })}
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>

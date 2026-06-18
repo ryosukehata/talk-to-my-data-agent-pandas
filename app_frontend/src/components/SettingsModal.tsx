@@ -60,6 +60,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
   const [localEnableBusinessInsights, setLocalEnableBusinessInsights] =
     useState(enableBusinessInsights);
   const [localIncludeCsvBom, setLocalIncludeCsvBom] = useState(includeCsvBom);
+  const accountInfo = dataRobotInfo?.datarobot_account_info;
+  const connectedAs = accountInfo
+    ? [accountInfo.firstName, accountInfo.lastName].filter(Boolean).join(' ') ||
+      accountInfo.username ||
+      ''
+    : '';
+  const appVersion = window.ENV?.APP_VERSION;
 
   const handleSaveSettings = () => {
     setCollapsiblePanelDefaultOpen(localCollapsiblePanelDefaultOpen);
@@ -204,14 +211,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
             </div>
             {isLoadingDataRobotInfo || isRefreshingConnection ? (
               <p className="body">{t('Loading DataRobot info...')}</p>
-            ) : dataRobotInfo?.datarobot_account_info ? (
+            ) : accountInfo ? (
               <div className="space-y-1">
+                {connectedAs && (
+                  <p>
+                    <span className="mr-1">{t('Connected as:')}</span>
+                    <span data-testid="connected-as-value">{connectedAs}</span>
+                  </p>
+                )}
                 <p>
-                  <span className="mr-1">{t('Connected as:')}</span>
-                  <span>{dataRobotInfo.datarobot_account_info.username}</span>
-                </p>
-                <p>
-                  {t('Email')}: {dataRobotInfo.datarobot_account_info.email}
+                  {t('Email')}: <span data-testid="email-value">{accountInfo.email}</span>
                 </p>
                 {dataRobotInfo.datarobot_api_token && (
                   <p>
@@ -305,6 +314,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onOpenChan
               </div>
             </div>
           </div>
+          {appVersion && (
+            <>
+              <Separator className="border-t my-2" />
+              <p className="text-xs text-muted-foreground">
+                {t('Version')}: {appVersion}
+              </p>
+            </>
+          )}
         </div>
         {/* スクロール可能エリア終了 */}
         <Separator className="border-t mt-2" />

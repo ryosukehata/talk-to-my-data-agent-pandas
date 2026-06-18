@@ -7,6 +7,8 @@ import { renderWithProviders } from '../test-utils';
 const mockUploadMutate = vi.fn();
 const mockLoadFromDatabase = vi.fn();
 const mockSelectDataSources = vi.fn();
+let mockDatasetRegistryError: unknown = null;
+let mockDataStoresError: unknown = null;
 
 vi.mock('@/api/datasets/hooks', () => ({
   useFetchDatasets: () => ({
@@ -15,6 +17,7 @@ vi.mock('@/api/datasets/hooks', () => ({
       remote: [{ id: 'remote-1', name: 'catalog-sales.csv', size: '3 MB' }],
     },
     isLoading: false,
+    error: mockDatasetRegistryError,
   }),
   useFileUploadMutation: () => ({
     mutate: mockUploadMutate,
@@ -62,6 +65,7 @@ vi.mock('@/api/datasources/hooks', () => ({
       },
     ],
     isLoading: false,
+    error: mockDataStoresError,
   }),
   useSelectDataSourcesMutation: () => ({
     mutate: mockSelectDataSources,
@@ -71,6 +75,8 @@ vi.mock('@/api/datasources/hooks', () => ({
 describe('AddDataModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDatasetRegistryError = null;
+    mockDataStoresError = null;
     localStorage.clear();
   });
 
@@ -86,6 +92,13 @@ describe('AddDataModal', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Data Registry')).toBeInTheDocument();
     expect(screen.getByText('Select one or more catalog items')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Do not upload datasets containing sensitive personal information/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /privacy policy/i })).toHaveAttribute(
+      'href',
+      'https://www.datarobot.com/privacy/'
+    );
   });
 
   test('keeps database schema and table selection available', async () => {
@@ -115,5 +128,42 @@ describe('AddDataModal', () => {
     expect(screen.getByText('Add External Data Source')).toBeInTheDocument();
     expect(screen.getByText('Select a data store')).toBeInTheDocument();
     expect(screen.getByText('Select one or more data sources')).toBeInTheDocument();
+  });
+
+  test('hides registry selectors when DataRobot returns seat license access denied', async () => {
+    mockDatasetRegistryError = {
+      response: {
+        data: {
+          detail: {
+            code: 'USER_ACCESS_DENIED',
+          },
+        },
+      },
+    };
+    const user = userEvent.setup();
+    renderWithProviders(<AddDataModal />);
+
+    await user.click(screen.getByRole('button', { name: /add data/i }));
+
+    expect(screen.queryByText('Select one or more catalog items')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Remote Data Registry' })).toBeDisabled();
+  });
+
+  test('disables remote data connections when DataRobot returns seat license access denied', async () => {
+    mockDataStoresError = {
+      response: {
+        data: {
+          detail: {
+            code: 'USER_ACCESS_DENIED',
+          },
+        },
+      },
+    };
+    const user = userEvent.setup();
+    renderWithProviders(<AddDataModal />);
+
+    await user.click(screen.getByRole('button', { name: /add data/i }));
+
+    expect(screen.getByRole('radio', { name: 'Remote Data Connections' })).toBeDisabled();
   });
 });

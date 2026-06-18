@@ -12,6 +12,8 @@ import { useState } from 'react';
 import { dictionaryKeys } from '../dictionaries/keys';
 import { DictionaryTable } from '../dictionaries/types';
 import { AxiosError } from 'axios';
+import { ApiError } from '@/state/types';
+import { Dataset } from './api-requests';
 
 interface FileUploadResponse {
   filename?: string;
@@ -29,8 +31,13 @@ export interface UploadError extends Error {
   isAxiosError?: boolean;
 }
 
+type DatasetsResponse = {
+  local: Dataset[];
+  remote: Dataset[];
+};
+
 export const useFetchDatasets = ({ limit = 100 } = {}) => {
-  const queryResult = useQuery({
+  const queryResult = useQuery<DatasetsResponse, AxiosError<ApiError>>({
     queryKey: datasetKeys.list(limit),
     queryFn: async ({ signal }) => {
       const [local, remote] = await Promise.all([
@@ -40,6 +47,12 @@ export const useFetchDatasets = ({ limit = 100 } = {}) => {
       return { local: local, remote: remote };
     },
     refetchInterval: 5 * 60 * 1000,
+    retry: (failureCount, error) => {
+      if (error.response?.data?.detail?.code === 'USER_ACCESS_DENIED') {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
 
   return queryResult;

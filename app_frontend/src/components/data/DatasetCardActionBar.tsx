@@ -32,6 +32,7 @@ export const DatasetCardActionBar: React.FC<DatasetCardActionBarProps> = ({
   const { t } = useTranslation();
   const isDisabled = disabled || isProcessing || isDownloading;
   const searchLabel = viewMode === DATA_TABS.DESCRIPTION ? t('Search') : t('Search columns');
+  const canDownload = Boolean(onDownload) && viewMode !== DATA_TABS.RAW;
 
   return (
     <div className={cn('flex items-center gap-1', className)}>
@@ -46,7 +47,7 @@ export const DatasetCardActionBar: React.FC<DatasetCardActionBarProps> = ({
       )}
 
       {/* Download Button */}
-      {onDownload && (
+      {canDownload && (
         <Button
           variant="link"
           onClick={onDownload}

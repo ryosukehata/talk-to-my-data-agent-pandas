@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AxiosError } from 'axios';
 import { dataSourceKeys } from './keys';
 import {
   externalDataSourceName,
@@ -7,12 +8,19 @@ import {
   selectSourcesForDataStore,
 } from './api-requests';
 import { dictionaryKeys, DictionaryTable } from '../dictionaries';
+import { ApiError } from '@/state/types';
 
 export const useListAvailableDataStores = () => {
-  const queryResult = useQuery({
+  const queryResult = useQuery<ExternalDataStore[], AxiosError<ApiError>>({
     queryKey: dataSourceKeys.available,
     queryFn: listAvailableExternalDataStores,
     refetchInterval: 5 * 60 * 1000,
+    retry: (failureCount, error) => {
+      if (error.response?.data?.detail?.code === 'USER_ACCESS_DENIED') {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
   return queryResult;
 };

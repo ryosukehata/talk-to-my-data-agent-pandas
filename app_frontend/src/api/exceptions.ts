@@ -9,6 +9,10 @@ export const localizeException = (t: (a: string) => string, error: any) => {
         return t('Datasets exceed maximum size.');
       case 'DATASET_INVALID':
         return t('The dataset cannot be used.');
+      case 'USER_ACCESS_DENIED':
+        return t(
+          'Feature unavailable due to seat license restrictions. Please contact your DataRobot administrator.'
+        );
     }
   }
   return null;

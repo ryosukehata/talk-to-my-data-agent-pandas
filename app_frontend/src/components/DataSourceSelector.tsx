@@ -9,9 +9,17 @@ import { Loader2, MessageCircleQuestion } from 'lucide-react';
 interface DataSourceSelectorProps {
   value: string;
   onChange: (value: string) => void;
+  accessDenied?: {
+    datasetRegistry?: boolean;
+    dataStore?: boolean;
+  };
 }
 
-export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, onChange }) => {
+export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
+  value,
+  onChange,
+  accessDenied,
+}) => {
   const { t } = useTranslation();
   const dataSources = useGetSupportedDataSourceTypes();
   const availableExternalDataStores = useListAvailableDataStores();
@@ -44,7 +52,11 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
           </Tooltip>
         </div>
         <div className="flex space-x-2">
-          <RadioGroupItem value={DATA_SOURCES.REMOTE_CATALOG} id="r2" />
+          <RadioGroupItem
+            value={DATA_SOURCES.REMOTE_CATALOG}
+            id="r2"
+            disabled={accessDenied?.datasetRegistry}
+          />
           <Label htmlFor="r2" className="mn-label">
             {t('Remote Data Registry')}
           </Label>
@@ -94,7 +106,7 @@ export const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ value, o
           </Tooltip>
         </div>
         <div className="flex space-x-2">
-          <RadioGroupItem value={NEW_DATA_STORE} id="r4" />
+          <RadioGroupItem value={NEW_DATA_STORE} id="r4" disabled={accessDenied?.dataStore} />
           <Label htmlFor="r4" className="mn-label">
             {t('Remote Data Connections')}
           </Label>
