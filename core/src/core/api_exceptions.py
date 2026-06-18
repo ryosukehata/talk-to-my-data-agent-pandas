@@ -27,6 +27,7 @@ class UsageExceptionType(Enum):
     FEATURE_NOT_SUPPORTED = (400, "FEATURE_NOT_SUPPORTED")
     # Generic "operating on invalid targets".
     NO_SUCH_TARGET = (400, "NO_SUCH_TARGET")
+    USER_ACCESS_DENIED = (403, "USER_ACCESS_DENIED")
     NOT_FOUND = (404, "NOT_FOUND")
 
 

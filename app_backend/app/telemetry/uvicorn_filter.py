@@ -14,7 +14,7 @@
 
 import logging
 
-from .logging import JsonFormatter, TextFormatter
+from .logging import JsonFormatter, ReadableFormatter, TextFormatter
 
 
 class HealthCheckFilter(logging.Filter):
@@ -43,6 +43,8 @@ def configure_uvicorn_logging(
     handler = logging.StreamHandler()
     if log_format == "json":
         handler.setFormatter(JsonFormatter())
+    elif log_format == "readable":
+        handler.setFormatter(ReadableFormatter())
     else:
         handler.setFormatter(
             TextFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -59,6 +61,8 @@ def configure_uvicorn_logging(
     handler = logging.StreamHandler()
     if log_format == "json":
         handler.setFormatter(JsonFormatter())
+    elif log_format == "readable":
+        handler.setFormatter(ReadableFormatter())
     else:
         handler.setFormatter(
             TextFormatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")

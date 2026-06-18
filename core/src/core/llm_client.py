@@ -324,9 +324,9 @@ class AsyncLLMClient:
     Async LLM client with token tracking.
 
     Usage:
-        from core.token_tracking import TokenUsageTracker, TiktokenCountingStrategy
+        from core.token_tracking import HeuristicTokenCountingStrategy, TokenUsageTracker
 
-        tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
+        tracker = TokenUsageTracker(strategy=HeuristicTokenCountingStrategy())
         async with AsyncLLMClient(token_tracker=tracker) as client:
             result = await client.chat.completions.create(...)
 

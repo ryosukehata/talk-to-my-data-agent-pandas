@@ -107,7 +107,7 @@ from core.schema import (
     SupportedDataSourceTypes,
 )
 from core.token_tracking import (
-    TiktokenCountingStrategy,
+    HeuristicTokenCountingStrategy,
     TokenUsageTracker,
     count_messages_tokens,
 )
@@ -415,7 +415,7 @@ def get_registry_datasets(
     Returns:
         list[DataRegistryDataset]: _description_
     """
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         return list_registry_datasets(remote=remote, limit=limit)
 
 
@@ -596,7 +596,7 @@ async def upload_files(
     if registry_ids:
         id_list: list[str] = json.loads(registry_ids)
         if id_list:
-            with use_user_token(request):
+            with use_user_token(request, allow_use_builder_token=True):
                 if normalized_data_source == InternalDataSourceType.REMOTE_REGISTRY:
                     dataframes, tasks = await register_remote_registry_datasets(
                         request, id_list, analyst_db
@@ -1331,7 +1331,7 @@ async def create_chat_message(
 
             # Create token tracker for summarization
             summarization_tracker = TokenUsageTracker(
-                strategy=TiktokenCountingStrategy()
+                strategy=HeuristicTokenCountingStrategy()
             )
 
             try:
@@ -1741,7 +1741,7 @@ def get_available_external_data_stores(
     Returns:
         list[ExternalDataStore]: The given page of datastores.
     """
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         return asyncio.run(
             DataSourceRecipe.list_available_datastores(analyst_db.user_id)
         )
@@ -1774,7 +1774,7 @@ async def register_external_data_sources(
     logger.debug(
         "PUT /external-data-stores/%s/external-data-sources/", external_data_store_id
     )
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         name = await DataSourceRecipe.get_canonical_name_for_datastore_id(
             external_data_store_id
         )
@@ -1824,7 +1824,7 @@ async def update_data_sources_for_data_store(
     external_data_store_id: str,
     analyst_db: AnalystDB,
 ) -> None:
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         logger.debug("Loading recipe for datasources %s.")
         recipe = await DataSourceRecipe.load_or_create(
             analyst_db, external_data_store_id

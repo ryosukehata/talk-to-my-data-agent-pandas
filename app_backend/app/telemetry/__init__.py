@@ -12,13 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .logging import FormatType, JsonFormatter, LogLevel, TextFormatter, init_logging
+from .logging import (
+    FormatType,
+    JsonFormatter,
+    LogLevel,
+    ReadableFormatter,
+    TextFormatter,
+    init_logging,
+)
 from .uvicorn_filter import configure_uvicorn_logging
 
 __all__ = [
     "FormatType",
     "JsonFormatter",
     "LogLevel",
+    "ReadableFormatter",
     "TextFormatter",
     "configure_uvicorn_logging",
     "init_logging",

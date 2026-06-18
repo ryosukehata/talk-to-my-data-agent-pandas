@@ -15,8 +15,12 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-import tiktoken
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+
+try:
+    import tiktoken
+except ImportError:  # pragma: no cover - only exercised when optional dep is absent
+    tiktoken = None  # type: ignore[assignment]
 
 from core.constants import (
     ALTERNATIVE_LLM_BIG,
@@ -26,6 +30,13 @@ from core.constants import (
 from core.logging_helper import get_logger
 
 logger = get_logger()
+
+
+def count_tokens_heuristic(text: str) -> int:
+    """Estimate token count without model-specific tokenizer dependencies."""
+    if not text:
+        return 0
+    return max(1, int(len(text) / 4))
 
 
 def count_tokens_tiktoken(text: str, model: str = ALTERNATIVE_LLM_BIG) -> int:
@@ -38,6 +49,9 @@ def count_tokens_tiktoken(text: str, model: str = ALTERNATIVE_LLM_BIG) -> int:
     Returns:
         Number of tokens in the text
     """
+    if tiktoken is None:
+        return count_tokens_heuristic(text)
+
     try:
         encoding_name = TIKTOKEN_ENCODING_MAP.get(model, DEFAULT_TIKTOKEN_ENCODING)
         encoding = tiktoken.get_encoding(encoding_name)
@@ -46,8 +60,7 @@ def count_tokens_tiktoken(text: str, model: str = ALTERNATIVE_LLM_BIG) -> int:
         logger.warning(
             f"Error counting tokens with tiktoken: {e}. Using fallback estimation."
         )
-        # Fallback: roughly 4 characters per token
-        return len(text) // 4
+        return count_tokens_heuristic(text)
 
 
 def estimate_csv_rows_for_token_limit(
@@ -69,7 +82,8 @@ def estimate_csv_rows_for_token_limit(
         tuple: (csv_string, final_token_count)
     """
     df_csv = df.head(initial_rows).to_csv(index=False, quoting=1)
-    csv_token_count = count_tokens_tiktoken(df_csv, model)
+    del model
+    csv_token_count = count_tokens_heuristic(df_csv)
 
     if csv_token_count <= max_tokens:
         return df_csv, csv_token_count
@@ -83,12 +97,12 @@ def estimate_csv_rows_for_token_limit(
     estimated_rows = max(100, estimated_rows)
 
     df_csv = df.head(estimated_rows).to_csv(index=False, quoting=1)
-    final_token_count = count_tokens_tiktoken(df_csv, model)
+    final_token_count = count_tokens_heuristic(df_csv)
 
     if final_token_count > max_tokens:
         estimated_rows = int(estimated_rows * 0.8)
         df_csv = df.head(estimated_rows).to_csv(index=False, quoting=1)
-        final_token_count = count_tokens_tiktoken(df_csv, model)
+        final_token_count = count_tokens_heuristic(df_csv)
 
     logger.info(
         f"Reduced CSV to {estimated_rows} rows ({final_token_count} tokens) to fit within context window."
@@ -128,6 +142,8 @@ class TiktokenCountingStrategy:
 
     def _get_encoding(self, model: str) -> tiktoken.Encoding:
         """Get or cache encoding for model."""
+        if tiktoken is None:
+            raise RuntimeError("tiktoken is not installed")
         encoding_name = TIKTOKEN_ENCODING_MAP.get(model, DEFAULT_TIKTOKEN_ENCODING)
         if encoding_name not in self._encodings:
             try:
@@ -148,8 +164,7 @@ class TiktokenCountingStrategy:
             logger.warning(
                 f"Error counting tokens with tiktoken: {e}. Using fallback estimation."
             )
-            # Fallback: roughly 4 characters per token
-            return len(text) // 4
+            return count_tokens_heuristic(text)
 
     def _count_messages(
         self, messages: list[ChatCompletionMessageParam], model: str
@@ -199,6 +214,47 @@ class TiktokenCountingStrategy:
         return prompt_tokens, completion_tokens
 
 
+class HeuristicTokenCountingStrategy:
+    """Dependency-free token counting based on a conservative character heuristic."""
+
+    def _count_text(self, text: str) -> int:
+        return count_tokens_heuristic(text)
+
+    def _count_messages(self, messages: list[ChatCompletionMessageParam]) -> int:
+        total_tokens = 0
+        for msg in messages:
+            if hasattr(msg, "get"):
+                role = str(msg.get("role", ""))
+                content = str(msg.get("content", ""))
+            else:
+                role = str(getattr(msg, "role", ""))
+                content = str(getattr(msg, "content", ""))
+            total_tokens += self._count_text(role)
+            total_tokens += self._count_text(content)
+            total_tokens += 4
+        return total_tokens
+
+    def _extract_response_text(self, response: Any) -> str:
+        if hasattr(response, "content") and response.content:
+            return str(response.content)
+        if hasattr(response, "model_dump_json"):
+            return str(response.model_dump_json())
+        if hasattr(response, "__dict__"):
+            return str(response.__dict__)
+        return str(response)
+
+    def count_tokens(
+        self,
+        messages: list[ChatCompletionMessageParam],
+        response: Any,
+        model: str,
+    ) -> tuple[int, int]:
+        del model
+        prompt_tokens = self._count_messages(messages)
+        completion_tokens = self._count_text(self._extract_response_text(response))
+        return prompt_tokens, completion_tokens
+
+
 class ApiResponseCountingStrategy:
     """Token counting from OpenAI API response (when available/correct)."""
 
@@ -210,7 +266,7 @@ class ApiResponseCountingStrategy:
             fallback_strategy: Strategy to use if API response doesn't have usage data
         """
         if fallback_strategy is None:
-            fallback_strategy = TiktokenCountingStrategy()
+            fallback_strategy = HeuristicTokenCountingStrategy()
         self.fallback_strategy: TokenCountingStrategy = fallback_strategy
 
     def count_tokens(
@@ -329,6 +385,7 @@ class TokenUsageTracker:
 def count_messages_tokens(
     messages: list[ChatCompletionMessageParam], model: str = ALTERNATIVE_LLM_BIG
 ) -> int:
-    """Count tokens in messages using tiktoken."""
-    strategy = TiktokenCountingStrategy()
-    return strategy._count_messages(messages, model)
+    """Count tokens in messages using the default dependency-free heuristic."""
+    del model
+    strategy = HeuristicTokenCountingStrategy()
+    return strategy._count_messages(messages)

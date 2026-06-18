@@ -168,7 +168,30 @@ class File:
         )
 
 
-def get_visitors_token(request: Request) -> str | None:
+_TRUE_ENV_VALUES = {"1", "true", "yes", "y", "on"}
+
+
+def _env_bool(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in _TRUE_ENV_VALUES
+
+
+def _should_use_builder_api_token() -> bool:
+    return _env_bool("USE_BUILDER_API_TOKEN") or _env_bool(
+        "MLOPS_RUNTIME_PARAM_USE_BUILDER_API_TOKEN"
+    )
+
+
+def get_visitors_token(
+    request: Request,
+    allow_use_builder_token: bool = False,
+) -> str | None:
+    if (
+        allow_use_builder_token
+        and _should_use_builder_api_token()
+        and os.environ.get("DATAROBOT_API_TOKEN")
+    ):
+        return os.environ["DATAROBOT_API_TOKEN"]
+
     if request.state.session.datarobot_api_scoped_token:
         return cast(str, request.state.session.datarobot_api_scoped_token)
 
@@ -176,9 +199,15 @@ def get_visitors_token(request: Request) -> str | None:
 
 
 @contextmanager
-def use_user_token(request: Request) -> Generator[None, None, None]:
+def use_user_token(
+    request: Request,
+    allow_use_builder_token: bool = False,
+) -> Generator[None, None, None]:
     """Context manager to temporarily use the user's DataRobot token."""
-    token = get_visitors_token(request)
+    token = get_visitors_token(
+        request,
+        allow_use_builder_token=allow_use_builder_token,
+    )
     if token:
         with dr.Client(
             token=token,
@@ -188,7 +217,11 @@ def use_user_token(request: Request) -> Generator[None, None, None]:
     elif not os.environ.get(
         "DR_CUSTOM_APP_EXTERNAL_URL"
     ):  # indicates that it's a local environment
-        yield
+        if os.environ.get("DATAROBOT_DEFAULT_USE_CASE") == "":
+            with dr.client.client_configuration(default_use_case=[]):
+                yield
+        else:
+            yield
     else:
         raise HTTPException(
             status_code=401,
