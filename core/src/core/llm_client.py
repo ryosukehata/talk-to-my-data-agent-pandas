@@ -20,10 +20,10 @@ from types import TracebackType
 from typing import Any, Type
 
 import instructor
+from datarobot_genai.core.utils.token_tracking import TokenUsageTracker
 from openai import AsyncOpenAI
 
 from core.constants import get_llm_model
-from core.token_tracking import TokenUsageTracker
 
 try:
     import litellm
@@ -324,7 +324,10 @@ class AsyncLLMClient:
     Async LLM client with token tracking.
 
     Usage:
-        from core.token_tracking import HeuristicTokenCountingStrategy, TokenUsageTracker
+        from datarobot_genai.core.utils.token_tracking import (
+            HeuristicTokenCountingStrategy,
+            TokenUsageTracker,
+        )
 
         tracker = TokenUsageTracker(strategy=HeuristicTokenCountingStrategy())
         async with AsyncLLMClient(token_tracker=tracker) as client:
@@ -333,7 +336,7 @@ class AsyncLLMClient:
         usage_info = TokenUsageInfo(**tracker.to_dict())
 
         # To use API response strategy:
-        from core.token_tracking import ApiResponseCountingStrategy
+        from datarobot_genai.core.utils.token_tracking import ApiResponseCountingStrategy
 
         tracker = TokenUsageTracker(strategy=ApiResponseCountingStrategy())
         async with AsyncLLMClient(token_tracker=tracker) as client:

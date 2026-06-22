@@ -3,9 +3,11 @@ from io import StringIO
 from types import SimpleNamespace
 
 import datarobot
+import pandas as pd
 import pytest
 from core.api_exceptions import ApplicationUsageException
 from core.config import Config as CoreConfig
+from datarobot_genai.core.utils import token_tracking as genai_token_tracking
 from utils.data_connections.datarobot.helpers import RecipeError, handle_datarobot_error
 from utils.datarobot_client import get_visitors_token, use_user_token
 from utils.token_tracking import (
@@ -13,6 +15,7 @@ from utils.token_tracking import (
     HeuristicTokenCountingStrategy,
     TokenUsageTracker,
     count_messages_tokens,
+    estimate_csv_rows_for_token_limit,
 )
 
 from app.config import Config
@@ -193,3 +196,25 @@ def test_default_token_counting_uses_heuristic_strategy() -> None:
     tracker = TokenUsageTracker(strategy=ApiResponseCountingStrategy())
     assert isinstance(tracker.strategy.fallback_strategy, HeuristicTokenCountingStrategy)
     assert count_messages_tokens([{"role": "user", "content": "hello world"}]) > 0
+
+
+def test_token_tracking_is_provided_by_datarobot_genai() -> None:
+    assert TokenUsageTracker is genai_token_tracking.TokenUsageTracker
+    assert (
+        HeuristicTokenCountingStrategy
+        is genai_token_tracking.HeuristicTokenCountingStrategy
+    )
+    assert ApiResponseCountingStrategy is genai_token_tracking.ApiResponseCountingStrategy
+    assert count_messages_tokens is genai_token_tracking.count_messages_tokens
+
+
+def test_csv_token_estimation_accepts_legacy_model_argument() -> None:
+    csv_text, token_count = estimate_csv_rows_for_token_limit(
+        pd.DataFrame({"name": ["sales"]}),
+        100,
+        1,
+        "azure/gpt-4o",
+    )
+
+    assert "sales" in csv_text
+    assert token_count > 0
