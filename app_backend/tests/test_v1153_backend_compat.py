@@ -200,7 +200,9 @@ def test_handle_datarobot_error_maps_unwrapped_value_error() -> None:
 
 def test_default_token_counting_uses_heuristic_strategy() -> None:
     tracker = TokenUsageTracker(strategy=ApiResponseCountingStrategy())
-    assert isinstance(tracker.strategy.fallback_strategy, HeuristicTokenCountingStrategy)
+    assert isinstance(
+        tracker.strategy.fallback_strategy, HeuristicTokenCountingStrategy
+    )
     assert count_messages_tokens([{"role": "user", "content": "hello world"}]) > 0
 
 

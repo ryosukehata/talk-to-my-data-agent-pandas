@@ -24,7 +24,11 @@ from pydantic_settings import (
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
-from pydantic_settings.sources import parse_env_vars
+
+try:
+    from pydantic_settings.sources import parse_env_vars
+except ImportError:  # pydantic-settings >= 2.12
+    from pydantic_settings.sources.utils import parse_env_vars
 
 
 class PulumiSettingsSource(EnvSettingsSource):

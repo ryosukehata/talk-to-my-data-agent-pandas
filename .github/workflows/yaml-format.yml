@@ -7,7 +7,6 @@ on:
       - '**.yml'
     branches:
       - main
-      - dev
       - 'release/*'
   pull_request:
     paths:

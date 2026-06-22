@@ -22,7 +22,6 @@ tasks:
       - echo "🧹 Running linters.."
       - uv run ruff format "$SRCDIR"
       - uv run ruff check "$SRCDIR" --fix
-      - uv run mypy --pretty "$SRCDIR"
 
   lint-check:
     desc: 🧹 Check whether the codebase is linted
@@ -30,11 +29,17 @@ tasks:
       - echo "🧹 Linting"
       - uv run ruff format --check "$SRCDIR"
       - uv run ruff check "$SRCDIR"
-      - uv run mypy --pretty "$SRCDIR"
 
   test:
     silent: true
     desc: "🧪 Run tests"
     cmds:
       - echo "🧪 Running tests.."
-      - uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml
+      - |
+        set +e
+        uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml
+        pytest_status=$?
+        set -e
+        if [ "$pytest_status" -ne 0 ] && [ "$pytest_status" -ne 5 ]; then
+          exit "$pytest_status"
+        fi

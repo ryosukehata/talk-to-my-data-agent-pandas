@@ -21,11 +21,16 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - upstream `v11.5.1` 以降の `core/src/core/routers/*` 分割を復帰し、monolithic な `core.rest_api` を app factory と互換 re-export 中心へ縮小する。
 - OpenTelemetry は upstream と同じ `app_backend/app/telemetry/otel.py` と `core/src/core/telemetry` symlink 構成へ寄せる。
 - chart prompt に、title/axis/annotation は plain text のみという制約を追加。
+- CI workflow は upstream `v11.5.3` の backend/core/frontend/infra 分割と Taskfile 実行方式へ寄せ、root `requirements.txt` install に依存する独自 workflow は削除する。
+- frontend CI は upstream と同じ lint/test/knip/coverage 構成へ寄せる。ただしこの fork には `app_frontend/package-lock.json` がないため、install command は `npm install` を維持する。
+- upstream Taskfile の strict mypy 実行は、既存 fork の customize 実装と tests がまだ mypy clean ではないため今回の CI 復旧範囲から外す。型整備は別 PR で扱う。
+- `app_backend/Taskfile.yaml` の `TEST_USER_EMAIL` は dev task のみに残し、test task へは渡さない。CI では deployed-like environment と衝突して session middleware が runtime error になるため。
 
 ## 見送り
 
 - React UI 側の version 表示、Add Data modal、Settings modal は frontend PR で扱う。
-- `.env.template`、CI workflow、Taskfile は infra PR で扱う。
+- React UI 本体の upstream 追従は frontend PR で扱う。
+- `.env.template` は infra PR で扱う。
 
 ## TDD
 
@@ -72,6 +77,12 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `app_backend/app/telemetry/otel.py` と `core/src/core/telemetry -> ../../../app_backend/app/telemetry` を復帰し、`core.rest_api` は upstream と同じ `from .telemetry import otel` を使う。
 - `core/src/core/data_analyst_telemetry.py` は `core.telemetry.otel` への互換 alias に縮小し、既存の `telemetry.trace` / `telemetry.time` import を維持しながら実体を upstream `OTel` singleton に揃える。
 - `app_backend/tests/test_v1153_backend_compat.py` に `core.rest_api.otel` と旧 `core.data_analyst_telemetry.telemetry` が同じ `core.telemetry.otel` を指すことを固定するテストを追加。
+- `.github/workflows/*` を upstream `v11.5.3` の分割 workflow に寄せ、root `requirements.txt` を install する `lint-python` / `python-static-checks` / `python-deps-install-test` / `python-unit-tests` / `pulumi-up` workflow を削除する。
+- `app_backend/Taskfile.yaml`、`frontend/Taskfile.yaml`、`infra/Taskfile.yaml`、`frontend/pyproject.toml`、`frontend/uv.lock`、`infra/pyproject.toml`、`infra/uv.lock` を upstream `v11.5.3` に寄せる。
+- `app_frontend/package.json` に upstream workflow が要求する `test:coverage` script と `@vitest/coverage-v8` を追加する。
+- `app_frontend/vite.config.ts` に upstream と同じ coverage reporter (`json-summary` を含む) を追加し、coverage report action が参照する `coverage-summary.json` を生成する。
+- `core/Taskfile.yaml` と `frontend/Taskfile.yaml` は、Python tests が未配置の場合の pytest exit 5 を成功扱いにする。legacy `frontend` は coverage XML が生成されないため、`frontend-test.yml` の coverage upload は外す。
+- `core/src/core/resources.py` は `pydantic-settings` 2.12 で `parse_env_vars` の公開位置が変わったため、旧 `pydantic_settings.sources` と新 `pydantic_settings.sources.utils` の両方に対応する。
 
 ## 検証
 
@@ -89,8 +100,24 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `uv run --project app_backend --all-extras --dev ruff check app_backend/app/telemetry core/src/core/rest_api.py core/src/core/data_analyst_telemetry.py app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_v1151_fastapi_app_factory.py`: passed
 - `uv run --project core python - <<'PY' ...`: core import smoke passed
 - `uv run --project core python - <<'PY' ...`: `core.token_tracking` removed smoke passed
+- `uv run ruff format --check .` / `uv run ruff check .` (`app_backend`): passed
+- `uv run pytest -q` (`app_backend`): 112 passed
+- `uv run ruff format --check src` / `uv run ruff check src` (`core`): passed
+- `uv run pytest --cov ...` with no-test exit handling (`core`): no tests collected, accepted as package-level no-test state
+- `uv run ruff format --check .` / `uv run ruff check .` (`infra`): passed
+- `uv run ruff format --check .` / `uv run ruff check .` (`frontend`): passed
+- `uv sync --all-extras --dev` (`frontend`): passed after restoring `frontend/core -> ../core`
+- `uv run pytest --cov ...` with no-test exit handling (`frontend`): no tests collected, accepted as legacy no-test state
+- `uv run --with 'pydantic-settings==2.12.0' python - <<'PY' ...` (`app_backend`): `core.resources` import passed
+- `npm run lint` (`app_frontend`): passed with 6 existing warnings
+- `npm run test` (`app_frontend`): 123 passed
+- `npm run knip` (`app_frontend`): passed with 1 configuration hint
+- `npm run test:coverage` (`app_frontend`): 123 passed and coverage summary generated
+- `npm run build` (`app_frontend`): passed
+- GitHub workflow YAML parse via `python3` + PyYAML: passed
 
 ## 既知事項
 
 - `app_backend/tests` 終了後、LiteLLM の atexit logging が閉じた stream に書こうとする warning が出ることがある。pytest の終了コードは成功しており、本 PR の変更による test failure ではない。
 - Python 3.12.11 では `aiohttp.connector` の `enable_cleanup_closed` deprecation warning が 1 件出る。pytest の終了コードは成功。
+- `app_backend` / `core` で strict mypy を試すと既存 customize/tests 由来のエラーが多数出る。upstream CI 構成との差分として、今回の Taskfile lint は ruff に限定する。

@@ -91,7 +91,9 @@ get_available_external_data_stores = (
 get_supported_datasource_types = (
     external_data_store_routes.get_supported_datasource_types
 )
-register_external_data_sources = external_data_store_routes.register_external_data_sources
+register_external_data_sources = (
+    external_data_store_routes.register_external_data_sources
+)
 update_data_sources_for_data_store = (
     external_data_store_routes.update_data_sources_for_data_store
 )
