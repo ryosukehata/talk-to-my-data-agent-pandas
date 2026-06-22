@@ -18,6 +18,7 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `llm_client.py` に upstream の OpenAI exception import と verbose error logging を取り込む。
 - `core/pyproject.toml` と `app_backend/core -> ../core` の editable package 構成を upstream `v11.5.3` に寄せる。
 - backend 依存関係を upstream `v11.5.3` の source constraints に寄せ、`datarobot-genai`、`pyarrow==20.0.0`、`pydantic>=2.11.4`、`duckdb>=1.3.1`、`datarobot-asgi-middleware>=0.2.0` などを反映。
+- upstream `v11.5.1` 以降の `core/src/core/routers/*` 分割を復帰し、monolithic な `core.rest_api` を app factory と互換 re-export 中心へ縮小する。
 - chart prompt に、title/axis/annotation は plain text のみという制約を追加。
 
 ## 見送り
@@ -62,6 +63,11 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `core` の upstream 制約 `kaleido==0.2.0` と衝突しないよう、app_backend 側の重複制約も `kaleido==0.2.0` に戻す。
 - `fastapi>=0.115.11,<0.130` にして、`fastapi 0.138` / `starlette 1.3` 系で `_IncludedRouter.path` が存在せず ASGI instrumentation が落ちる問題を避ける。
 - `core/src/core/prompts.py` に chart title/text の plain text 制約を追加。
+- `core/src/core/deps.py` と `core/src/core/routers/*` を復帰し、registry/database/datasets/dictionaries/chats/external-data-stores/user の endpoint 実装を upstream と同じ router module に分割。
+- `core/src/core/rest_api.py` は upstream の thin app factory に寄せつつ、既存の `create_app()` singleton、`app` export、`core.customize.rest_api` mount、`utils.rest_api` 経由の互換 re-export を維持。
+- `core/src/core/file_utils.py` を追加し、CSV decode/validation helper を router から参照する構成へ移動。ただし fork の pandas 前提を維持するため、upstream の polars return ではなく `pd.DataFrame` を返す。
+- `core/src/core/routers/database.py` は upstream split を採用しつつ、既存 fork の `schema_name` 指定を background task に渡す挙動を維持。
+- `app_backend/tests/test_v1151_fastapi_app_factory.py` に、`/api/v1/datasets/upload`、`/api/v1/database/select`、`/api/v1/chats/{chat_id}/messages` が `core.routers.*` の endpoint を指す characterization test を追加。
 
 ## 検証
 
@@ -69,8 +75,11 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_llm_client.py -q`: 12 passed
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_main.py app_backend/tests/test_v1151_fastapi_integration.py -q`: 22 passed, 3 skipped
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests -q`: 107 passed, 3 skipped
+- `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_v1151_fastapi_app_factory.py app_backend/tests/test_v1151_fastapi_integration.py app_backend/tests/test_rest_api_v0424_compat.py app_backend/tests/test_main.py app_backend/tests/test_upstream_compat_imports.py -q`: 29 passed, 3 skipped
+- `uv run --project app_backend --all-extras --dev pytest app_backend/tests -q`: 108 passed, 3 skipped
 - `uv run --project app_backend --all-extras --dev ruff check core/src/core/llm_client.py app_backend/tests/test_llm_client.py`: passed
 - `uv run --project app_backend --all-extras --dev ruff check core/src/core/data_connections/datarobot/helpers.py app_backend/tests/test_v1153_backend_compat.py`: passed
+- `uv run --project app_backend --all-extras --dev ruff check --fix core/src/core/rest_api.py core/src/core/file_utils.py core/src/core/routers app_backend/tests/test_rest_api_v0424_compat.py app_backend/tests/test_v1151_fastapi_app_factory.py`: passed
 - `uv run --project core python - <<'PY' ...`: core import smoke passed
 - `uv run --project core python - <<'PY' ...`: `core.token_tracking` removed smoke passed
 
