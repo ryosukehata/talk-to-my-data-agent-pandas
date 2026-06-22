@@ -107,6 +107,16 @@ def retryable_recipe_preview_exception(exc: BaseException) -> bool:
 
 
 def _handle_403_client_error(client_error: ClientError) -> None:
+    """
+    Handle 403 ClientError, raising ApplicationUsageException for seat license restrictions.
+
+    Args:
+        client_error: The ClientError with status_code 403
+
+    Raises:
+        ApplicationUsageException: If the error is due to seat license restrictions
+        ClientError: Re-raises the original error if not seat license related
+    """
     error_message = (
         client_error.json.get("message", str(client_error))
         if client_error.json
@@ -116,8 +126,9 @@ def _handle_403_client_error(client_error: ClientError) -> None:
         raise ApplicationUsageException(
             UsageExceptionType.USER_ACCESS_DENIED,
             "Feature unavailable due to seat license restrictions. Please contact your DataRobot administrator.",
-        ) from client_error
-    raise client_error
+        )
+    else:
+        raise client_error
 
 
 @contextmanager
@@ -137,29 +148,38 @@ def handle_datarobot_error(
     try:
         yield
     except ValueError as e:
-        client_error = next(
-            (arg for arg in e.args if isinstance(arg, ClientError)),
-            None,
-        )
-        if client_error is None:
+        # ClientError is often wrapped in ValueError: ('message', ClientError(...))
+        client_error = None
+        if e.args and len(e.args) >= 2:
+            for arg in e.args:
+                if isinstance(arg, ClientError):
+                    client_error = arg
+                    break
+
+        if client_error:
+            # Handle the wrapped ClientError
+            if client_error.status_code == 404:
+                message = f"{resource} not found (404.)"
+                logger.log(not_found_severity, message, exc_info=True)
+            elif client_error.status_code == 403:
+                _handle_403_client_error(client_error)
+            else:
+                message = (
+                    f"Exception in retrieving {resource} ({client_error.status_code})."
+                )
+                logger.log(other_severity, message, exc_info=True)
+            if exception_type:
+                raise exception_type(message) from client_error
+            else:
+                raise client_error
+        else:
+            # No ClientError found - treat as unexpected exception
             message = f"Unexpected exception in retrieving {resource}."
             logger.log(other_severity, message, exc_info=True)
             if exception_type:
                 raise exception_type(message) from e
-            raise
-
-        if client_error.status_code == 404:
-            message = f"{resource} not found (404.)"
-            logger.log(not_found_severity, message, exc_info=True)
-        elif client_error.status_code == 403:
-            _handle_403_client_error(client_error)
-        else:
-            message = f"Exception in retrieving {resource} ({client_error.status_code})."
-            logger.log(other_severity, message, exc_info=True)
-
-        if exception_type:
-            raise exception_type(message) from client_error
-        raise client_error
+            else:
+                raise
     except ClientError as e:
         if e.status_code == 404:
             message = f"{resource} not found (404.)"

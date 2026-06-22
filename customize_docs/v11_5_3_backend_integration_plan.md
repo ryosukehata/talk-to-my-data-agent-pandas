@@ -12,7 +12,7 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - DataRobot API 呼び出しで builder token fallback を許可できるようにする。
 - builder token fallback の設定を upstream と同じ `core.config.Config` 経由に寄せる。
 - local 実行時の空 `DATAROBOT_DEFAULT_USE_CASE` を DataRobot client config へ明示する。
-- Data Registry / DataStore まわりの 403 seat license error を利用者向け例外へ変換。
+- Data Registry / DataStore まわりの 403 seat license error と wrapped `ClientError` handling を upstream に寄せる。
 - token usage の default fallback を `tiktoken` から heuristic strategy へ変更。
 - token tracking 実装を `datarobot_genai.core.utils.token_tracking` へ寄せ、`core.token_tracking` / `utils.token_tracking` の compatibility shim は削除する。
 - `llm_client.py` に upstream の OpenAI exception import と verbose error logging を取り込む。
@@ -41,6 +41,7 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
   - token 使用時も空 `DATAROBOT_DEFAULT_USE_CASE` が `default_use_case=[]` として DataRobot client に渡ること。
   - seat license 403 が `ApplicationUsageException` になること。
   - ValueError wrapped 404 が `RecipeError` になること。
+  - ClientError を含まない ValueError が unexpected exception として `RecipeError` になること。
   - token counting fallback が heuristic strategy であること。
   - `TokenUsageTracker` などを `datarobot_genai` から直接 import すること。
 
@@ -50,7 +51,7 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `app_backend/app/telemetry/*` に `ReadableFormatter` を追加し、default config を `readable` に変更。
 - `core/src/core/config.py` を追加し、upstream と同じ `use_builder_api_token` setting を持たせる。
 - `core/src/core/datarobot_client.py` に builder token fallback と empty use case handling を追加。
-- `core/src/core/data_connections/datarobot/helpers.py` に wrapped ClientError / seat license 403 handling を追加。
+- `core/src/core/data_connections/datarobot/helpers.py` に wrapped ClientError / seat license 403 / ClientError を含まない ValueError fallback handling を追加。
 - `core/src/core/api.py` / `core/src/core/rest_api.py` の DataRobot user-token context で builder token fallback を許可。
 - `core/src/core/token_tracking.py` と `utils/token_tracking.py` を削除し、参照箇所は `datarobot_genai.core.utils.token_tracking` へ直接切り替える。
 - `estimate_csv_rows_for_token_limit` の呼び出しは upstream と同じ 3 引数に揃える。
@@ -64,12 +65,12 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 
 ## 検証
 
-- `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_v1153_backend_compat.py -q`: 11 passed
+- `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_v1153_backend_compat.py -q`: 12 passed
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_llm_client.py -q`: 12 passed
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_main.py app_backend/tests/test_v1151_fastapi_integration.py -q`: 22 passed, 3 skipped
-- `uv run --project app_backend --all-extras --dev pytest app_backend/tests -q`: 106 passed, 3 skipped
+- `uv run --project app_backend --all-extras --dev pytest app_backend/tests -q`: 107 passed, 3 skipped
 - `uv run --project app_backend --all-extras --dev ruff check core/src/core/llm_client.py app_backend/tests/test_llm_client.py`: passed
-- `uv run --project app_backend --all-extras --dev ruff check app_backend/tests/test_v1153_backend_compat.py core/src/core/llm_client.py core/src/core/token_tracking.py`: passed
+- `uv run --project app_backend --all-extras --dev ruff check core/src/core/data_connections/datarobot/helpers.py app_backend/tests/test_v1153_backend_compat.py`: passed
 - `uv run --project core python - <<'PY' ...`: core import smoke passed
 - `uv run --project core python - <<'PY' ...`: `core.token_tracking` removed smoke passed
 

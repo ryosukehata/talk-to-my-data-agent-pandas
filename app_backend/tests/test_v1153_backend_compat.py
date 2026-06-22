@@ -189,8 +189,16 @@ def test_handle_datarobot_error_maps_wrapped_404() -> None:
             raise wrapped_error
 
 
+def test_handle_datarobot_error_maps_unwrapped_value_error() -> None:
+    with pytest.raises(
+        RecipeError,
+        match="Unexpected exception in retrieving Dataset.iterate\\(\\).",
+    ):
+        with handle_datarobot_error("Dataset.iterate()"):
+            raise ValueError("Current use case is invalid.")
+
+
 def test_default_token_counting_uses_heuristic_strategy() -> None:
     tracker = TokenUsageTracker(strategy=ApiResponseCountingStrategy())
     assert isinstance(tracker.strategy.fallback_strategy, HeuristicTokenCountingStrategy)
     assert count_messages_tokens([{"role": "user", "content": "hello world"}]) > 0
-
