@@ -1,78 +1,64 @@
 [project]
-
-name = "app_backend"
+name = "core"
 version = "0.1.0"
-description = "FastAPI Server"
+description = "Core business logic and utilities shareable across components"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+authors = [
+    { name = "DataRobot", email = "oss-community-management@datarobot.com" }
+]
+requires-python = ">=3.10"
 dependencies = [
-    "aiologic>=0.16,<1.0",
     "aiofiles==24.1.0",
+    "aiologic>=0.16,<1.0",
     "aiosqlite>=0.21.0,<0.22",
-    "babel>=2.16,<3",
-    "boto3>=1.36.2,<2.0",
-    "core",
-    "cryptography>=44.0.0,<45.0",
-    "datarobot[auth-authlib,core]>=3.10.0",
-    "datarobot-asgi-middleware>=0.2.0",
+    "chardet>=5.0.0,<6.0",
+    "datarobot[auth-authlib,core]>=3.9.1",
     "datarobot-genai>=0.3.4,<0.4",
-    "db-dtypes>=1.3.1,<2.0",
     "duckdb>=1.3.1,<1.4",
-    "eval-type-backport>=0.2.2,<1.0",
-    "fastapi[standard]>=0.115.11,<0.130",
-    "fastexcel>=0.12.1,<1.0",
+    "fastapi>=0.115.6,<1.0",
     "fsspec>=2023.1.0,<=2025.3.0",
-    "google-auth>=2.37.0,<3.0",
     "google-cloud-bigquery>=3.27.0,<4.0",
     "hdbcli>=2.23.27,<3.0",
-    "httpx>=0.28.1",
+    "httpx>=0.23.0,<1.0",
+    "inquirer>=3.4.0,<4.0",
     "instructor[litellm]>=1.3.4,<2.0",
     "joblib>=1.4.2,<2.0",
     "kaleido==0.2.0",
-    "lightgbm>=4.5.0,<5.0",
     "litellm>=1.72.1",
-    "numba>=0.61.0,<1.0",
+    "nbformat>=5.10.0,<6.0",
     "numpy>=2.1.3,<3.0",
-    "tiktoken>=0.11.0,<1.0",
-    "openai>=1.76.2,<2",
-    "opentelemetry-api>=1.22.0,<1.30.0",
-    "opentelemetry-sdk>=1.22.0,<1.30.0",
-    "opentelemetry-exporter-otlp-proto-http>=1.22.0,<1.30.0",
+    "openai>=1.60.0,<2",
+    "openpyxl>=3.1.5,<4.0",
+    "opentelemetry-api>=1.20.0,<1.30.0",
+    "opentelemetry-sdk>=1.20.0,<1.30.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.20.0,<1.30.0",
     "opentelemetry-instrumentation>=0.45b0,<0.59b0",
     "opentelemetry-instrumentation-fastapi>=0.45b0,<0.59b0",
-    "opentelemetry-instrumentation-httpx>=0.45b0,<1.0",
+    "opentelemetry-instrumentation-httpx>=0.45b0,<0.59b0",
     "opentelemetry-instrumentation-requests>=0.45b0,<0.59b0",
-    "openpyxl>=3.1.5,<4.0",
     "pandas>=2.2.3,<3.0",
     "plotly>=5.24.1,<6.0",
     "polars>=1.22.0,<2.0",
     "psutil>=6.1.1,<7.0",
-    "pyarrow==20.0.0",
-    "pydantic>=2.11.4,<3.0",
+    "pyarrow>=19.0.0,<22.0.0",
+    "pydantic>=2.7.4,<3.0",
     "pydantic-settings>=2.4.0,<3.0",
-    "python-dotenv>=1.0.1",
-    "python-docx>=1.1.0,<2.0",
     "python-multipart>=0.0.20,<1.0",
     "requests>=2.32.5,<3.0",
+    "rich>=13.9.4,<14.0",
     "scikit-learn>=1.6.1,<2.0",
     "scipy>=1.15.1,<2.0",
     "snowflake-connector-python>=3.12.4,<4.0",
     "snowflake-sqlalchemy>=1.7.3,<2.0",
-    "spacy>=3.8.3,<4.0",
-    "sqlalchemy>=2.0.37,<3.0",
     "statsmodels>=0.14.4,<1.0",
     "textblob>=0.19.0,<1.0",
-    "tslearn>=0.6.3,<1.0",
-    "types-aiofiles==24.1.0.20241221",
-    "typing-extensions>=4.12.2,<5.0",
-    "uvicorn==0.34.0,<1",
-    "langid==1.1.6",
-    "pillow",
-    "chardet>=5.0.0,<6.0",
-    "tenacity>=8.0.0",
 ]
 
-[project.optional-dependencies]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
 dev = [
     "mypy>=1.15.0",
     "ruff>=0.11.11",
@@ -87,31 +73,10 @@ dev = [
     "types-pyyaml>=6.0.12.20241230,<7.0",
 ]
 
-[tool.uv.sources]
-core = { path = "core", editable = true }
-
-[build-system]
-requires = ["hatchling>=1.18.0"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["app"]
-include = ["static", "templates"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-norecursedirs = [".venv", "venv", ".git", ".tox", "dist", "build", "*.egg"]
-filterwarnings = [
-    # Ignore DataRobot SDK deprecation warnings about mypy_extensions.TypedDict
-    "ignore:mypy_extensions.TypedDict is deprecated:DeprecationWarning:datarobot.*",
-    # Ignore other common deprecation warnings that clutter CI output
-    "ignore::DeprecationWarning:datarobot.*",
-    # Ignore Pydantic V2 migration warnings
-    "ignore:.*is deprecated and will be removed.*:pydantic.warnings.PydanticDeprecatedSince20",
-    "ignore:.*is deprecated.*:pydantic.warnings.PydanticDeprecatedSince20",
-]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
