@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import datarobot
 import pytest
 from core.api_exceptions import ApplicationUsageException
+from core.config import Config as CoreConfig
 from utils.data_connections.datarobot.helpers import RecipeError, handle_datarobot_error
 from utils.datarobot_client import get_visitors_token, use_user_token
 from utils.token_tracking import (
@@ -63,10 +64,35 @@ def test_builder_token_can_be_selected_when_allowed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("USE_BUILDER_API_TOKEN", "true")
+    monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.com/api/v2")
     monkeypatch.setenv("DATAROBOT_API_TOKEN", "builder-token")
     request = make_request(session_token="session-token", header_token="header-token")
 
     assert get_visitors_token(request, allow_use_builder_token=True) == "builder-token"
+
+
+def test_core_config_exposes_builder_token_toggle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("USE_BUILDER_API_TOKEN", "true")
+    monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.com/api/v2")
+    monkeypatch.setenv("DATAROBOT_API_TOKEN", "builder-token")
+
+    config = CoreConfig()
+
+    assert config.use_builder_api_token is True
+    assert config.datarobot_api_token == "builder-token"
+
+
+def test_core_config_reads_runtime_builder_token_toggle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("USE_BUILDER_API_TOKEN", raising=False)
+    monkeypatch.setenv("MLOPS_RUNTIME_PARAM_USE_BUILDER_API_TOKEN", "true")
+    monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.com/api/v2")
+    monkeypatch.setenv("DATAROBOT_API_TOKEN", "builder-token")
+
+    assert CoreConfig().use_builder_api_token is True
 
 
 def test_builder_token_is_not_used_unless_allowed(

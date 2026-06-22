@@ -21,6 +21,8 @@ import datarobot as dr
 import trafaret as t
 from fastapi import HTTPException, Request
 
+from core.config import Config
+
 FILE_API_CONNECT_TIMEOUT = float(os.environ.get("FILE_API_CONNECT_TIMEOUT", 180))
 FILE_API_READ_TIMEOUT = float(os.environ.get("FILE_API_READ_TIMEOUT", 180))
 
@@ -168,29 +170,14 @@ class File:
         )
 
 
-_TRUE_ENV_VALUES = {"1", "true", "yes", "y", "on"}
-
-
-def _env_bool(name: str) -> bool:
-    return os.environ.get(name, "").strip().lower() in _TRUE_ENV_VALUES
-
-
-def _should_use_builder_api_token() -> bool:
-    return _env_bool("USE_BUILDER_API_TOKEN") or _env_bool(
-        "MLOPS_RUNTIME_PARAM_USE_BUILDER_API_TOKEN"
-    )
-
-
 def get_visitors_token(
     request: Request,
     allow_use_builder_token: bool = False,
 ) -> str | None:
-    if (
-        allow_use_builder_token
-        and _should_use_builder_api_token()
-        and os.environ.get("DATAROBOT_API_TOKEN")
-    ):
-        return os.environ["DATAROBOT_API_TOKEN"]
+    if allow_use_builder_token:
+        config = Config()
+        if config.use_builder_api_token is True:
+            return config.datarobot_api_token
 
     if request.state.session.datarobot_api_scoped_token:
         return cast(str, request.state.session.datarobot_api_scoped_token)
