@@ -138,6 +138,39 @@ def test_use_user_token_clears_empty_local_default_use_case(
     assert calls == [{"default_use_case": []}]
 
 
+def test_use_user_token_clears_empty_default_use_case_with_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.com/api/v2")
+    monkeypatch.setenv("DATAROBOT_DEFAULT_USE_CASE", "")
+    request = make_request(session_token="session-token")
+
+    calls: list[dict[str, object]] = []
+
+    class Client:
+        def __init__(self, **kwargs: object) -> None:
+            calls.append(kwargs)
+
+        def __enter__(self) -> None:
+            return None
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    monkeypatch.setattr(datarobot, "Client", Client)
+
+    with use_user_token(request):
+        pass
+
+    assert calls == [
+        {
+            "token": "session-token",
+            "endpoint": "https://app.datarobot.com/api/v2",
+            "default_use_case": [],
+        }
+    ]
+
+
 def test_handle_datarobot_error_maps_seat_license_403() -> None:
     error = datarobot.errors.ClientError("Access denied", 403)
     error.json = {"message": "Access denied due to seat license restrictions"}

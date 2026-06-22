@@ -196,10 +196,15 @@ def use_user_token(
         allow_use_builder_token=allow_use_builder_token,
     )
     if token:
-        with dr.Client(
+        client_kwargs: dict[str, Any] = dict(
             token=token,
             endpoint=os.environ.get("DATAROBOT_ENDPOINT"),
-        ):
+        )
+        # Clear use case context when DATAROBOT_DEFAULT_USE_CASE is empty;
+        # the SDK treats "" as a valid ID.
+        if os.environ.get("DATAROBOT_DEFAULT_USE_CASE") == "":
+            client_kwargs["default_use_case"] = []
+        with dr.Client(**client_kwargs):
             yield
     elif not os.environ.get(
         "DR_CUSTOM_APP_EXTERNAL_URL"

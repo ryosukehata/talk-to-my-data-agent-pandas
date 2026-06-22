@@ -35,6 +35,7 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
   - builder token fallback が許可時だけ使われること。
   - `core.config.Config` が `USE_BUILDER_API_TOKEN` / `MLOPS_RUNTIME_PARAM_USE_BUILDER_API_TOKEN` と `DATAROBOT_API_TOKEN` を公開すること。
   - local empty use case が `default_use_case=[]` として設定されること。
+  - token 使用時も空 `DATAROBOT_DEFAULT_USE_CASE` が `default_use_case=[]` として DataRobot client に渡ること。
   - seat license 403 が `ApplicationUsageException` になること。
   - ValueError wrapped 404 が `RecipeError` になること。
   - token counting fallback が heuristic strategy であること。
@@ -52,9 +53,9 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 
 ## 検証
 
-- `uv run pytest app_backend/tests/test_v1153_backend_compat.py -q`: 10 passed
-- `uv run pytest app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_main.py app_backend/tests/test_v1151_fastapi_integration.py -q`: 19 passed, 3 skipped
-- `uv run pytest app_backend/tests -q`: 104 passed, 3 skipped
+- `uv run pytest app_backend/tests/test_v1153_backend_compat.py -q`: 11 passed
+- `uv run pytest app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_main.py app_backend/tests/test_v1151_fastapi_integration.py -q`: 20 passed, 3 skipped
+- `uv run pytest app_backend/tests -q`: 105 passed, 3 skipped
 
 ## 既知事項
 
