@@ -33,7 +33,6 @@ import core.routers.registry as registry_routes
 import core.routers.user as user_routes
 from core import deps, file_utils
 from core import middleware as core_middleware
-from core.data_analyst_telemetry import telemetry
 from core.logging_helper import get_logger
 from core.middleware import session_middleware
 from core.routers import (
@@ -46,6 +45,8 @@ from core.routers import (
     supported_types_router,
     user_router,
 )
+
+from .telemetry import otel
 
 logger = get_logger()
 
@@ -217,11 +218,11 @@ def _create_fastapi_app(
         logger.exception("Failed to load customize API endpoints: %s", e)
 
     # Initialize telemetry on application startup
-    telemetry.log_application_start()
+    otel.log_application_start()
 
     # Setup auto-instrumentation for FastAPI
     # This will automatically trace all incoming HTTP requests
-    telemetry.instrument_fastapi_app(app)
+    otel.instrument_fastapi_app(app)
 
     return app
 

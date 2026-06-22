@@ -202,3 +202,13 @@ def test_default_token_counting_uses_heuristic_strategy() -> None:
     tracker = TokenUsageTracker(strategy=ApiResponseCountingStrategy())
     assert isinstance(tracker.strategy.fallback_strategy, HeuristicTokenCountingStrategy)
     assert count_messages_tokens([{"role": "user", "content": "hello world"}]) > 0
+
+
+def test_core_rest_api_uses_upstream_otel_singleton() -> None:
+    from core.data_analyst_telemetry import telemetry
+    from core.telemetry import otel
+
+    from core import rest_api
+
+    assert rest_api.otel is otel
+    assert telemetry is otel

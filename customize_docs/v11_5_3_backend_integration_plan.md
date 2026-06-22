@@ -19,6 +19,7 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `core/pyproject.toml` と `app_backend/core -> ../core` の editable package 構成を upstream `v11.5.3` に寄せる。
 - backend 依存関係を upstream `v11.5.3` の source constraints に寄せ、`datarobot-genai`、`pyarrow==20.0.0`、`pydantic>=2.11.4`、`duckdb>=1.3.1`、`datarobot-asgi-middleware>=0.2.0` などを反映。
 - upstream `v11.5.1` 以降の `core/src/core/routers/*` 分割を復帰し、monolithic な `core.rest_api` を app factory と互換 re-export 中心へ縮小する。
+- OpenTelemetry は upstream と同じ `app_backend/app/telemetry/otel.py` と `core/src/core/telemetry` symlink 構成へ寄せる。
 - chart prompt に、title/axis/annotation は plain text のみという制約を追加。
 
 ## 見送り
@@ -68,6 +69,9 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `core/src/core/file_utils.py` を追加し、CSV decode/validation helper を router から参照する構成へ移動。ただし fork の pandas 前提を維持するため、upstream の polars return ではなく `pd.DataFrame` を返す。
 - `core/src/core/routers/database.py` は upstream split を採用しつつ、既存 fork の `schema_name` 指定を background task に渡す挙動を維持。
 - `app_backend/tests/test_v1151_fastapi_app_factory.py` に、`/api/v1/datasets/upload`、`/api/v1/database/select`、`/api/v1/chats/{chat_id}/messages` が `core.routers.*` の endpoint を指す characterization test を追加。
+- `app_backend/app/telemetry/otel.py` と `core/src/core/telemetry -> ../../../app_backend/app/telemetry` を復帰し、`core.rest_api` は upstream と同じ `from .telemetry import otel` を使う。
+- `core/src/core/data_analyst_telemetry.py` は `core.telemetry.otel` への互換 alias に縮小し、既存の `telemetry.trace` / `telemetry.time` import を維持しながら実体を upstream `OTel` singleton に揃える。
+- `app_backend/tests/test_v1153_backend_compat.py` に `core.rest_api.otel` と旧 `core.data_analyst_telemetry.telemetry` が同じ `core.telemetry.otel` を指すことを固定するテストを追加。
 
 ## 検証
 
@@ -77,9 +81,12 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests -q`: 107 passed, 3 skipped
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_v1151_fastapi_app_factory.py app_backend/tests/test_v1151_fastapi_integration.py app_backend/tests/test_rest_api_v0424_compat.py app_backend/tests/test_main.py app_backend/tests/test_upstream_compat_imports.py -q`: 29 passed, 3 skipped
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests -q`: 108 passed, 3 skipped
+- `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_v1151_fastapi_app_factory.py app_backend/tests/test_v1151_fastapi_integration.py app_backend/tests/test_main.py -q`: 28 passed, 3 skipped
+- `uv run --project app_backend --all-extras --dev pytest app_backend/tests -q`: 109 passed, 3 skipped
 - `uv run --project app_backend --all-extras --dev ruff check core/src/core/llm_client.py app_backend/tests/test_llm_client.py`: passed
 - `uv run --project app_backend --all-extras --dev ruff check core/src/core/data_connections/datarobot/helpers.py app_backend/tests/test_v1153_backend_compat.py`: passed
 - `uv run --project app_backend --all-extras --dev ruff check --fix core/src/core/rest_api.py core/src/core/file_utils.py core/src/core/routers app_backend/tests/test_rest_api_v0424_compat.py app_backend/tests/test_v1151_fastapi_app_factory.py`: passed
+- `uv run --project app_backend --all-extras --dev ruff check app_backend/app/telemetry core/src/core/rest_api.py core/src/core/data_analyst_telemetry.py app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_v1151_fastapi_app_factory.py`: passed
 - `uv run --project core python - <<'PY' ...`: core import smoke passed
 - `uv run --project core python - <<'PY' ...`: `core.token_tracking` removed smoke passed
 

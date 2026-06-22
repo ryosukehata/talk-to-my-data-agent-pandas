@@ -20,14 +20,17 @@ from .logging import (
     TextFormatter,
     init_logging,
 )
+from .otel import OTel, otel
 from .uvicorn_filter import configure_uvicorn_logging
 
 __all__ = [
     "FormatType",
     "JsonFormatter",
     "LogLevel",
+    "OTel",
     "ReadableFormatter",
     "TextFormatter",
     "configure_uvicorn_logging",
     "init_logging",
+    "otel",
 ]
