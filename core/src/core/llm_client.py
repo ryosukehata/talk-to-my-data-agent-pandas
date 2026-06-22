@@ -13,15 +13,29 @@
 # limitations under the License.
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from types import TracebackType
 from typing import Any, Type
 
+import httpx
 import instructor
 from datarobot_genai.core.utils.token_tracking import TokenUsageTracker
-from openai import AsyncOpenAI
+from openai import (
+    APIConnectionError,
+    APIError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    AuthenticationError,
+    BadRequestError,
+    InternalServerError,
+    NotFoundError,
+    RateLimitError,
+)
 
 from core.constants import get_llm_model
 
@@ -40,6 +54,8 @@ _MODEL_ALIASES_FOR_CONFIG_DEFAULT = {
 }
 _DEFAULT_REQUEST_TIMEOUT_SECONDS = 180.0
 _DEFAULT_MAX_RETRIES = 2
+
+log = logging.getLogger(__name__)
 
 
 def _env_bool(env: Mapping[str, str], name: str, default: bool = False) -> bool:
@@ -249,7 +265,7 @@ class ChatProxy:
 
 
 class CompletionsProxy:
-    """Proxy for completions interface with token tracking."""
+    """Proxy for completions interface with token tracking and verbose error handling."""
 
     def __init__(
         self,
@@ -294,14 +310,25 @@ class CompletionsProxy:
         messages = kwargs.get("messages", [])
         model = kwargs.get("model", "unknown")
 
-        # Call underlying implementation
-        result = await self._completions.create(*args, **kwargs)
+        log.debug(
+            f"LLM API call starting - model: {model}, "
+            f"api_base: {kwargs.get('api_base', 'default')}, "
+            f"messages_count: {len(messages)}, timeout: {kwargs.get('timeout')}s"
+        )
 
-        # Track tokens if tracker is available
-        if self._tracker:
-            self._tracker.track_call(messages, result, model)
+        try:
+            # Call underlying implementation
+            result = await self._completions.create(*args, **kwargs)
 
-        return result
+            # Track tokens if tracker is available
+            if self._tracker:
+                self._tracker.track_call(messages, result, model)
+
+            log.debug(f"LLM API call completed successfully - model: {model}")
+            return result
+        except Exception as e:
+            self._log_llm_error(e, model, kwargs)
+            raise
 
     async def create_with_completion(self, *args: Any, **kwargs: Any) -> Any:
         """Intercept create calls to track tokens."""
@@ -309,14 +336,108 @@ class CompletionsProxy:
         messages = kwargs.get("messages", [])
         model = kwargs.get("model", "unknown")
 
-        # Call underlying implementation
-        result, org = await self._completions.create_with_completion(*args, **kwargs)
+        log.debug(
+            f"LLM API call starting - model: {model}, "
+            f"api_base: {kwargs.get('api_base', 'default')}, "
+            f"messages_count: {len(messages)}, timeout: {kwargs.get('timeout')}s"
+        )
 
-        # Track tokens if tracker is available
-        if self._tracker:
-            self._tracker.track_call(messages, result, model)
+        try:
+            # Call underlying implementation
+            result, org = await self._completions.create_with_completion(
+                *args, **kwargs
+            )
 
-        return result, org
+            # Track tokens if tracker is available
+            if self._tracker:
+                self._tracker.track_call(messages, result, model)
+
+            log.debug(f"LLM API call completed successfully - model: {model}")
+            return result, org
+        except Exception as e:
+            self._log_llm_error(e, model, kwargs)
+            raise
+
+    def _log_llm_error(self, e: Exception, model: str, kwargs: dict[str, Any]) -> None:
+        """Log detailed error information for LLM API failures."""
+        api_base = kwargs.get("api_base", "default")
+        timeout = kwargs.get("timeout", "unknown")
+        error_type = type(e).__name__
+        error_message = str(e)
+
+        # Extract status code if available
+        status_code = None
+        if hasattr(e, "status_code"):
+            status_code = e.status_code
+        elif hasattr(e, "response") and hasattr(e.response, "status_code"):
+            status_code = e.response.status_code
+
+        # Map exception types to error descriptions
+        error_descriptions: dict[type[BaseException], tuple[str, str]] = {
+            APITimeoutError: (
+                "TIMEOUT",
+                f"Request timed out after {timeout}s. Check if the deployment is responsive.",
+            ),
+            AuthenticationError: (
+                "AUTH ERROR (401)",
+                "Unauthorized access. Check API token and permissions.",
+            ),
+            NotFoundError: (
+                "NOT FOUND (404)",
+                "Resource not found. The deployment ID may be incorrect or deleted.",
+            ),
+            RateLimitError: (
+                "RATE LIMIT (429)",
+                "Rate limit exceeded. Too many requests, please slow down.",
+            ),
+            InternalServerError: (
+                "SERVER ERROR (500)",
+                "Internal server error. The LLM deployment may be misconfigured or down. "
+                "Often caused by: incorrect model name, deployment issues, or unavailable target model.",
+            ),
+            BadRequestError: (
+                "BAD REQUEST (400)",
+                "Invalid request. Check request parameters and model name.",
+            ),
+            APIConnectionError: (
+                "CONNECTION ERROR",
+                "Failed to connect. Check network connectivity and firewall rules.",
+            ),
+            APIStatusError: (
+                f"STATUS ERROR ({status_code or 'unknown'})",
+                "HTTP error from server.",
+            ),
+            APIError: (
+                "ERROR",
+                "API error occurred.",
+            ),
+        }
+
+        # Find matching error type
+        label, description = "ERROR", "Unexpected error occurred."
+        for exc_type, (exc_label, exc_desc) in error_descriptions.items():
+            if isinstance(e, exc_type):
+                label, description = exc_label, exc_desc
+                break
+        else:
+            # Also check for asyncio.TimeoutError and httpx.ConnectError
+            if isinstance(e, asyncio.TimeoutError):
+                label = "TIMEOUT"
+                description = (
+                    f"Request timed out after {timeout}s. "
+                    "Check if the deployment is responsive."
+                )
+            elif isinstance(e, httpx.ConnectError):
+                label = "CONNECTION ERROR"
+                description = (
+                    "Failed to connect. Check network connectivity and firewall rules."
+                )
+
+        log.error(
+            f"LLM API {label}: {description} "
+            f"Endpoint: {api_base}, Model: {model}. "
+            f"Error: {error_type}: {error_message}"
+        )
 
 
 class AsyncLLMClient:

@@ -15,6 +15,7 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - Data Registry / DataStore まわりの 403 seat license error を利用者向け例外へ変換。
 - token usage の default fallback を `tiktoken` から heuristic strategy へ変更。
 - token tracking 実装を `datarobot_genai.core.utils.token_tracking` へ寄せ、既存 `core.token_tracking` / `utils.token_tracking` import は compatibility re-export として維持。
+- `llm_client.py` に upstream の OpenAI exception import と verbose error logging を取り込む。
 - `core/pyproject.toml` と `app_backend/core -> ../core` の editable package 構成を upstream `v11.5.3` に寄せる。
 - backend 依存関係を upstream `v11.5.3` の source constraints に寄せ、`datarobot-genai`、`pyarrow==20.0.0`、`pydantic>=2.11.4`、`duckdb>=1.3.1`、`datarobot-asgi-middleware>=0.2.0` などを反映。
 - chart prompt に、title/axis/annotation は plain text のみという制約を追加。
@@ -55,6 +56,7 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `core/src/core/token_tracking.py` を `datarobot_genai.core.utils.token_tracking` の compatibility re-export に変更。
 - `core/src/core/token_tracking.py` の `estimate_csv_rows_for_token_limit` は既存 4 引数呼び出しを受け、`model` を無視して `datarobot_genai` 実装へ委譲する。
 - `core/src/core/llm_client.py` の `TokenUsageTracker` import を `datarobot_genai` へ変更。
+- `core/src/core/llm_client.py` は既存の `LLMClientConfig` / `create_with_completion` 対応を維持しつつ、upstream の `APIConnectionError` / `APITimeoutError` / `RateLimitError` などの詳細ログを `CompletionsProxy` に追加する。
 - `core/pyproject.toml`、`core/README.md`、`core/Taskfile.yaml`、`app_backend/core` symlink を復帰し、`app_backend/pyproject.toml` から `core` を editable dependency として参照する。
 - `app_backend/requirements.in` を upstream 形式で追加し、`app_backend/requirements.txt` を compile 生成物として更新。
 - `core` の upstream 制約 `kaleido==0.2.0` と衝突しないよう、app_backend 側の重複制約も `kaleido==0.2.0` に戻す。
@@ -64,8 +66,10 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 ## 検証
 
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_v1153_backend_compat.py -q`: 13 passed
+- `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_llm_client.py -q`: 12 passed
 - `uv run --project app_backend --all-extras --dev pytest app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_main.py app_backend/tests/test_v1151_fastapi_integration.py -q`: 22 passed, 3 skipped
-- `uv run --project app_backend --all-extras --dev pytest app_backend/tests -q`: 107 passed, 3 skipped
+- `uv run --project app_backend --all-extras --dev pytest app_backend/tests -q`: 108 passed, 3 skipped
+- `uv run --project app_backend --all-extras --dev ruff check core/src/core/llm_client.py app_backend/tests/test_llm_client.py`: passed
 - `uv run --project app_backend --all-extras --dev ruff check app_backend/tests/test_v1153_backend_compat.py core/src/core/llm_client.py core/src/core/token_tracking.py`: passed
 - `uv run --project core python - <<'PY' ...`: core import smoke passed
 

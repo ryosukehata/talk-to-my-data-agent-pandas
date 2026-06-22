@@ -1,19 +1,23 @@
 import asyncio
 import json
+import logging
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
 from typing import Any
 
+import httpx
 import pytest
-from core import llm_client
+from openai import APIConnectionError
 from pydantic import BaseModel
 from utils.llm_client import (
     AsyncLLMClient,
     CompletionsProxy,
     CompletionTokenCompatibilityProxy,
 )
+
+from core import llm_client
 
 
 class _RecordingCompletions:
@@ -27,6 +31,12 @@ class _RecordingCompletions:
     async def create_with_completion(self, **kwargs: Any) -> tuple[str, str]:
         self.kwargs = kwargs
         return "created", "raw"
+
+
+class _FailingCompletions:
+    async def create(self, **_kwargs: Any) -> Any:
+        request = httpx.Request("POST", "https://example.test/chat/completions")
+        raise APIConnectionError(message="network down", request=request)
 
 
 class _RecordingTracker:
@@ -104,6 +114,38 @@ def test_completions_proxy_tracks_tokens_for_create_with_completion() -> None:
     assert completions.kwargs["timeout"] == 12
     assert completions.kwargs["max_completion_tokens"] == 128
     assert tracker.calls == [(messages, "created", "model")]
+
+
+def test_completions_proxy_logs_verbose_llm_api_errors(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    config = llm_client.LLMClientConfig(
+        default_model="datarobot/bedrock/test-model",
+        timeout=45,
+        max_retries=1,
+    )
+    proxy = CompletionsProxy(
+        _FailingCompletions(),
+        tracker=None,
+        llm_config=config,
+        api_base="https://app.example/api/v2/deployments/abc/chat/completions",
+    )
+
+    with caplog.at_level(logging.ERROR, logger="core.llm_client"):
+        with pytest.raises(APIConnectionError):
+            asyncio.run(
+                proxy.create(
+                    messages=[{"role": "user", "content": "hello"}],
+                    model="datarobot-deployed-llm",
+                )
+            )
+
+    assert "LLM API CONNECTION ERROR" in caplog.text
+    assert "Endpoint: https://app.example/api/v2/deployments/abc/chat/completions" in (
+        caplog.text
+    )
+    assert "Model: datarobot/bedrock/test-model" in caplog.text
+    assert "Error: APIConnectionError: network down" in caplog.text
 
 
 def test_completion_token_compatibility_proxy_rewrites_max_tokens() -> None:
