@@ -21,10 +21,10 @@ from typing import Any, Generator, Optional, cast
 
 import datarobot as dr
 import streamlit as st
-from helpers import state_init
 from streamlit.delta_generator import DeltaGenerator
 from streamlit_javascript import st_javascript
 
+from helpers import state_init
 from utils.logging_helper import get_logger
 
 logger = get_logger("DR Connect")

@@ -52,9 +52,17 @@ base_router = APIRouter()
 _configured_app: FastAPI | None = None
 
 
+def get_app_version() -> str:
+    version_file = os.path.join(BASE_DIR, "VERSION")
+    if os.path.isfile(version_file):
+        with open(version_file, encoding="utf-8") as file:
+            return file.read().strip()
+    return ""
+
+
 @base_router.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "healthy"}
+    return {"status": "healthy", "version": get_app_version()}
 
 
 def is_static_frontend_available(
@@ -92,6 +100,7 @@ async def get_env() -> Response:
         "APP_BASE_URL": app_base_url,
         "API_PORT": os.getenv("PORT"),
         "DATAROBOT_ENDPOINT": os.getenv("DATAROBOT_ENDPOINT", ""),
+        "APP_VERSION": get_app_version(),
         "IS_STATIC_FRONTEND": STATIC_FRONTEND_AVAILABLE,
         "USE_DATAROBOT_LLM_GATEWAY": os.getenv("USE_DATAROBOT_LLM_GATEWAY", "false"),
     }

@@ -46,6 +46,12 @@ import sklearn
 import statsmodels as sm
 from datarobot.client import RESTClientObject
 from datarobot.models.dataset import Dataset
+from datarobot_genai.core.utils.token_tracking import (
+    HeuristicTokenCountingStrategy,
+    TokenUsageTracker,
+    count_messages_tokens,
+    estimate_csv_rows_for_token_limit,
+)
 from fastapi import Request
 from joblib import Memory
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
@@ -72,6 +78,7 @@ from core.constants import (
     REGISTRY_DATASET_SIZE_CUTOFF,
     VALUE_ERROR_MESSAGE,
 )
+from core.data_connections.datarobot.helpers import handle_datarobot_error
 from core.datarobot_client import use_user_token
 from core.datarobot_dataset_handler import (
     BaseRecipe,
@@ -80,12 +87,6 @@ from core.datarobot_dataset_handler import (
     load_or_create_spark_recipe,
 )
 from core.llm_client import AsyncLLMClient
-from core.token_tracking import (
-    TiktokenCountingStrategy,
-    TokenUsageTracker,
-    count_messages_tokens,
-    estimate_csv_rows_for_token_limit,
-)
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from core import prompts, tools
@@ -246,7 +247,8 @@ def list_registry_datasets(
     """
     logger.info(f"Acting as user: {get_user_email()}")
 
-    datasets = list(Dataset.iterate(limit=limit, filter_failed=True))
+    with handle_datarobot_error("Dataset.iterate()"):
+        datasets = list(Dataset.iterate(limit=limit, filter_failed=True))
 
     return [
         DataRegistryDataset(
@@ -326,7 +328,7 @@ async def register_remote_registry_datasets(
     downloaded_datasets = []
 
     if dataset_ids:
-        with use_user_token(request):
+        with use_user_token(request, allow_use_builder_token=True):
             recipe = await load_or_create_spark_recipe(analyst_db, dataset_ids)
 
             await recipe.refresh()  # Clear out any removed datasets.
@@ -368,7 +370,7 @@ async def register_remote_datasets(
     datasets: list[Dataset],
 ) -> None:
     for dataset in datasets:
-        with use_user_token(request):
+        with use_user_token(request, allow_use_builder_token=True):
             preview = await recipe.preview_dataset(dataset)
         analyst_dataset = AnalystDataset(name=dataset.name, data=preview.response)
 
@@ -459,7 +461,7 @@ async def register_datasource(
     data_store_id: str,
     datasources: list[ExternalDataSource],
 ) -> None:
-    with use_user_token(request):
+    with use_user_token(request, allow_use_builder_token=True):
         recipe = await DataSourceRecipe.load_or_create(analyst_db, data_store_id)
         for ds in datasources:
             preview = await recipe.preview_datasource(ds)
@@ -1399,9 +1401,7 @@ async def get_business_analysis(
 
         initial_rows = 750
 
-        df_csv, _ = estimate_csv_rows_for_token_limit(
-            df, MAX_CSV_TOKENS, initial_rows, ALTERNATIVE_LLM_BIG
-        )
+        df_csv, _ = estimate_csv_rows_for_token_limit(df, MAX_CSV_TOKENS, initial_rows)
 
         # Create messages for OpenAI
         messages: list[ChatCompletionMessageParam] = [
@@ -2016,7 +2016,7 @@ async def run_complete_analysis(
     telemetry_json: dict[str, Any] | None = None,
 ) -> AsyncGenerator[Component | AnalysisGenerationError, None]:
     datasets_names = [ds.name for ds in dataset_metadata]
-    token_tracker = TokenUsageTracker(strategy=TiktokenCountingStrategy())
+    token_tracker = TokenUsageTracker(strategy=HeuristicTokenCountingStrategy())
     analysis_context = RunCompleteAnalysisRequestContext(
         chat_request=chat_request,
         request=request,
@@ -2133,7 +2133,7 @@ async def run_complete_analysis(
                 return
 
             if request:
-                with use_user_token(request):
+                with use_user_token(request, allow_use_builder_token=True):
                     recipe = await DataSourceRecipe.load_or_create(
                         analyst_db, data_store_id
                     )
@@ -2181,7 +2181,7 @@ async def run_complete_analysis(
                 logging.info("Running DataWrangling analysis")
 
                 if request:
-                    with use_user_token(request):
+                    with use_user_token(request, allow_use_builder_token=True):
                         recipe = await load_or_create_spark_recipe(
                             analyst_db=analyst_db
                         )

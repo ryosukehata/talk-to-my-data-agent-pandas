@@ -41,6 +41,7 @@
   },
   "ignoreBinaries": [ ],
   "ignoreDependencies": [
+    "@vitest/coverage-v8",
     "@fontsource/*",
     "@radix-ui/react-toggle"
   ]

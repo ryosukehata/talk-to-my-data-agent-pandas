@@ -3,6 +3,7 @@ from types import TracebackType
 from typing import Any
 
 import pytest
+from datarobot_genai.core.utils.token_tracking import TokenUsageTracker
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
@@ -15,7 +16,6 @@ from utils.customize.infrastructure.llm import llm as refiner_llm
 from utils.customize.infrastructure.llm import report_questions_generator
 from utils.customize.usecase.prompt.builder import IRefinerDataInfoMessageFactory
 from utils.customize.usecase.report.generate_questions import GenerateQuestionsUseCase
-from utils.token_tracking import TokenUsageTracker
 
 
 class _SlowCompletions:

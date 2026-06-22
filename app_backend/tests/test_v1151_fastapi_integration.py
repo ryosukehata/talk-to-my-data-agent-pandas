@@ -22,7 +22,8 @@ def test_backend_app_exposes_health_endpoint(
     response = TestClient(create_app()).get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    assert response.json()["status"] == "healthy"
+    assert "version" in response.json()
 
 
 def test_backend_app_lifespan_initializes_deps(

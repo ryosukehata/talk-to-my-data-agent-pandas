@@ -16,10 +16,10 @@ import asyncio
 from typing import List
 
 import streamlit as st
-from app_settings import PAGE_ICON, apply_custom_css
-from datarobot_connect import DataRobotTokenManager
 from streamlit.navigation.page import StreamlitPage
 
+from app_settings import PAGE_ICON, apply_custom_css
+from datarobot_connect import DataRobotTokenManager
 from utils.i18n import gettext
 
 pages: List[StreamlitPage] = [

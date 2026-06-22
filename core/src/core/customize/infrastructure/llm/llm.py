@@ -9,6 +9,9 @@ from __future__ import annotations
 import asyncio
 from typing import cast
 
+from datarobot_genai.core.utils.token_tracking import TokenUsageTracker
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+
 from core.constants import ALTERNATIVE_LLM_BIG
 from core.customize.domain.question_refiner.domain import (
     RefinedQuestion,
@@ -19,10 +22,6 @@ from core.customize.domain.question_refiner.service_interface import (
 from core.customize.infrastructure.llm.timeout import get_llm_timeout_seconds
 from core.llm_client import AsyncLLMClient
 from core.logging_helper import get_logger
-from core.token_tracking import (
-    TokenUsageTracker,
-)
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
 logger = get_logger(__name__)
 QUESTION_REFINER_TIMEOUT_ENV = "QUESTION_REFINER_LLM_TIMEOUT_SECONDS"
