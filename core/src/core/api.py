@@ -46,6 +46,12 @@ import sklearn
 import statsmodels as sm
 from datarobot.client import RESTClientObject
 from datarobot.models.dataset import Dataset
+from datarobot_genai.core.utils.token_tracking import (
+    HeuristicTokenCountingStrategy,
+    TokenUsageTracker,
+    count_messages_tokens,
+    estimate_csv_rows_for_token_limit,
+)
 from fastapi import Request
 from joblib import Memory
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
@@ -81,12 +87,6 @@ from core.datarobot_dataset_handler import (
     load_or_create_spark_recipe,
 )
 from core.llm_client import AsyncLLMClient
-from core.token_tracking import (
-    HeuristicTokenCountingStrategy,
-    TokenUsageTracker,
-    count_messages_tokens,
-    estimate_csv_rows_for_token_limit,
-)
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from core import prompts, tools
@@ -1401,9 +1401,7 @@ async def get_business_analysis(
 
         initial_rows = 750
 
-        df_csv, _ = estimate_csv_rows_for_token_limit(
-            df, MAX_CSV_TOKENS, initial_rows, ALTERNATIVE_LLM_BIG
-        )
+        df_csv, _ = estimate_csv_rows_for_token_limit(df, MAX_CSV_TOKENS, initial_rows)
 
         # Create messages for OpenAI
         messages: list[ChatCompletionMessageParam] = [

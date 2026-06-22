@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from datarobot_genai.core.utils.token_tracking import TokenUsageTracker
+
 from core.constants import ALTERNATIVE_LLM_BIG
 from core.customize.domain.report.service_interface import (
     IReportSummaryService,
@@ -15,7 +17,6 @@ from core.customize.domain.report.service_interface import (
 )
 from core.llm_client import AsyncLLMClient
 from core.logging_helper import get_logger
-from core.token_tracking import TokenUsageTracker
 
 logger = get_logger("LLMReportSummaryService")
 

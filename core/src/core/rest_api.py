@@ -66,6 +66,12 @@ from core.logging_helper import get_logger
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
+from datarobot_genai.core.utils.token_tracking import (
+    HeuristicTokenCountingStrategy,
+    TokenUsageTracker,
+    count_messages_tokens,
+)
+
 from core.api import (
     AnalysisGenerationError,
     list_registry_datasets,
@@ -105,11 +111,6 @@ from core.schema import (
     RunChartsResult,
     RunDatabaseAnalysisResult,
     SupportedDataSourceTypes,
-)
-from core.token_tracking import (
-    HeuristicTokenCountingStrategy,
-    TokenUsageTracker,
-    count_messages_tokens,
 )
 
 logger = get_logger()

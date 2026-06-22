@@ -8,11 +8,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from datarobot_genai.core.utils.token_tracking import TokenUsageTracker
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+
 from core.customize.domain.question_refiner.domain import (
     RefinedQuestion,
 )
-from core.token_tracking import TokenUsageTracker
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
 
 class IQuestionGenerationService(ABC):
