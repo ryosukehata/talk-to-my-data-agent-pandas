@@ -5,6 +5,10 @@ import { SettingsModal } from "@/components/SettingsModal";
 import { useDataRobotInfo, useUpdateApiToken } from "@/api/user/hooks";
 import { renderWithProviders } from "../test-utils";
 
+const reloadTemplatesMock = vi.hoisted(() => ({
+  mutateAsync: vi.fn(),
+}));
+
 vi.mock("@/api/user/hooks", () => ({
   useDataRobotInfo: vi.fn(),
   useUpdateApiToken: vi.fn(),
@@ -12,7 +16,7 @@ vi.mock("@/api/user/hooks", () => ({
 
 vi.mock("@/api/templates/reloadHooks", () => ({
   useReloadTemplates: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: reloadTemplatesMock.mutateAsync,
     isPending: false,
   }),
 }));
@@ -25,6 +29,11 @@ describe("SettingsModal", () => {
     window.ENV = {};
     refetchDataRobotInfo = vi.fn().mockResolvedValue({});
     updateApiToken = vi.fn();
+    reloadTemplatesMock.mutateAsync.mockReset();
+    reloadTemplatesMock.mutateAsync.mockResolvedValue({
+      total_templates: 2,
+      categories: 1,
+    });
     (useUpdateApiToken as Mock).mockReturnValue({
       mutate: updateApiToken,
       isPending: false,
@@ -70,7 +79,7 @@ describe("SettingsModal", () => {
       data: {
         datarobot_account_info: {
           uid: "user-1",
-          username: "",
+          username: "fallback-user",
           firstName: "",
           lastName: "",
           email: "anon@example.com",
@@ -118,10 +127,7 @@ describe("SettingsModal", () => {
 
     renderWithProviders(<SettingsModal isOpen={true} onOpenChange={vi.fn()} />);
 
-    await user.type(
-      screen.getByPlaceholderText("Enter DataRobot API token"),
-      "new-token",
-    );
+    await user.type(screen.getByPlaceholderText("Enter API key"), "new-token");
     await user.click(screen.getByTestId("update-api-key-button"));
 
     expect(updateApiToken).toHaveBeenCalledWith(
@@ -130,5 +136,17 @@ describe("SettingsModal", () => {
         onSuccess: expect.any(Function),
       }),
     );
+  });
+
+  test("keeps template reload action wired to added mutation", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(<SettingsModal isOpen={true} onOpenChange={vi.fn()} />);
+
+    await user.click(screen.getByTestId("reload-templates-button"));
+
+    await waitFor(() => {
+      expect(reloadTemplatesMock.mutateAsync).toHaveBeenCalledTimes(1);
+    });
   });
 });

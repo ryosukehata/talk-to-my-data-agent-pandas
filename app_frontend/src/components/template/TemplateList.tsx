@@ -33,10 +33,6 @@ export const TemplateListItem = ({
   // カスタムプロンプトかどうかを判定
   const isCustomPrompt = template.category === "カスタム";
 
-  // Debug logs (remove in production)
-  console.log("Feature flags from API:", featureFlags);
-  console.log("templateEditEnabled:", templateEditEnabled);
-
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSelect(template);
@@ -94,11 +90,12 @@ export const TemplateListItem = ({
         <div className="flex shrink-0 gap-2">
           {isCustomPrompt && (
             <Button
-              variant="secondary"
+              variant="destructive"
               size="sm"
               onClick={handleDelete}
               disabled={isDeleting}
-              className="border-red-200 p-2 text-red-600 hover:border-red-300 hover:text-red-700"
+              className="px-2"
+              aria-label={t("Delete")}
               title={t("Delete")}
             >
               <Trash2 className="size-3" />

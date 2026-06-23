@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTranslation } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ import { TemplateCategoryFilter } from "./TemplateCategoryFilter";
 import { Loading } from "@/components/ui-custom/loading";
 import { convertCustomPromptsToTemplates } from "./utils";
 import { useCustomPromptState } from "@/components/custom-prompts";
+import { LoaderCircle } from "lucide-react";
 
 interface TemplateSelectorProps {
   open: boolean;
@@ -178,28 +180,24 @@ export const TemplateSelector = ({
           {customPromptsEnabled &&
             pendingUpdate &&
             (selectedCategory === "all" || selectedCategory === "カスタム") && (
-              <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3">
-                <div className="flex items-center gap-2">
-                  <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                  <span className="text-sm text-blue-700">
-                    {t("Custom prompt update in progress, please wait...")}
-                  </span>
-                </div>
-              </div>
+              <Alert variant="info" className="mb-4 py-3">
+                <LoaderCircle className="animate-spin" />
+                <AlertDescription>
+                  {t("Custom prompt update in progress, please wait...")}
+                </AlertDescription>
+              </Alert>
             )}
 
           {customPromptsEnabled &&
             customPromptsLoading &&
             shouldFetchCustomPrompts &&
             !pendingUpdate && (
-              <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3">
-                <div className="flex items-center gap-2">
-                  <div className="size-4 animate-spin rounded-full border-2 border-gray-500 border-t-transparent" />
-                  <span className="text-sm text-gray-700">
-                    {t("Loading custom prompts...")}
-                  </span>
-                </div>
-              </div>
+              <Alert variant="info" className="mb-4 py-3">
+                <LoaderCircle className="animate-spin" />
+                <AlertDescription>
+                  {t("Loading custom prompts...")}
+                </AlertDescription>
+              </Alert>
             )}
 
           {isLoading ? (
