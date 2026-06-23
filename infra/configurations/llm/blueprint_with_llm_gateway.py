@@ -23,7 +23,9 @@ def get_configuration(
         runtime_parameter("LLM_DEPLOYMENT_ID", deployment_id),
         runtime_parameter("USE_DATAROBOT_LLM_GATEWAY", "1"),
         runtime_parameter("LLM_DEFAULT_MODEL", default_model),
-        runtime_parameter("USE_BUILDER_API_TOKEN", configured_builder_api_token(resolved_env)),
+        runtime_parameter(
+            "USE_BUILDER_API_TOKEN", configured_builder_api_token(resolved_env)
+        ),
     )
     custom_model_runtime_parameters = (
         runtime_parameter("LLM_DEPLOYMENT_ID", deployment_id),

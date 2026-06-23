@@ -30,7 +30,9 @@ def get_configuration(
             "LLM_DEFAULT_MODEL_FRIENDLY_NAME",
             resolved_env.get("LLM_DEFAULT_MODEL_FRIENDLY_NAME"),
         ),
-        runtime_parameter("USE_BUILDER_API_TOKEN", configured_builder_api_token(resolved_env)),
+        runtime_parameter(
+            "USE_BUILDER_API_TOKEN", configured_builder_api_token(resolved_env)
+        ),
     )
     custom_model_runtime_parameters = (
         runtime_parameter("LLM_DEPLOYMENT_ID", deployment_id),

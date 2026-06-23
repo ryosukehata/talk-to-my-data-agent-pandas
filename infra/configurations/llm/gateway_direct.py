@@ -24,7 +24,9 @@ def get_configuration(
     )
     app_runtime_parameters = (
         *runtime_parameters,
-        runtime_parameter("USE_BUILDER_API_TOKEN", configured_builder_api_token(resolved_env)),
+        runtime_parameter(
+            "USE_BUILDER_API_TOKEN", configured_builder_api_token(resolved_env)
+        ),
     )
     return LLMConfigurationDefinition(
         name="LLM Gateway",
