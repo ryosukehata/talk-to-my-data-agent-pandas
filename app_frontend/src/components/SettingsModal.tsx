@@ -20,6 +20,7 @@ import { useReloadTemplates } from "@/api/templates/reloadHooks";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "@/theme/theme-provider";
+import { ExternalLink, RefreshCw } from "lucide-react";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -207,8 +208,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <div className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="mn-label">{t("DataRobot Connection")}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="mn-label">{t("DataRobot Connection")}</h3>
+                {isRefreshingConnection && (
+                  <RefreshCw className="size-3 animate-spin" />
+                )}
+              </div>
               <Button
+                data-testid="refresh-connection-button"
                 variant="ghost"
                 size="sm"
                 disabled={isRefreshingConnection}
@@ -235,7 +242,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {isLoadingDataRobotInfo || isRefreshingConnection ? (
               <p className="body">{t("Loading DataRobot info...")}</p>
             ) : accountInfo ? (
-              <div className="space-y-1">
+              <div data-testid="connection-info" className="space-y-1">
                 {connectedAs && (
                   <p>
                     <span className="mr-1">{t("Connected as:")}</span>
@@ -249,7 +256,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {dataRobotInfo.datarobot_api_token && (
                   <p>
                     <span className="mr-1">{t("API Token:")}</span>
-                    <span className="rounded py-0.5">
+                    <span
+                      data-testid="api-key-value"
+                      className="rounded py-0.5"
+                    >
                       {dataRobotInfo.datarobot_api_token}
                     </span>
                   </p>
@@ -257,29 +267,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {dataRobotInfo.datarobot_api_scoped_token && (
                   <p>
                     <span className="mr-1">{t("Scoped Token:")}</span>
-                    <span className="rounded py-0.5">
+                    <span
+                      data-testid="own-api-key-value"
+                      className="rounded py-0.5"
+                    >
                       {dataRobotInfo.datarobot_api_scoped_token}
                     </span>
                   </p>
                 )}
                 <p>
                   <a
+                    data-testid="manage-api-keys-link"
                     href={`/account/developer-tools`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {t("Manage API keys →")}
+                    {t("Manage API keys")}
+                    <ExternalLink className="ml-1 inline size-3" />
                   </a>
                 </p>
               </div>
             ) : refreshError ? (
-              <div className="space-y-2">
+              <div data-testid="connection-error" className="space-y-2">
                 <p className="text-destructive">{t("Connection error")}</p>
                 <p>{refreshError}</p>
                 <p>{t("Check your DataRobot connection and try again")}</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div data-testid="disconnected-state" className="space-y-2">
                 <p>{t("Not connected to DataRobot")}</p>
                 <p>
                   {t(
@@ -307,6 +322,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
                 <div className="flex justify-end">
                   <Button
+                    data-testid="update-api-key-button"
                     variant="ghost"
                     size="sm"
                     disabled={
@@ -333,7 +349,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {updateApiTokenMutation.isError && (
-                  <p className="mt-1 text-sm text-destructive">
+                  <p
+                    data-testid="api-key-error"
+                    className="mt-1 text-sm text-destructive"
+                  >
                     {updateApiTokenMutation.error instanceof Error
                       ? updateApiTokenMutation.error.message
                       : t("Failed to update API token")}

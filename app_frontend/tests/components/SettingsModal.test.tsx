@@ -1,4 +1,5 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi, type Mock } from "vitest";
 import { SettingsModal } from "@/components/SettingsModal";
 import { useDataRobotInfo, useUpdateApiToken } from "@/api/user/hooks";
@@ -16,11 +17,16 @@ vi.mock("@/api/templates/reloadHooks", () => ({
   }),
 }));
 
+let refetchDataRobotInfo: ReturnType<typeof vi.fn>;
+let updateApiToken: ReturnType<typeof vi.fn>;
+
 describe("SettingsModal", () => {
   beforeEach(() => {
     window.ENV = {};
+    refetchDataRobotInfo = vi.fn().mockResolvedValue({});
+    updateApiToken = vi.fn();
     (useUpdateApiToken as Mock).mockReturnValue({
-      mutate: vi.fn(),
+      mutate: updateApiToken,
       isPending: false,
       isError: false,
       reset: vi.fn(),
@@ -39,7 +45,7 @@ describe("SettingsModal", () => {
         datarobot_api_scoped_token: null,
       },
       isLoading: false,
-      refetch: vi.fn(),
+      refetch: refetchDataRobotInfo,
     });
   });
 
@@ -51,6 +57,11 @@ describe("SettingsModal", () => {
     );
     expect(screen.getByTestId("email-value")).toHaveTextContent(
       "anton@example.com",
+    );
+    expect(screen.getByTestId("api-key-value")).toHaveTextContent("****1234");
+    expect(screen.getByTestId("manage-api-keys-link")).toHaveAttribute(
+      "href",
+      "/account/developer-tools",
     );
   });
 
@@ -88,5 +99,36 @@ describe("SettingsModal", () => {
     expect(
       screen.getByText(/Version: v11\.5\.3-1-gabcdef0/),
     ).toBeInTheDocument();
+  });
+
+  test("keeps upstream refresh action wired to DataRobot info refetch", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(<SettingsModal isOpen={true} onOpenChange={vi.fn()} />);
+
+    await user.click(screen.getByTestId("refresh-connection-button"));
+
+    await waitFor(() => {
+      expect(refetchDataRobotInfo).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test("keeps upstream API token update action wired to mutation", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(<SettingsModal isOpen={true} onOpenChange={vi.fn()} />);
+
+    await user.type(
+      screen.getByPlaceholderText("Enter DataRobot API token"),
+      "new-token",
+    );
+    await user.click(screen.getByTestId("update-api-key-button"));
+
+    expect(updateApiToken).toHaveBeenCalledWith(
+      "new-token",
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+      }),
+    );
   });
 });

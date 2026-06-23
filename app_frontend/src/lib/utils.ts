@@ -10,7 +10,8 @@ const joinUrlPath = (origin: string, path?: string) => {
   if (!path) {
     return origin;
   }
-  return `${origin}/${trimSlashes(path)}`;
+  const normalizedPath = trimSlashes(path);
+  return normalizedPath ? `${origin}/${normalizedPath}` : origin;
 };
 
 export function getBaseUrl() {
@@ -24,7 +25,7 @@ export function getBaseUrl() {
     return `${trimSlashes(runtimeBaseUrl)}/ports/${window.ENV.API_PORT}`;
   }
 
-  return runtimeBaseUrl;
+  return runtimeBaseUrl ?? "/";
 }
 
 export function getApiUrl() {

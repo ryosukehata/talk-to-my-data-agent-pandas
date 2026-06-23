@@ -67,6 +67,12 @@ upstream `v11.5.3` の frontend 挙動修正を、現行 fork の template / cus
   - `react-syntax-highlighter` は現行依存に型定義がないため、`vite-env.d.ts` に最小 ambient declaration を追加して build を安定化。
   - `npm install --package-lock=false`: passed。ローカル Node 24 では `i18next-parser` の engine warning と npm audit warning が出る。
   - `npm run prettier && npm run lint && npm run test && npm run knip && npm run build`: passed。lintは既存warning 4件のみ、Vitestは 134 passed、knipはconfiguration hintsのみ、buildは既存chunk size warningのみ。
+- 2026-06-23 v11.5.3差分再確認
+  - `field.tsx` と `public/assets/datarobot_favicon.png` は upstream `v11.5.3` の asset / UI primitive parity として復帰。
+  - `.gitignore` は upstream 同様に `coverage` を ignore し、fork の lockfileなし npm 運用として `package-lock.json` ignore は維持。
+  - `getBaseUrl()` は upstream と同じく runtime base 未設定時に `/` を返すように戻し、`getApiUrl()` は `//api` にならないよう path join を補正。notebook static frontend の `APP_BASE_URL` / `API_PORT` / `IS_STATIC_FRONTEND` 対応は維持。
+  - SettingsModal は fork 独自の template reload / save footer を維持しつつ、upstream `v11.5.3` にあった DataRobot refresh / API key update / manage API keys link の test id と外部リンクアイコンを復帰。
+  - `npm run prettier && npm run lint && npm run test && npm run knip && npm run build`: passed。lintは既存warning 4件のみ、Vitestは 136 passed、knipはconfiguration hintsのみ、buildは既存chunk size warningのみ。
 - `./node_modules/.bin/vitest --run tests/components/AddDataModal.test.tsx tests/components/NewChatModal.test.tsx tests/components/RenameChatModal.test.tsx tests/components/SettingsModal.test.tsx tests/components/DatasetCardActionBar.test.tsx`: 16 passed
 - `./node_modules/.bin/tsc -b tsconfig.app.json`: passed
 - `./node_modules/.bin/eslint .`: passed with existing warnings only

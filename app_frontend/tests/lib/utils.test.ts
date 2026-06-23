@@ -12,7 +12,7 @@ describe("frontend URL helpers", () => {
   test("builds the default API URL from the current origin", () => {
     window.ENV = {};
 
-    expect(getBaseUrl()).toBe(undefined);
+    expect(getBaseUrl()).toBe("/");
     expect(getApiUrl()).toBe("http://localhost:3000/api");
   });
 
