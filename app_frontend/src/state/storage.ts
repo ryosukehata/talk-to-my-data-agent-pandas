@@ -1,9 +1,9 @@
-import { STORAGE_KEYS } from './constants';
+import { STORAGE_KEYS } from "./constants";
 
 const getAppIdFromUrl = (): string => {
   const url = window.location.href;
   const match = url.match(/\/custom_applications\/([^/]+)/);
-  return match ? match[1] : '';
+  return match ? match[1] : "";
 };
 
 /**
@@ -23,5 +23,5 @@ export const setStorageItem = (key: string, value: string): void => {
 };
 
 export const isWelcomeModalHidden = (): boolean => {
-  return getStorageItem(STORAGE_KEYS.HIDE_WELCOME_MODAL) === 'true';
+  return getStorageItem(STORAGE_KEYS.HIDE_WELCOME_MODAL) === "true";
 };

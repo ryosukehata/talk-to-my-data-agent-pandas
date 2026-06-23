@@ -1,11 +1,11 @@
 // Tab-based Template Selector
 
-import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { useTranslation } from '@/i18n';
-import { cn } from '@/lib/utils';
-import type { PromptTemplate } from '@/api/templates/types';
+import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "@/i18n";
+import { cn } from "@/lib/utils";
+import type { PromptTemplate } from "@/api/templates/types";
 
 interface TemplateTabsProps {
   templates: PromptTemplate[];
@@ -22,11 +22,13 @@ const SimpleTemplateCard = ({
   onSelect: (template: PromptTemplate) => void;
 }) => (
   <div
-    className="group cursor-pointer hover:bg-accent/30 transition-colors p-3 rounded-lg border border-transparent hover:border-border"
+    className="group cursor-pointer rounded-lg border border-transparent p-3 transition-colors hover:border-border hover:bg-accent/30"
     onClick={() => onSelect(template)}
   >
-    <h4 className="font-medium text-sm mb-1">{template.name}</h4>
-    <p className="text-xs text-muted-foreground line-clamp-1">{template.description}</p>
+    <h4 className="mb-1 text-sm font-medium">{template.name}</h4>
+    <p className="line-clamp-1 text-xs text-muted-foreground">
+      {template.description}
+    </p>
   </div>
 );
 
@@ -34,10 +36,10 @@ export const TemplateTabs = ({
   templates,
   categories,
   onSelectTemplate,
-  className = '',
+  className = "",
 }: TemplateTabsProps) => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState(categories[0] || 'all');
+  const [activeTab, setActiveTab] = useState(categories[0] || "all");
 
   // グループ化されたテンプレート
   const groupedTemplates = templates.reduce(
@@ -48,18 +50,25 @@ export const TemplateTabs = ({
       acc[template.category].push(template);
       return acc;
     },
-    {} as Record<string, PromptTemplate[]>
+    {} as Record<string, PromptTemplate[]>,
   );
 
   return (
-    <div className={cn('w-full', className)}>
+    <div className={cn("w-full", className)}>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* タブリスト */}
-        <TabsList className="grid w-full grid-cols-5 mb-6">
-          {categories.map(category => (
-            <TabsTrigger key={category} value={category} className="text-xs relative">
+        <TabsList className="mb-6 grid w-full grid-cols-5">
+          {categories.map((category) => (
+            <TabsTrigger
+              key={category}
+              value={category}
+              className="relative text-xs"
+            >
               {category}
-              <Badge variant="secondary" className="ml-1 text-xs min-w-[1.2rem] h-4">
+              <Badge
+                variant="default"
+                className="ml-1 h-4 min-w-[1.2rem] text-xs"
+              >
                 {groupedTemplates[category]?.length || 0}
               </Badge>
             </TabsTrigger>
@@ -67,18 +76,18 @@ export const TemplateTabs = ({
         </TabsList>
 
         {/* タブコンテンツ */}
-        {categories.map(category => (
+        {categories.map((category) => (
           <TabsContent key={category} value={category} className="mt-0">
             <div className="space-y-2">
-              {groupedTemplates[category]?.map(template => (
+              {groupedTemplates[category]?.map((template) => (
                 <SimpleTemplateCard
                   key={template.name}
                   template={template}
                   onSelect={onSelectTemplate}
                 />
               )) || (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  {t('No templates available in this category.')}
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  {t("No templates available in this category.")}
                 </p>
               )}
             </div>

@@ -1,42 +1,48 @@
-import React, { Suspense, lazy, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@radix-ui/react-separator';
-import { Button } from '@/components/ui/button';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
-import { faFileArrowDown } from '@fortawesome/free-solid-svg-icons/faFileArrowDown';
-import { useTranslation } from '@/i18n';
+import React, { Suspense, lazy, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@radix-ui/react-separator";
+import { Button } from "@/components/ui/button";
+import { FileDown, Trash2 } from "lucide-react";
+import { useTranslation } from "@/i18n";
 import {
   useDeleteChat,
   useFetchAllChats,
   useFetchAllMessages,
   useExport,
   usePollInProgressMessage,
-} from '@/api/chat-messages/hooks';
-import { InitialPrompt, UserPrompt, UserMessage, SystemMessage } from '@/components/chat';
-import { ROUTES } from './routes';
-import { Loading } from '@/components/ui-custom/loading';
-import { RenameChatModal } from '@/components/RenameChatModal';
-import { DataSourceToggle } from '@/components/DataSourceToggle';
+} from "@/api/chat-messages/hooks";
+import {
+  InitialPrompt,
+  UserPrompt,
+  UserMessage,
+  SystemMessage,
+} from "@/components/chat";
+import { ROUTES } from "./routes";
+import { Loading } from "@/components/ui-custom/loading";
+import { RenameChatModal } from "@/components/RenameChatModal";
+import { DataSourceToggle } from "@/components/DataSourceToggle";
 
-import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
-import { useMultipleDatasetMetadata } from '@/api/cleansed-datasets/hooks';
-import { DATA_SOURCES, EXTERNAL_DATA_STORE_PREFIX } from '@/constants/dataSources';
-import { Loading as ChatLoading } from '@/components/chat/Loading';
-import { ConfirmDialog } from '@/components/ui-custom/confirm-dialog';
-import { getChatMessageKey } from '@/components/ui-custom/prompt-input';
+import { useGeneratedDictionaries } from "@/api/dictionaries/hooks";
+import { useMultipleDatasetMetadata } from "@/api/cleansed-datasets/hooks";
+import {
+  DATA_SOURCES,
+  EXTERNAL_DATA_STORE_PREFIX,
+} from "@/constants/dataSources";
+import { Loading as ChatLoading } from "@/components/chat/Loading";
+import { ConfirmDialog } from "@/components/ui-custom/confirm-dialog";
+import { getChatMessageKey } from "@/components/ui-custom/prompt-input";
 
 // Lazy load ResponseMessage for better performance
 const ResponseMessage = lazy(() =>
-  import('../components/chat/ResponseMessage').then(module => ({
+  import("../components/chat/ResponseMessage").then((module) => ({
     default: module.ResponseMessage,
-  }))
+  })),
 );
 
 const ComponentLoading = () => {
   return (
-    <div className="p-3 bg-card rounded flex mb-2.5 mr-2">
+    <div className="mr-2 mb-2.5 flex rounded bg-card p-3">
       <ChatLoading />
     </div>
   );
@@ -51,16 +57,20 @@ export const Chats: React.FC = () => {
   // API data hooks
   const { data: chats } = useFetchAllChats();
   // Find the active chat based on chatId param
-  const activeChat = chats ? chats.find(chat => chat.id === chatId) : undefined;
+  const activeChat = chats
+    ? chats.find((chat) => chat.id === chatId)
+    : undefined;
 
-  const { data: messages = [], isLoading: messagesLoading } = useFetchAllMessages({ chatId });
-  const hasInProgressMessages = messages.some(m => m.in_progress);
-  const hasFailedMessages = messages.some(m => m.error);
+  const { data: messages = [], isLoading: messagesLoading } =
+    useFetchAllMessages({ chatId });
+  const hasInProgressMessages = messages.some((m) => m.in_progress);
+  const hasFailedMessages = messages.some((m) => m.error);
   usePollInProgressMessage({ chatId });
 
   const { mutate: deleteChat, isPending: isDeleting } = useDeleteChat({
     onSuccess: () => {
-      const otherChats = chats?.filter(chat => chat.id !== activeChat?.id) || [];
+      const otherChats =
+        chats?.filter((chat) => chat.id !== activeChat?.id) || [];
       localStorage.removeItem(getChatMessageKey(activeChat?.id as string));
       setIsDeleteDialogOpen(false);
       if (otherChats.length > 0) {
@@ -82,18 +92,22 @@ export const Chats: React.FC = () => {
   const { exportChat, isLoading: isExporting } = useExport();
   const { data: dictionaries } = useGeneratedDictionaries();
   const { data: multipleMetadata } = useMultipleDatasetMetadata(
-    dictionaries?.map(d => d.name) || []
+    dictionaries?.map((d) => d.name) || [],
   );
 
   const { hasMixedSources, allowedDataSources } = useMemo(() => {
-    if (!multipleMetadata) return { allowedDataSources: [], hasMixedSources: false };
+    if (!multipleMetadata)
+      return { allowedDataSources: [], hasMixedSources: false };
 
     const dataSourcesSet = new Set<string>();
 
     multipleMetadata.forEach(({ metadata }) => {
       const { data_source } = metadata;
 
-      if (data_source === DATA_SOURCES.FILE || data_source === DATA_SOURCES.CATALOG) {
+      if (
+        data_source === DATA_SOURCES.FILE ||
+        data_source === DATA_SOURCES.CATALOG
+      ) {
         dataSourcesSet.add(DATA_SOURCES.FILE);
       } else if (data_source === DATA_SOURCES.DATABASE) {
         dataSourcesSet.add(DATA_SOURCES.DATABASE);
@@ -112,14 +126,15 @@ export const Chats: React.FC = () => {
   }, [multipleMetadata]);
 
   const exportButtonTooltip = hasFailedMessages
-    ? t('Cannot export chat with errors')
+    ? t("Cannot export chat with errors")
     : isExporting
-      ? t('Exporting...')
+      ? t("Exporting...")
       : hasInProgressMessages
-        ? t('Wait for agent to finish responding')
-        : t('Export chat');
+        ? t("Wait for agent to finish responding")
+        : t("Export chat");
 
-  const isExportButtonDisabled = isExporting || hasInProgressMessages || hasFailedMessages;
+  const isExportButtonDisabled =
+    isExporting || hasInProgressMessages || hasFailedMessages;
 
   // Handler for deleting the current chat
   const handleDeleteChat = () => {
@@ -134,9 +149,12 @@ export const Chats: React.FC = () => {
 
     return (
       <>
-        <h2 className="heading-04 flex-1">
-          <strong>{activeChat.name || t('New Chat')}</strong>
-          <RenameChatModal chatId={activeChat.id} currentName={activeChat.name} />
+        <h2 className="flex-1 heading-04">
+          <strong>{activeChat.name || t("New Chat")}</strong>
+          <RenameChatModal
+            chatId={activeChat.id}
+            currentName={activeChat.name}
+          />
         </h2>
         <div>
           {hasMixedSources && (
@@ -153,43 +171,47 @@ export const Chats: React.FC = () => {
           title={exportButtonTooltip}
           testId="export-chat-button"
         >
-          <FontAwesomeIcon icon={faFileArrowDown} />
-          <span className="ml-2">{isExporting ? t('Exporting...') : t('Export chat')}</span>
+          <FileDown />
+          <span className="ml-2">
+            {isExporting ? t("Exporting...") : t("Export chat")}
+          </span>
         </Button>
         <Button
           variant="ghost"
           onClick={() => setIsDeleteDialogOpen(true)}
           testId="delete-all-chats-button"
         >
-          <FontAwesomeIcon icon={faTrash} />
-          <span className="ml-2">{t('Delete chat')}</span>
+          <Trash2 />
+          <span className="ml-2">{t("Delete chat")}</span>
         </Button>
       </>
     );
   };
 
   return (
-    <div className="p-6 h-full flex flex-col">
-      <div className="flex justify-between items-center gap-2 h-9">{renderChatHeader()}</div>
+    <div className="flex h-full flex-col p-6">
+      <div className="flex h-9 items-center justify-between gap-2">
+        {renderChatHeader()}
+      </div>
       <Separator className="my-4 border-t" />
       <ConfirmDialog
         open={isDeleteDialogOpen}
         isLoading={isDeleting}
         onOpenChange={setIsDeleteDialogOpen}
-        title={t('Delete chat')}
-        confirmText={t('Delete')}
-        cancelText={t('Cancel')}
-        description={t('Are you sure you want to delete this chat?')}
+        title={t("Delete chat")}
+        confirmText={t("Delete")}
+        cancelText={t("Cancel")}
+        description={t("Are you sure you want to delete this chat?")}
         onConfirm={handleDeleteChat}
         variant="destructive"
       />
       {messagesLoading && !messages?.length ? (
-        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
           <Loading />
         </div>
       ) : !chatId || messages?.length === 0 ? (
         <InitialPrompt
-          key={`initial-${chatId || 'new'}`}
+          key={`initial-${chatId || "new"}`}
           allowedDataSources={allowedDataSources}
           chatId={activeChat?.id}
           activeChat={activeChat}
@@ -199,9 +221,9 @@ export const Chats: React.FC = () => {
         <>
           <ScrollArea className="flex flex-1 flex-col overflow-y-hidden pr-2 pb-4">
             {activeChat?.id &&
-              messages?.map(message => (
-                <div key={message.id} className="flex flex-col w-full">
-                  {message.role === 'user' && (
+              messages?.map((message) => (
+                <div key={message.id} className="flex w-full flex-col">
+                  {message.role === "user" && (
                     <UserMessage
                       message={message}
                       chatId={activeChat.id}
@@ -209,7 +231,7 @@ export const Chats: React.FC = () => {
                       testId={`user-message-${message.id}`}
                     />
                   )}
-                  {message.role === 'assistant' && (
+                  {message.role === "assistant" && (
                     // Suspense is needed because of lazy-loading
                     <Suspense fallback={<ComponentLoading />}>
                       <ResponseMessage
@@ -221,8 +243,11 @@ export const Chats: React.FC = () => {
                       />
                     </Suspense>
                   )}
-                  {message.role === 'system' && (
-                    <SystemMessage message={message} testId={`system-message-${message.id}`} />
+                  {message.role === "system" && (
+                    <SystemMessage
+                      message={message}
+                      testId={`system-message-${message.id}`}
+                    />
                   )}
                 </div>
               ))}

@@ -1,8 +1,8 @@
-import React from 'react';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LoadingIndicator } from './LoadingIndicator';
-import { RESPONSE_TABS } from './constants';
-import { useTranslation } from '@/i18n';
+import React from "react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoadingIndicator } from "./LoadingIndicator";
+import { RESPONSE_TABS } from "./constants";
+import { useTranslation } from "@/i18n";
 
 interface TabState {
   isLoading?: boolean;
@@ -19,7 +19,11 @@ interface ResponseTabsProps {
   };
 }
 
-export const ResponseTabs: React.FC<ResponseTabsProps> = ({ value, onValueChange, tabStates }) => {
+export const ResponseTabs: React.FC<ResponseTabsProps> = ({
+  value,
+  onValueChange,
+  tabStates,
+}) => {
   const { t } = useTranslation();
 
   const states = tabStates || {
@@ -51,7 +55,7 @@ export const ResponseTabs: React.FC<ResponseTabsProps> = ({ value, onValueChange
             hasError={states.summary.hasError}
             successTestId="summary-loading-success"
           />
-          {t('Summary')}
+          {t("Summary")}
         </TabsTrigger>
         <TabsTrigger value={RESPONSE_TABS.INSIGHTS}>
           <LoadingIndicator
@@ -59,7 +63,7 @@ export const ResponseTabs: React.FC<ResponseTabsProps> = ({ value, onValueChange
             hasError={states.insights.hasError}
             successTestId="insights-loading-success"
           />
-          {t('More insights')}
+          {t("More insights")}
         </TabsTrigger>
         <TabsTrigger value={RESPONSE_TABS.CODE}>
           <LoadingIndicator
@@ -67,7 +71,7 @@ export const ResponseTabs: React.FC<ResponseTabsProps> = ({ value, onValueChange
             hasError={states.code.hasError}
             successTestId="code-loading-success"
           />
-          {t('Behind the scenes')}
+          {t("Behind the scenes")}
         </TabsTrigger>
       </TabsList>
     </Tabs>

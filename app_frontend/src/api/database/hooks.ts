@@ -1,13 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { databaseKeys } from './keys';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { databaseKeys } from "./keys";
 import {
   getDatabaseSchemas,
   getDatabaseTables,
   loadFromDatabase,
   getDefaultSchema,
-} from './api-requests';
-import { dictionaryKeys } from '../dictionaries/keys';
-import { DictionaryTable } from '../dictionaries/types';
+} from "./api-requests";
+import { dictionaryKeys } from "../dictionaries/keys";
+import { DictionaryTable } from "../dictionaries/types";
 
 export const useGetDatabaseSchemas = () => {
   const queryResult = useQuery({
@@ -46,7 +46,13 @@ export const useLoadFromDatabaseMutation = ({
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: ({ tableNames, schema }: { tableNames: string[]; schema?: string }) =>
+    mutationFn: ({
+      tableNames,
+      schema,
+    }: {
+      tableNames: string[];
+      schema?: string;
+    }) =>
       loadFromDatabase({
         tableNames,
         schema,
@@ -56,7 +62,7 @@ export const useLoadFromDatabaseMutation = ({
         queryClient.getQueryData<DictionaryTable[]>(dictionaryKeys.all) || [];
       return { previousDictionaries };
     },
-    onSuccess: data => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: dictionaryKeys.all });
       onSuccess(data);
     },
@@ -64,7 +70,7 @@ export const useLoadFromDatabaseMutation = ({
       if (context?.previousDictionaries) {
         queryClient.setQueryData<DictionaryTable[]>(
           dictionaryKeys.all,
-          context.previousDictionaries
+          context.previousDictionaries,
         );
       }
       onError(error);

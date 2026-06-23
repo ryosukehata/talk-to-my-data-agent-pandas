@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
-import { useTranslation } from '@/i18n';
+import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/i18n";
 import {
   Dialog,
   DialogContent,
@@ -8,18 +8,18 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useState } from 'react';
-import { useCreateChat } from '@/api/chat-messages/hooks';
-import { useNavigate } from 'react-router-dom';
-import { generateChatRoute } from '@/pages/routes';
-import { useAppState } from '@/state/hooks';
-import { cn } from '@/lib/utils';
-import { getChatName } from '@/api/chat-messages/utils';
+} from "@/components/ui/dialog";
+import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useState } from "react";
+import { useCreateChat } from "@/api/chat-messages/hooks";
+import { useNavigate } from "react-router-dom";
+import { generateChatRoute } from "@/pages/routes";
+import { useAppState } from "@/state/hooks";
+import { cn } from "@/lib/utils";
+import { getChatName } from "@/api/chat-messages/utils";
+import { MAX_CHAT_NAME_LENGTH } from "@/constants/chat";
 
 type NewChatModalType = {
   highlight: boolean;
@@ -37,69 +37,82 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
     <Dialog
       defaultOpen={false}
       open={open}
-      onOpenChange={open => {
+      onOpenChange={(open) => {
         setName(getChatName());
         setOpen(open);
       }}
     >
       <DialogTrigger asChild>
         <Button
-          className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]', 'mr-2')}
+          className={cn(
+            highlight && "animate-(--animation-blink-border-and-shadow)",
+            "mr-2",
+          )}
           variant="secondary"
         >
-          <FontAwesomeIcon icon={faPlus} /> {t('New chat')}
+          <Plus /> {t("New chat")}
         </Button>
       </DialogTrigger>
       <DialogContent
         className="sm:max-w-[500px]"
         // prevent focus from returning back to modal trigger, we want it to be autofocused on prompt-input
-        onCloseAutoFocus={e => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>{t('Create new chat')}</DialogTitle>
+          <DialogTitle>{t("Create new chat")}</DialogTitle>
           <DialogDescription>
-            {t('Creating a new chat does not affect any of your existing questions.')}
+            {t(
+              "Creating a new chat does not affect any of your existing questions.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right mn-label">
-              {t('Chat name')}
+            <Label htmlFor="name" className="mn-label text-right">
+              {t("Chat name")}
             </Label>
             <Input
               id="name"
               value={name}
-              onChange={event => setName(event.target.value)}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={MAX_CHAT_NAME_LENGTH}
               className="col-span-3"
-              placeholder={t('Enter a name for your chat')}
+              placeholder={t("Enter a name for your chat")}
               disabled={isPending}
               autoFocus
               autoComplete="off"
-              onKeyDown={event => {
-                if (event.key === 'Enter' && name.trim()) {
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && name.trim()) {
                   createChat(
                     { name: name.trim(), dataSource },
                     {
-                      onSuccess: newChat => {
+                      onSuccess: (newChat) => {
                         setOpen(false);
                         navigate(generateChatRoute(newChat.id));
                       },
-                    }
+                    },
                   );
                 }
               }}
             />
+            {name.length >= MAX_CHAT_NAME_LENGTH && (
+              <p className="col-span-3 col-start-2 text-xs text-destructive">
+                {t("Chat name has reached maximum of {{max}} characters", {
+                  max: MAX_CHAT_NAME_LENGTH,
+                })}
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>
           <Button
             variant="ghost"
             onClick={() => {
-              setName('');
+              setName("");
               setOpen(false);
             }}
           >
-            {t('Cancel')}
+            {t("Cancel")}
           </Button>
           <Button
             onClick={() => {
@@ -107,17 +120,17 @@ export const NewChatModal = ({ highlight }: NewChatModalType) => {
                 createChat(
                   { name: name.trim(), dataSource },
                   {
-                    onSuccess: newChat => {
+                    onSuccess: (newChat) => {
                       setOpen(false);
                       navigate(generateChatRoute(newChat.id));
                     },
-                  }
+                  },
                 );
               }
             }}
             disabled={isPending || !name.trim()}
           >
-            {isPending ? t('Creating...') : t('Create chat')}
+            {isPending ? t("Creating...") : t("Create chat")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -2,10 +2,10 @@
  * Reports Page - Report Builder
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { isAxiosError } from 'axios';
-import { useTranslation } from '@/i18n';
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { isAxiosError } from "axios";
+import { useTranslation } from "@/i18n";
 import {
   useReports,
   useReport,
@@ -16,30 +16,38 @@ import {
   useUpdateQuestionStatus,
   useGenerateWord,
   useDownloadWord,
-} from '@/api/reports';
-import { ReportStatus, QuestionStatus, Report } from '@/api/reports/types';
-import { refineQuestions } from '@/api/refiner';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
-import { faPlay } from '@fortawesome/free-solid-svg-icons/faPlay';
-import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons/faSpinner';
-import { faCheck } from '@fortawesome/free-solid-svg-icons/faCheck';
-import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons/faExclamationTriangle';
-import { faClock } from '@fortawesome/free-solid-svg-icons/faClock';
-import { faArrowLeft } from '@fortawesome/free-solid-svg-icons/faArrowLeft';
-import { faMagicWandSparkles } from '@fortawesome/free-solid-svg-icons/faMagicWandSparkles';
-import { faCheckCircle } from '@fortawesome/free-solid-svg-icons/faCheckCircle';
-import { faDownload } from '@fortawesome/free-solid-svg-icons/faDownload';
-import loader from '@/assets/loader.svg';
-import { useAppState } from '@/state/hooks';
+} from "@/api/reports";
+import { ReportStatus, QuestionStatus, Report } from "@/api/reports/types";
+import { refineQuestions } from "@/api/refiner";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import {
+  ArrowLeft,
+  Check,
+  CircleCheck,
+  Clock,
+  Download,
+  Loader2,
+  Play,
+  Plus,
+  Trash2,
+  TriangleAlert,
+  WandSparkles,
+  type LucideIcon,
+} from "lucide-react";
+import loader from "@/assets/loader.svg";
+import { useAppState } from "@/state/hooks";
 
 type ApiErrorResponse = {
   detail?: unknown;
@@ -48,12 +56,12 @@ type ApiErrorResponse = {
 const getReportErrorMessage = (error: unknown, fallback: string): string => {
   if (isAxiosError<ApiErrorResponse>(error)) {
     const detail = error.response?.data?.detail;
-    if (typeof detail === 'string' && detail.trim()) {
+    if (typeof detail === "string" && detail.trim()) {
       return detail;
     }
-    if (detail && typeof detail === 'object' && 'message' in detail) {
+    if (detail && typeof detail === "object" && "message" in detail) {
       const message = (detail as { message?: unknown }).message;
-      if (typeof message === 'string' && message.trim()) {
+      if (typeof message === "string" && message.trim()) {
         return message;
       }
     }
@@ -70,39 +78,65 @@ const getReportErrorMessage = (error: unknown, fallback: string): string => {
 const StatusBadge = ({ status }: { status: ReportStatus | QuestionStatus }) => {
   const { t } = useTranslation();
 
-  const getStatusConfig = () => {
+  const getStatusConfig = (): {
+    type?: "default" | "outline";
+    variant: "default" | "destructive" | "info" | "warning" | "success";
+    icon: LucideIcon;
+    label: string;
+  } => {
     switch (status) {
-      case 'completed':
-      case 'done':
-        return { variant: 'default' as const, icon: faCheck, label: t('Completed') };
-      case 'generating_word':
-        return { variant: 'secondary' as const, icon: faSpinner, label: t('Generating Word') };
-      case 'refining':
-        return { variant: 'secondary' as const, icon: faSpinner, label: t('Refining') };
-      case 'chat_processing':
-      case 'running':
-        return { variant: 'secondary' as const, icon: faSpinner, label: t('Processing') };
-      case 'error':
-        return { variant: 'destructive' as const, icon: faExclamationTriangle, label: t('Error') };
-      case 'ready':
-        return { variant: 'secondary' as const, icon: faCheckCircle, label: t('Ready') };
-      case 'pending':
+      case "completed":
+      case "done":
+        return { variant: "success", icon: Check, label: t("Completed") };
+      case "generating_word":
+        return {
+          variant: "info",
+          icon: Loader2,
+          label: t("Generating Word"),
+        };
+      case "refining":
+        return { variant: "info", icon: Loader2, label: t("Refining") };
+      case "chat_processing":
+      case "running":
+        return { variant: "info", icon: Loader2, label: t("Processing") };
+      case "error":
+        return {
+          variant: "destructive",
+          icon: TriangleAlert,
+          label: t("Error"),
+        };
+      case "ready":
+        return { variant: "success", icon: CircleCheck, label: t("Ready") };
+      case "pending":
       default:
-        return { variant: 'outline' as const, icon: faClock, label: t('Pending') };
+        return {
+          type: "outline",
+          variant: "default",
+          icon: Clock,
+          label: t("Pending"),
+        };
     }
   };
 
   const config = getStatusConfig();
+  const Icon = config.icon;
 
   return (
-    <Badge variant={config.variant} className="gap-1">
-      <FontAwesomeIcon
-        icon={config.icon}
-        className={
-          ['refining', 'chat_processing', 'running', 'generating_word'].includes(status as string)
-            ? 'animate-spin'
-            : ''
-        }
+    <Badge type={config.type} variant={config.variant} className="gap-1">
+      <Icon
+        className={[
+          "size-4",
+          [
+            "refining",
+            "chat_processing",
+            "running",
+            "generating_word",
+          ].includes(status as string)
+            ? "animate-spin"
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       />
       {config.label}
     </Badge>
@@ -110,22 +144,28 @@ const StatusBadge = ({ status }: { status: ReportStatus | QuestionStatus }) => {
 };
 
 // Create Report Form
-const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void }) => {
+const CreateReportForm = ({
+  onSuccess,
+}: {
+  onSuccess: (reportId: string) => void;
+}) => {
   const { t } = useTranslation();
   const { dataSource } = useAppState();
-  const [theme, setTheme] = useState('');
+  const [theme, setTheme] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { mutate: createReport } = useCreateReport({
-    onSuccess: data => {
-      setTheme('');
+    onSuccess: (data) => {
+      setTheme("");
       setIsCreating(false);
       setErrorMessage(null);
       onSuccess(data.report_id);
     },
-    onError: error => {
+    onError: (error) => {
       setIsCreating(false);
-      setErrorMessage(getReportErrorMessage(error, t('Failed to create report')));
+      setErrorMessage(
+        getReportErrorMessage(error, t("Failed to create report")),
+      );
     },
   });
 
@@ -147,14 +187,20 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
     return (
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col items-center justify-center py-12 space-y-4">
-            <FontAwesomeIcon icon={faSpinner} className="w-8 h-8 animate-spin text-primary" />
+          <div className="flex flex-col items-center justify-center space-y-4 py-12">
+            <Loader2 className="size-8 animate-spin text-primary" />
             <div className="text-center">
-              <p className="font-medium text-lg">{t('Generating questions...')}</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                {t('AI is analyzing your data and creating analysis questions.')}
+              <p className="text-lg font-medium">
+                {t("Generating questions...")}
               </p>
-              <p className="text-sm text-muted-foreground">{t('This may take a few seconds.')}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t(
+                  "AI is analyzing your data and creating analysis questions.",
+                )}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t("This may take a few seconds.")}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -165,28 +211,34 @@ const CreateReportForm = ({ onSuccess }: { onSuccess: (reportId: string) => void
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('Create New Report')}</CardTitle>
+        <CardTitle>{t("Create New Report")}</CardTitle>
         <CardDescription>
-          {t('Enter a theme and we will generate analysis questions automatically')}
+          {t(
+            "Enter a theme and we will generate analysis questions automatically",
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="theme">{t('Report Theme')}</Label>
+            <Label htmlFor="theme">{t("Report Theme")}</Label>
             <Input
               id="theme"
-              placeholder={t('e.g., Analyze sales trends and predict next month')}
+              placeholder={t(
+                "e.g., Analyze sales trends and predict next month",
+              )}
               value={theme}
-              onChange={e => setTheme(e.target.value)}
+              onChange={(e) => setTheme(e.target.value)}
               disabled={isCreating}
             />
           </div>
           <Button type="submit" disabled={isCreating || !theme.trim()}>
-            <FontAwesomeIcon icon={faPlus} className="mr-2" />
-            {t('Create Report')}
+            <Plus className="mr-2 size-4" />
+            {t("Create Report")}
           </Button>
-          {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
+          {errorMessage && (
+            <p className="text-sm text-destructive">{errorMessage}</p>
+          )}
         </form>
       </CardContent>
     </Card>
@@ -198,43 +250,50 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { dataSource } = useAppState();
-  const [refiningQuestionIds, setRefiningQuestionIds] = useState<Set<string>>(new Set());
+  const [refiningQuestionIds, setRefiningQuestionIds] = useState<Set<string>>(
+    new Set(),
+  );
   const { data, isLoading, refetch } = useReport(reportId, {
-    refetchInterval: query => {
+    refetchInterval: (query) => {
       // Auto-refetch while processing
       const report = query.state.data?.report;
       if (!report) return false;
 
       // Check if processing
-      if (['chat_processing', 'generating_word'].includes(report.status)) return 3000;
+      if (["chat_processing", "generating_word"].includes(report.status))
+        return 3000;
 
       return false;
     },
   });
-  const { mutate: executeQuestions, isPending: isExecuting } = useExecuteQuestions({
-    onSuccess: () => {
-      refetch();
-    },
-  });
+  const { mutate: executeQuestions, isPending: isExecuting } =
+    useExecuteQuestions({
+      onSuccess: () => {
+        refetch();
+      },
+    });
   const { mutate: deleteReport, isPending: isDeleting } = useDeleteReport({
     onSuccess: () => {
-      navigate('/reports');
+      navigate("/reports");
     },
   });
   const { mutateAsync: updateQuestion } = useUpdateQuestion();
   const { mutateAsync: updateQuestionStatus } = useUpdateQuestionStatus();
-  const { mutate: generateWord, isPending: isGeneratingWord } = useGenerateWord({
-    onSuccess: () => {
-      refetch();
+  const { mutate: generateWord, isPending: isGeneratingWord } = useGenerateWord(
+    {
+      onSuccess: () => {
+        refetch();
+      },
     },
-  });
-  const { mutate: downloadWord, isPending: isDownloadingWord } = useDownloadWord();
+  );
+  const { mutate: downloadWord, isPending: isDownloadingWord } =
+    useDownloadWord();
 
   // Refine a single question
   const refineQuestion = useCallback(
     async (questionId: string, direction: string): Promise<boolean> => {
-      setRefiningQuestionIds(prev => new Set(prev).add(questionId));
-      await updateQuestionStatus({ reportId, questionId, status: 'refining' });
+      setRefiningQuestionIds((prev) => new Set(prev).add(questionId));
+      await updateQuestionStatus({ reportId, questionId, status: "refining" });
       try {
         const result = await refineQuestions({
           user_direction: direction,
@@ -250,42 +309,46 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
               error_message: null,
             },
           });
-          await updateQuestionStatus({ reportId, questionId, status: 'ready' });
+          await updateQuestionStatus({ reportId, questionId, status: "ready" });
           refetch();
           return true;
         }
 
-        throw new Error(result.error || t('Failed to refine question'));
+        throw new Error(result.error || t("Failed to refine question"));
       } catch (error) {
-        console.error('Failed to refine question:', error);
-        const message = getReportErrorMessage(error, t('Failed to refine question'));
+        console.error("Failed to refine question:", error);
+        const message = getReportErrorMessage(
+          error,
+          t("Failed to refine question"),
+        );
         await updateQuestion({
           reportId,
           questionId,
-          request: { status: 'error', error_message: message },
+          request: { status: "error", error_message: message },
         });
         refetch();
         return false;
       } finally {
-        setRefiningQuestionIds(prev => {
+        setRefiningQuestionIds((prev) => {
           const next = new Set(prev);
           next.delete(questionId);
           return next;
         });
       }
     },
-    [dataSource, reportId, t, updateQuestion, updateQuestionStatus, refetch]
+    [dataSource, reportId, t, updateQuestion, updateQuestionStatus, refetch],
   );
 
   // Refine all unrefined questions sequentially to avoid rate limiting, then auto-execute
   const refineAllQuestions = useCallback(
     async (report: Report, autoExecuteAfter: boolean = false) => {
       const unrefinedQuestions = report.questions.filter(
-        q => !q.refined_question || q.refined_question === q.original_direction
+        (q) =>
+          !q.refined_question || q.refined_question === q.original_direction,
       );
 
       console.log(
-        `🔄 Starting refine for ${unrefinedQuestions.length} questions, autoExecuteAfter=${autoExecuteAfter}`
+        `🔄 Starting refine for ${unrefinedQuestions.length} questions, autoExecuteAfter=${autoExecuteAfter}`,
       );
 
       // Run refinements sequentially to avoid overwhelming the LLM API
@@ -294,16 +357,24 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
       for (const question of unrefinedQuestions) {
         try {
           console.log(`🔄 Refining question ${question.question_id}...`);
-          const success = await refineQuestion(question.question_id, question.original_direction);
+          const success = await refineQuestion(
+            question.question_id,
+            question.original_direction,
+          );
           if (success) {
             console.log(`✅ Refined question ${question.question_id}`);
           } else {
             allRefinementsSucceeded = false;
-            console.error(`❌ Failed to refine question ${question.question_id}`);
+            console.error(
+              `❌ Failed to refine question ${question.question_id}`,
+            );
           }
         } catch (error) {
           allRefinementsSucceeded = false;
-          console.error(`❌ Failed to refine question ${question.question_id}:`, error);
+          console.error(
+            `❌ Failed to refine question ${question.question_id}:`,
+            error,
+          );
           // Continue with next question even if one fails
         }
       }
@@ -320,7 +391,7 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
         }, 1000);
       }
     },
-    [refineQuestion, executeQuestions, reportId]
+    [refineQuestion, executeQuestions, reportId],
   );
 
   // Auto-refine: automatically start refining when there are unrefined questions
@@ -332,12 +403,13 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
 
     const report = data.report;
     const unrefinedQuestions = report.questions.filter(
-      q => !q.refined_question || q.refined_question === q.original_direction
+      (q) => !q.refined_question || q.refined_question === q.original_direction,
     );
 
     if (
       unrefinedQuestions.length > 0 &&
-      (['pending', 'refining'].includes(report.status) || report.status === 'refining')
+      (["pending", "refining"].includes(report.status) ||
+        report.status === "refining")
     ) {
       autoRefineStarted.current = reportId;
       // Auto-execute after refinement completes
@@ -347,29 +419,37 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <img src={loader} alt={t('Loading')} className="w-8 h-8 animate-spin" />
+      <div className="flex h-64 items-center justify-center">
+        <img src={loader} alt={t("Loading")} className="size-8 animate-spin" />
       </div>
     );
   }
 
   if (!data?.report) {
-    return <div className="text-center text-muted-foreground">{t('Report not found')}</div>;
+    return (
+      <div className="text-center text-muted-foreground">
+        {t("Report not found")}
+      </div>
+    );
   }
 
   const report = data.report;
   const hasUnrefinedQuestions = report.questions.some(
-    q => !q.refined_question || q.refined_question === q.original_direction
+    (q) => !q.refined_question || q.refined_question === q.original_direction,
   );
   const canExecute =
-    (['pending', 'refining'].includes(report.status) || report.status === 'refining') &&
+    (["pending", "refining"].includes(report.status) ||
+      report.status === "refining") &&
     report.questions.length > 0 &&
     !hasUnrefinedQuestions;
-  const canGenerateWord = report.status === 'completed' && !report.word_file_path;
-  const isWordBeingGenerated = report.status === 'generating_word' || isGeneratingWord;
+  const canGenerateWord =
+    report.status === "completed" && !report.word_file_path;
+  const isWordBeingGenerated =
+    report.status === "generating_word" || isGeneratingWord;
   const progress =
     report.questions.length > 0
-      ? (report.questions.filter(q => q.status === 'completed').length / report.questions.length) *
+      ? (report.questions.filter((q) => q.status === "completed").length /
+          report.questions.length) *
         100
       : 0;
 
@@ -378,9 +458,13 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>
-            <FontAwesomeIcon icon={faArrowLeft} className="mr-2" />
-            {t('Back')}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/reports")}
+          >
+            <ArrowLeft className="mr-2 size-4" />
+            {t("Back")}
           </Button>
           <div>
             <h1 className="text-2xl font-bold">{report.title}</h1>
@@ -390,83 +474,95 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
         <div className="flex items-center gap-2">
           <StatusBadge status={report.status} />
           {hasUnrefinedQuestions &&
-            (['pending', 'refining'].includes(report.status) || report.status === 'refining') && (
+            (["pending", "refining"].includes(report.status) ||
+              report.status === "refining") && (
               <Button
                 variant="secondary"
                 onClick={() => refineAllQuestions(report, true)}
                 disabled={refiningQuestionIds.size > 0}
               >
                 {refiningQuestionIds.size > 0 ? (
-                  <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                  <Loader2 className="mr-2 size-4 animate-spin" />
                 ) : (
-                  <FontAwesomeIcon icon={faMagicWandSparkles} className="mr-2" />
+                  <WandSparkles className="mr-2 size-4" />
                 )}
-                {t('Refine All')}
+                {t("Refine All")}
               </Button>
             )}
           {canExecute && (
-            <Button onClick={() => executeQuestions(reportId)} disabled={isExecuting}>
-              {isExecuting ? (
-                <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
-              ) : (
-                <FontAwesomeIcon icon={faPlay} className="mr-2" />
-              )}
-              {t('Execute Questions')}
-            </Button>
-          )}
-          {(canGenerateWord || report.status === 'generating_word') && !report.word_file_path && (
             <Button
-              variant="outline"
-              onClick={() => generateWord(reportId)}
-              disabled={isWordBeingGenerated}
+              onClick={() => executeQuestions(reportId)}
+              disabled={isExecuting}
             >
-              {isWordBeingGenerated ? (
-                <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+              {isExecuting ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
               ) : (
-                <FontAwesomeIcon icon={faMagicWandSparkles} className="mr-2" />
+                <Play className="mr-2 size-4" />
               )}
-              {isWordBeingGenerated ? t('Generating Word') : t('Generate Word')}
+              {t("Execute Questions")}
             </Button>
           )}
-          {report.status === 'done' && report.word_file_path && (
+          {(canGenerateWord || report.status === "generating_word") &&
+            !report.word_file_path && (
+              <Button
+                variant="secondary"
+                onClick={() => generateWord(reportId)}
+                disabled={isWordBeingGenerated}
+              >
+                {isWordBeingGenerated ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <WandSparkles className="mr-2 size-4" />
+                )}
+                {isWordBeingGenerated
+                  ? t("Generating Word")
+                  : t("Generate Word")}
+              </Button>
+            )}
+          {report.status === "done" && report.word_file_path && (
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => downloadWord(reportId)}
               disabled={isDownloadingWord}
             >
               {isDownloadingWord ? (
-                <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                <Loader2 className="mr-2 size-4 animate-spin" />
               ) : (
-                <FontAwesomeIcon icon={faDownload} className="mr-2" />
+                <Download className="mr-2 size-4" />
               )}
-              {t('Download Word')}
+              {t("Download Word")}
             </Button>
           )}
           <Button
             variant="destructive"
             size="icon"
             onClick={() => {
-              if (window.confirm(t('Are you sure you want to delete this report?'))) {
+              if (
+                window.confirm(
+                  t("Are you sure you want to delete this report?"),
+                )
+              ) {
                 deleteReport(reportId);
               }
             }}
             disabled={isDeleting}
           >
-            <FontAwesomeIcon
-              icon={isDeleting ? faSpinner : faTrash}
-              className={isDeleting ? 'animate-spin' : ''}
-            />
+            {isDeleting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Trash2 />
+            )}
           </Button>
         </div>
       </div>
 
       {/* Progress */}
-      {report.status === 'chat_processing' && (
+      {report.status === "chat_processing" && (
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>{t('Executing questions...')}</span>
+                <span>{t("Executing questions...")}</span>
                 <span>{Math.round(progress)}%</span>
               </div>
               <Progress value={progress} />
@@ -475,94 +571,112 @@ const ReportDetail = ({ reportId }: { reportId: string }) => {
         </Card>
       )}
 
-      {report.status === 'generating_word' && (
+      {report.status === "generating_word" && (
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
-              <span>{t('Generating Word')}</span>
+              <Loader2 className="size-4 animate-spin" />
+              <span>{t("Generating Word")}</span>
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Questions */}
-      <Card className="flex flex-col max-h-[60vh]">
+      <Card className="flex max-h-[60vh] flex-col">
         <CardHeader className="flex-shrink-0">
           <CardTitle>
-            {t('Questions')} ({report.questions.length})
+            {t("Questions")} ({report.questions.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-y-auto">
           <div className="space-y-4">
             {report.questions.map((question, index) => {
-              const isRefiningThis = refiningQuestionIds.has(question.question_id);
+              const isRefiningThis = refiningQuestionIds.has(
+                question.question_id,
+              );
               const needsRefinement =
                 !question.refined_question ||
                 question.refined_question === question.original_direction;
 
               return (
-                <div key={question.question_id} className="border rounded-lg p-4">
+                <div
+                  key={question.question_id}
+                  className="rounded-lg border p-4"
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-muted-foreground">#{index + 1}</span>
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="font-medium text-muted-foreground">
+                          #{index + 1}
+                        </span>
                         <StatusBadge status={question.status} />
                         {isRefiningThis && (
-                          <Badge variant="outline" className="gap-1">
-                            <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
-                            {t('Refining...')}
+                          <Badge
+                            type="outline"
+                            variant="info"
+                            className="gap-1"
+                          >
+                            <Loader2 className="size-4 animate-spin" />
+                            {t("Refining...")}
                           </Badge>
                         )}
                         {!isRefiningThis && needsRefinement && (
-                          <Badge variant="secondary" className="gap-1">
-                            {t('Not refined')}
+                          <Badge variant="warning" className="gap-1">
+                            {t("Not refined")}
                           </Badge>
                         )}
-                        {!isRefiningThis && !needsRefinement && question.status === 'pending' && (
-                          <Badge variant="default" className="gap-1 bg-green-600">
-                            <FontAwesomeIcon icon={faCheckCircle} />
-                            {t('Refined')}
-                          </Badge>
-                        )}
+                        {!isRefiningThis &&
+                          !needsRefinement &&
+                          question.status === "pending" && (
+                            <Badge variant="success" className="gap-1">
+                              <CircleCheck className="size-4" />
+                              {t("Refined")}
+                            </Badge>
+                          )}
                       </div>
-                      <p className="text-sm text-muted-foreground mb-1">
-                        {t('Direction')}: {question.original_direction}
+                      <p className="mb-1 text-sm text-muted-foreground">
+                        {t("Direction")}: {question.original_direction}
                       </p>
                       {!needsRefinement && (
-                        <p className="font-medium">{question.refined_question}</p>
+                        <p className="font-medium">
+                          {question.refined_question}
+                        </p>
                       )}
                       {question.error_message && (
-                        <p className="text-sm text-destructive mt-2">
-                          {t('Error')}: {question.error_message}
+                        <p className="mt-2 text-sm text-destructive">
+                          {t("Error")}: {question.error_message}
                         </p>
                       )}
                       {question.chat_id && (
                         <Button
                           variant="link"
-                          className="p-0 h-auto mt-2"
+                          className="mt-2 h-auto p-0"
                           onClick={() => navigate(`/chats/${question.chat_id}`)}
                         >
-                          {t('View Chat Result')} →
+                          {t("View Chat Result")} →
                         </Button>
                       )}
                     </div>
                     {/* Refine button for individual question */}
                     {needsRefinement &&
-                      (['pending', 'refining'].includes(report.status) ||
-                        report.status === 'refining') && (
+                      (["pending", "refining"].includes(report.status) ||
+                        report.status === "refining") && (
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() =>
-                            refineQuestion(question.question_id, question.original_direction)
+                            refineQuestion(
+                              question.question_id,
+                              question.original_direction,
+                            )
                           }
                           disabled={isRefiningThis}
                         >
                           {isRefiningThis ? (
-                            <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                            <Loader2 className="size-4 animate-spin" />
                           ) : (
-                            <FontAwesomeIcon icon={faMagicWandSparkles} />
+                            <WandSparkles className="size-4" />
                           )}
                         </Button>
                       )}
@@ -591,36 +705,38 @@ const ReportList = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, isLoading } = useReports();
-  const { mutate: generateWord, isPending: isGeneratingWord } = useGenerateWord();
-  const { mutate: downloadWord, isPending: isDownloadingWord } = useDownloadWord();
+  const { mutate: generateWord, isPending: isGeneratingWord } =
+    useGenerateWord();
+  const { mutate: downloadWord, isPending: isDownloadingWord } =
+    useDownloadWord();
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <img src={loader} alt={t('Loading')} className="w-8 h-8 animate-spin" />
+      <div className="flex h-64 items-center justify-center">
+        <img src={loader} alt={t("Loading")} className="size-8 animate-spin" />
       </div>
     );
   }
 
   if (!data?.reports?.length) {
     return (
-      <div className="text-center text-muted-foreground py-8">
-        {t('No reports yet. Create your first report above.')}
+      <div className="py-8 text-center text-muted-foreground">
+        {t("No reports yet. Create your first report above.")}
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">{t('Your Reports')}</h2>
+      <h2 className="text-xl font-semibold">{t("Your Reports")}</h2>
       <div className="grid gap-4">
-        {data.reports.map(report => (
+        {data.reports.map((report) => (
           <Card key={report.report_id} className="transition-colors">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between gap-4">
                 <button
                   type="button"
-                  className="text-left flex-1"
+                  className="flex-1 text-left"
                   onClick={() => navigate(`/reports/${report.report_id}`)}
                 >
                   <h3 className="font-medium">{report.title}</h3>
@@ -630,41 +746,50 @@ const ReportList = () => {
                 </button>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">{t('Progress')}</p>
-                    <p className="font-medium">{Math.round(report.progress * 100)}%</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("Progress")}
+                    </p>
+                    <p className="font-medium">
+                      {Math.round(report.progress * 100)}%
+                    </p>
                   </div>
                   <StatusBadge status={report.status} />
-                  {(report.status === 'completed' || report.status === 'generating_word') &&
+                  {(report.status === "completed" ||
+                    report.status === "generating_word") &&
                     !report.word_file_path && (
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => generateWord(report.report_id)}
-                        disabled={isGeneratingWord || report.status === 'generating_word'}
+                        disabled={
+                          isGeneratingWord ||
+                          report.status === "generating_word"
+                        }
                       >
-                        {isGeneratingWord || report.status === 'generating_word' ? (
-                          <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                        {isGeneratingWord ||
+                        report.status === "generating_word" ? (
+                          <Loader2 className="mr-2 size-4 animate-spin" />
                         ) : (
-                          <FontAwesomeIcon icon={faMagicWandSparkles} className="mr-2" />
+                          <WandSparkles className="mr-2 size-4" />
                         )}
-                        {isGeneratingWord || report.status === 'generating_word'
-                          ? t('Generating Word')
-                          : t('Generate Word')}
+                        {isGeneratingWord || report.status === "generating_word"
+                          ? t("Generating Word")
+                          : t("Generate Word")}
                       </Button>
                     )}
-                  {report.status === 'done' && report.word_file_path && (
+                  {report.status === "done" && report.word_file_path && (
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => downloadWord(report.report_id)}
                       disabled={isDownloadingWord}
                     >
                       {isDownloadingWord ? (
-                        <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin" />
+                        <Loader2 className="mr-2 size-4 animate-spin" />
                       ) : (
-                        <FontAwesomeIcon icon={faDownload} className="mr-2" />
+                        <Download className="mr-2 size-4" />
                       )}
-                      {t('Download Word')}
+                      {t("Download Word")}
                     </Button>
                   )}
                 </div>
@@ -693,7 +818,7 @@ export const Reports = () => {
   // If we have a reportId, show detail view
   if (reportId) {
     return (
-      <div className="container mx-auto py-6 px-4 max-w-4xl">
+      <div className="container mx-auto max-w-4xl px-4 py-6">
         <ReportDetail reportId={reportId} />
       </div>
     );
@@ -701,14 +826,14 @@ export const Reports = () => {
 
   // Otherwise show list view
   return (
-    <div className="container mx-auto py-6 px-4 max-w-4xl">
+    <div className="container mx-auto max-w-4xl px-4 py-6">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{t('Report Builder')}</h1>
+          <h1 className="text-2xl font-bold">{t("Report Builder")}</h1>
           {!showCreateForm && (
             <Button onClick={() => setShowCreateForm(true)}>
-              <FontAwesomeIcon icon={faPlus} className="mr-2" />
-              {t('New Report')}
+              <Plus className="mr-2 size-4" />
+              {t("New Report")}
             </Button>
           )}
         </div>
@@ -717,7 +842,7 @@ export const Reports = () => {
           <>
             <CreateReportForm onSuccess={handleReportCreated} />
             <Button variant="ghost" onClick={() => setShowCreateForm(false)}>
-              {t('Cancel')}
+              {t("Cancel")}
             </Button>
             <Separator />
           </>

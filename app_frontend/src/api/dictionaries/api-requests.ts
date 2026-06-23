@@ -1,16 +1,19 @@
-import { toast } from 'sonner';
-import i18n from '@/i18n';
-import apiClient from '../apiClient';
-import { DictionaryRow, DictionaryTable } from './types';
+import { toast } from "sonner";
+import i18n from "@/i18n";
+import apiClient from "../apiClient";
+import { DictionaryRow, DictionaryTable } from "./types";
 
 export const getGeneratedDictionaries = async ({
   signal,
 }: {
   signal?: AbortSignal;
 }): Promise<Array<DictionaryTable>> => {
-  const { data } = await apiClient.get<Array<DictionaryTable>>(`/v1/dictionaries`, {
-    signal,
-  });
+  const { data } = await apiClient.get<Array<DictionaryTable>>(
+    `/v1/dictionaries`,
+    {
+      signal,
+    },
+  );
 
   return data;
 };
@@ -49,7 +52,7 @@ export const updateDictionaryCell = async ({
       field,
       value,
     },
-    { signal }
+    { signal },
   );
 
   return data;
@@ -70,31 +73,31 @@ export const downloadDictionary = async ({
     // Use fetch directly instead of apiClient to get raw response with blob
     const response = await fetch(
       `${apiClient.defaults.baseURL}/v1/dictionaries/${encodedName}/download${
-        includeBom ? '?bom=true' : ''
+        includeBom ? "?bom=true" : ""
       }`,
       {
-        method: 'GET',
+        method: "GET",
         headers: {
-          Accept: 'application/json, text/csv',
-          'Content-Type': 'application/json',
+          Accept: "application/json, text/csv",
+          "Content-Type": "application/json",
         },
-        credentials: 'include', // Include cookies in the request
+        credentials: "include", // Include cookies in the request
         signal,
-      }
+      },
     );
 
     if (!response.ok) {
       throw new Error(`Failed to download dictionary: ${response.statusText}`);
     }
 
-    const filename = i18n.t('{{name}}_dictionary.csv', { name });
+    const filename = i18n.t("{{name}}_dictionary.csv", { name });
     // Convert response to blob
     const blob = await response.blob();
 
     // Create download link and trigger download
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
+    const a = document.createElement("a");
+    a.style.display = "none";
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
@@ -104,8 +107,8 @@ export const downloadDictionary = async ({
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   } catch (error) {
-    console.error('Error downloading dictionary:', error);
-    toast.error(i18n.t('Error downloading dictionary'));
+    console.error("Error downloading dictionary:", error);
+    toast.error(i18n.t("Error downloading dictionary"));
     throw error;
   }
 };

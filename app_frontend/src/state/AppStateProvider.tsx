@@ -1,7 +1,7 @@
-import React, { useReducer } from 'react';
-import { AppState } from './types';
-import { reducer, createInitialState, actions } from './reducer';
-import { AppStateContext } from './AppStateContext';
+import React, { useReducer } from "react";
+import { AppState } from "./types";
+import { reducer, createInitialState, actions } from "./reducer";
+import { AppStateContext } from "./AppStateContext";
 
 export const AppStateProvider: React.FC<{
   children: React.ReactNode;
@@ -47,5 +47,9 @@ export const AppStateProvider: React.FC<{
     setExpandGraphsInsightsDefaultOpen,
   };
 
-  return <AppStateContext.Provider value={contextValue}>{children}</AppStateContext.Provider>;
+  return (
+    <AppStateContext.Provider value={contextValue}>
+      {children}
+    </AppStateContext.Provider>
+  );
 };

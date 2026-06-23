@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMagnifyingGlass, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { useTranslation } from '@/i18n';
-import { Button } from '@/components/ui/button';
+import React, { useState } from "react";
+import { Search, X } from "lucide-react";
+import { useTranslation } from "@/i18n";
+import { Button } from "@/components/ui/button";
 
 interface SearchControlProps {
   onSearch?: (searchText: string) => void;
@@ -14,12 +13,12 @@ interface SearchControlProps {
 export const SearchControl: React.FC<SearchControlProps> = ({
   onSearch,
   disabled = false,
-  testId = 'search-control',
+  testId = "search-control",
   searchLabel,
 }) => {
   const { t } = useTranslation();
-  const labelText = searchLabel || t('Search');
-  const [searchText, setSearchText] = useState('');
+  const labelText = searchLabel || t("Search");
+  const [searchText, setSearchText] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,9 +28,9 @@ export const SearchControl: React.FC<SearchControlProps> = ({
   };
 
   const handleClear = () => {
-    setSearchText('');
+    setSearchText("");
     setIsExpanded(false);
-    onSearch?.('');
+    onSearch?.("");
   };
 
   const handleExpand = () => {
@@ -47,10 +46,10 @@ export const SearchControl: React.FC<SearchControlProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Escape') {
-      setSearchText('');
+    if (e.key === "Escape") {
+      setSearchText("");
       setIsExpanded(false);
-      onSearch?.('');
+      onSearch?.("");
     }
   };
 
@@ -62,10 +61,10 @@ export const SearchControl: React.FC<SearchControlProps> = ({
         onClick={handleExpand}
         disabled={disabled}
         className="mr-2 h-9 px-3"
-        aria-label={t('Search')}
+        aria-label={t("Search")}
         data-testid={`${testId}-button`}
       >
-        <FontAwesomeIcon icon={faMagnifyingGlass} className="size-4" />
+        <Search className="size-4" />
         {labelText}
       </Button>
     );
@@ -73,7 +72,7 @@ export const SearchControl: React.FC<SearchControlProps> = ({
 
   return (
     <div className="mr-2 flex w-48 items-center transition-all duration-300 ease-in-out">
-      <FontAwesomeIcon icon={faMagnifyingGlass} className="mr-3 size-4 shrink-0 text-foreground" />
+      <Search className="mr-3 size-4 shrink-0 text-foreground" />
       <div className="relative flex-1">
         {/* Using a native input component because we need custom look and feel here */}
         <input
@@ -93,12 +92,12 @@ export const SearchControl: React.FC<SearchControlProps> = ({
             variant="ghost"
             size="sm"
             onClick={handleClear}
-            onMouseDown={e => e.preventDefault()}
-            className="absolute right-0 top-1/2 size-7 -translate-y-1/2 p-0 hover:bg-muted"
-            title={t('Clear')}
+            onMouseDown={(e) => e.preventDefault()}
+            className="absolute top-1/2 right-0 size-7 -translate-y-1/2 p-0 hover:bg-muted"
+            title={t("Clear")}
             data-testid={`${testId}-clear`}
           >
-            <FontAwesomeIcon icon={faXmark} className="size-3" />
+            <X className="size-3" />
           </Button>
         )}
       </div>

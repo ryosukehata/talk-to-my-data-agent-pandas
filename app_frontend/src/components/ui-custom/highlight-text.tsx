@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface HighlightTextProps {
   text: string;
@@ -9,13 +9,16 @@ interface HighlightTextProps {
 export const HighlightText: React.FC<HighlightTextProps> = ({
   text,
   searchText,
-  className = '',
+  className = "",
 }) => {
   if (!searchText?.trim() || !text) {
     return <span className={className}>{text}</span>;
   }
 
-  const regex = new RegExp(`(${searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const regex = new RegExp(
+    `(${searchText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+    "gi",
+  );
   const parts = text.split(regex);
 
   return (
@@ -26,7 +29,10 @@ export const HighlightText: React.FC<HighlightTextProps> = ({
         regex.lastIndex = 0;
 
         return isMatch ? (
-          <mark key={index} className="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded">
+          <mark
+            key={index}
+            className="rounded bg-yellow-200 px-0.5 dark:bg-yellow-800"
+          >
             {part}
           </mark>
         ) : (

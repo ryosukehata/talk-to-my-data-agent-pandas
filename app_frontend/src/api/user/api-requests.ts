@@ -1,9 +1,11 @@
-import { apiClient } from '../apiClient';
+import { apiClient } from "../apiClient";
 
 interface DataRobotInfoResponse {
   datarobot_account_info: {
     uid: string;
     username: string;
+    firstName?: string;
+    lastName?: string;
     email: string;
     language: string;
     [key: string]: string | number | boolean | null | undefined;
@@ -13,16 +15,21 @@ interface DataRobotInfoResponse {
 }
 
 export const getDataRobotInfo = async (): Promise<DataRobotInfoResponse> => {
-  const response = await apiClient.get<DataRobotInfoResponse>('/v1/user/datarobot-account');
+  const response = await apiClient.get<DataRobotInfoResponse>(
+    "/v1/user/datarobot-account",
+  );
 
-  if (!response.data.datarobot_api_scoped_token && !response.data.datarobot_api_token) {
+  if (
+    !response.data.datarobot_api_scoped_token &&
+    !response.data.datarobot_api_token
+  ) {
     try {
       const updatedResponse = await apiClient.get<DataRobotInfoResponse>(
-        '/v1/user/datarobot-account'
+        "/v1/user/datarobot-account",
       );
       return updatedResponse.data;
     } catch (error) {
-      console.error('Error fetching DataRobot info:', error);
+      console.error("Error fetching DataRobot info:", error);
     }
   }
 
@@ -31,11 +38,11 @@ export const getDataRobotInfo = async (): Promise<DataRobotInfoResponse> => {
 
 export const updateApiToken = async (apiToken: string): Promise<void> => {
   try {
-    await apiClient.post('/v1/user/datarobot-account', {
+    await apiClient.post("/v1/user/datarobot-account", {
       api_token: apiToken,
     });
   } catch (error) {
-    console.error('Error updating API token:', error);
+    console.error("Error updating API token:", error);
     throw error;
   }
 };

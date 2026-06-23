@@ -1,5 +1,5 @@
-import { IChat, IChatMessage } from './types';
-import { SidebarMenuOptionType } from '@/components/ui-custom/sidebar-menu';
+import { IChat, IChatMessage } from "./types";
+import { SidebarMenuOptionType } from "@/components/ui-custom/sidebar-menu";
 
 export const getChatsMenu = (data: IChat[]): SidebarMenuOptionType[] => {
   const sortedChats = data?.slice().sort((a, b) => {
@@ -8,7 +8,7 @@ export const getChatsMenu = (data: IChat[]): SidebarMenuOptionType[] => {
     return dateB - dateA;
   });
 
-  return sortedChats?.map(c => ({
+  return sortedChats?.map((c) => ({
     key: c.id,
     name: c.name,
   }));
@@ -16,17 +16,17 @@ export const getChatsMenu = (data: IChat[]): SidebarMenuOptionType[] => {
 
 export const getMessage = (
   messages: IChatMessage[],
-  messageId: string | undefined | null
+  messageId: string | undefined | null,
 ): IChatMessage | undefined => {
   if (!messageId) {
     return undefined;
   }
-  return messages.find(message => message.id === messageId);
+  return messages.find((message) => message.id === messageId);
 };
 
 export const getResponseMessage = (
   messages: IChatMessage[],
-  messageId: string | undefined | null
+  messageId: string | undefined | null,
 ): IChatMessage | undefined => {
   if (!messageId) {
     return undefined;
@@ -35,14 +35,14 @@ export const getResponseMessage = (
   if (!message) return undefined;
 
   // If it's already an assistant message, return it
-  if (message.role === 'assistant') return message;
+  if (message.role === "assistant") return message;
 
   // If it's a user message, find the next assistant message (skip system messages)
-  const userIndex = messages.findIndex(msg => msg.id === messageId);
+  const userIndex = messages.findIndex((msg) => msg.id === messageId);
   if (userIndex === -1) return undefined;
 
   for (let i = userIndex + 1; i < messages.length; i++) {
-    if (messages[i].role === 'assistant') {
+    if (messages[i].role === "assistant") {
       return messages[i];
     }
   }

@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import * as ToggleGroupPrimitive from '@radix-ui/react-toggle-group';
+import * as React from "react";
+import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 function ToggleGroup({
   className,
@@ -13,8 +13,8 @@ function ToggleGroup({
     <ToggleGroupPrimitive.Root
       data-slot="toggle-group"
       className={cn(
-        'inline-flex items-center rounded-lg border-2 border-sidebar-border bg-sidebar-border',
-        className
+        "inline-flex items-center rounded-lg border-2 border-sidebar-border bg-sidebar-border",
+        className,
       )}
       {...props}
     />
@@ -30,15 +30,15 @@ function ToggleGroupItem({
       data-slot="toggle-group-item"
       className={cn(
         // Base styles
-        'inline-flex items-center justify-center',
+        "inline-flex items-center justify-center",
         // Spacing
-        'px-4 py-1.5',
+        "px-4 py-1.5",
         // Typography
-        'text-sm font-medium',
+        "text-sm font-medium",
         // Background & Text
-        'text-secondary-foreground',
+        "text-secondary-foreground",
         // Shape & Border
-        'rounded-lg',
+        "rounded-lg",
         // Cursor & Interactivity
         `
           cursor-pointer
@@ -51,19 +51,19 @@ function ToggleGroupItem({
           focus-visible:border-ring focus-visible:ring-[1px] focus-visible:ring-ring
         `,
         // Hover state
-        'hover:bg-muted hover:text-accent',
+        "hover:bg-muted hover:text-accent",
         // Active/Pressed state
         `
           focus:z-2
           data-[state=on]:border-accent data-[state=on]:bg-sidebar-accent data-[state=on]:text-foreground
         `,
         // Disabled state
-        'data-[disabled]:pointer-events-none data-[disabled]:text-muted-foreground data-[disabled]:opacity-50',
+        "data-[disabled]:pointer-events-none data-[disabled]:text-muted-foreground data-[disabled]:opacity-50",
         // Text selection
-        'select-none',
+        "select-none",
         // Transitions
-        'transition-colors',
-        className
+        "transition-colors",
+        className,
       )}
       {...props}
     />

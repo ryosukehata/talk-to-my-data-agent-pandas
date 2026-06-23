@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Table,
   TableBody,
@@ -6,15 +6,19 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { useTranslation } from '@/i18n';
-import { DictionaryTable as DT, DictionaryRow } from '@/api/dictionaries/types';
-import { Input } from '@/components/ui/input';
-import { HighlightText } from '@/components/ui-custom/highlight-text';
+} from "@/components/ui/table";
+import { useTranslation } from "@/i18n";
+import { DictionaryTable as DT, DictionaryRow } from "@/api/dictionaries/types";
+import { Input } from "@/components/ui/input";
+import { HighlightText } from "@/components/ui-custom/highlight-text";
 
 interface DictionaryTableProps {
   data: DT;
-  onUpdateCell?: (rowIndex: number, field: keyof DictionaryRow, value: string) => void;
+  onUpdateCell?: (
+    rowIndex: number,
+    field: keyof DictionaryRow,
+    value: string,
+  ) => void;
   searchText?: string;
 }
 
@@ -22,7 +26,11 @@ interface EditableCellProps {
   initialValue: string;
   rowIndex: number;
   field: keyof DictionaryRow;
-  onUpdate?: (rowIndex: number, field: keyof DictionaryRow, value: string) => void;
+  onUpdate?: (
+    rowIndex: number,
+    field: keyof DictionaryRow,
+    value: string,
+  ) => void;
   searchText?: string;
 }
 
@@ -53,13 +61,13 @@ const EditableCell: React.FC<EditableCellProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       setEditing(false);
       if (value !== initialValue && onUpdate) {
         onUpdate(rowIndex, field, value);
       }
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setEditing(false);
       setValue(initialValue);
     }
@@ -68,19 +76,19 @@ const EditableCell: React.FC<EditableCellProps> = ({
   return editing ? (
     <Input
       value={value}
-      onChange={e => setValue(e.target.value)}
+      onChange={(e) => setValue(e.target.value)}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
       autoFocus
-      className="w-full h-[28px]"
+      className="h-[28px] w-full"
     />
   ) : (
     <div
       onDoubleClick={handleDoubleClick}
-      className="cursor-pointer hover:bg-secondary p-1 rounded min-h-[28px] text-muted-foreground"
+      className="min-h-[28px] cursor-pointer rounded p-1 text-muted-foreground hover:bg-secondary"
       title="Double-click to edit"
     >
-      <HighlightText text={value} searchText={searchText || ''} />
+      <HighlightText text={value} searchText={searchText || ""} />
     </div>
   );
 };
@@ -99,7 +107,11 @@ export const DictionaryTable: React.FC<DictionaryTableProps> = ({
   searchText,
 }) => {
   const { t } = useTranslation();
-  const handleCellUpdate = (rowIndex: number, field: keyof DictionaryRow, value: string) => {
+  const handleCellUpdate = (
+    rowIndex: number,
+    field: keyof DictionaryRow,
+    value: string,
+  ) => {
     if (onUpdateCell) {
       onUpdateCell(rowIndex, field, value);
     }
@@ -109,16 +121,19 @@ export const DictionaryTable: React.FC<DictionaryTableProps> = ({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[200px]">{t('Column')}</TableHead>
-          <TableHead>{t('Type')}</TableHead>
-          <TableHead>{t('Description')}</TableHead>
+          <TableHead className="w-[200px]">{t("Column")}</TableHead>
+          <TableHead>{t("Type")}</TableHead>
+          <TableHead>{t("Description")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {data.column_descriptions?.map((column, index) => (
           <TableRow key={column.column}>
             <TableCell className="font-medium">
-              <HighlightText text={column.column} searchText={searchText || ''} />
+              <HighlightText
+                text={column.column}
+                searchText={searchText || ""}
+              />
             </TableCell>
             <TableCell>
               <EditableCell

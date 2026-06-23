@@ -1,7 +1,7 @@
-import { AxiosProgressEvent } from 'axios';
-import apiClient from '../apiClient';
+import { AxiosProgressEvent } from "axios";
+import apiClient from "../apiClient";
 
-type Dataset = {
+export type Dataset = {
   id: string;
   name: string;
   created: string;
@@ -31,7 +31,7 @@ export const getDatasets = async ({
     `/v1/registry/datasets?limit=${limit}&remote=${remote}`,
     {
       signal,
-    }
+    },
   );
   return data;
 };
@@ -51,7 +51,7 @@ export const getDatasetById = async ({
     `/v1/datasets/${datasetId}?skip=${skip}&limit=${limit}`,
     {
       signal,
-    }
+    },
   );
   return data;
 };
@@ -71,21 +71,25 @@ export async function uploadDataset({
 }) {
   const formData = new FormData();
 
-  dataSource ??= 'catalog';
+  dataSource ??= "catalog";
 
   if (files && files.length > 0) {
-    files.forEach(file => formData.append('files', file));
+    files.forEach((file) => formData.append("files", file));
   }
 
-  formData.append('registry_ids', JSON.stringify(catalogIds || []));
+  formData.append("registry_ids", JSON.stringify(catalogIds || []));
 
-  const response = await apiClient.post(`/v1/datasets/upload?data_source=${dataSource}`, formData, {
-    headers: {
-      'content-type': 'multipart/form-data',
+  const response = await apiClient.post(
+    `/v1/datasets/upload?data_source=${dataSource}`,
+    formData,
+    {
+      headers: {
+        "content-type": "multipart/form-data",
+      },
+      onUploadProgress,
+      signal,
     },
-    onUploadProgress,
-    signal,
-  });
+  );
 
   const { data } = response;
 
@@ -99,7 +103,7 @@ export const deleteAllDatasets = async (): Promise<unknown> => {
 };
 
 export async function getSupportedDataSourceTypes(): Promise<string[]> {
-  const response = await apiClient.get('/v1/supported-data-source-types');
+  const response = await apiClient.get("/v1/supported-data-source-types");
 
   const { data } = response;
 
@@ -118,17 +122,18 @@ export const downloadDataset = async ({
   try {
     const response = await apiClient.get(`/v1/datasets/${datasetId}/download`, {
       params: { bom: includeBom },
-      responseType: 'blob',
+      responseType: "blob",
       signal,
     });
 
     const blob = response.data;
-    const contentDisposition = response.headers['content-disposition'];
-    const filename = contentDisposition?.match(/filename="?([^"]+)"?/)?.[1] || 'dataset.csv';
+    const contentDisposition = response.headers["content-disposition"];
+    const filename =
+      contentDisposition?.match(/filename="?([^"]+)"?/)?.[1] || "dataset.csv";
 
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
+    const a = document.createElement("a");
+    a.style.display = "none";
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
@@ -137,7 +142,7 @@ export const downloadDataset = async ({
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   } catch (error) {
-    console.error('DEBUG Error downloading dataset:', error);
+    console.error("DEBUG Error downloading dataset:", error);
     throw error;
   }
 };

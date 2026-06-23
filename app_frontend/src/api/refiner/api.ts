@@ -2,8 +2,8 @@
  * Question Refiner API functions
  */
 
-import apiClient from '@/api/apiClient';
-import { RefineQuestionsRequest, RefineQuestionsResponse } from './types';
+import apiClient from "@/api/apiClient";
+import { RefineQuestionsRequest, RefineQuestionsResponse } from "./types";
 
 /**
  * Refine user questions based on dataset context
@@ -12,8 +12,8 @@ import { RefineQuestionsRequest, RefineQuestionsResponse } from './types';
  * @returns Promise with refined questions response
  */
 export const refineQuestions = async (
-  request: RefineQuestionsRequest
+  request: RefineQuestionsRequest,
 ): Promise<RefineQuestionsResponse> => {
-  const response = await apiClient.post('/v1/refiner', request);
+  const response = await apiClient.post("/v1/refiner", request);
   return response.data;
 };

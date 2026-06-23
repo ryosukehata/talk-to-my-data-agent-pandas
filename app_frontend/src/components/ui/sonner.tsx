@@ -1,6 +1,6 @@
-import { Toaster as Sonner, type ToasterProps } from 'sonner';
-import { XCircle, CheckCircle, AlertCircle, Info } from 'lucide-react';
-import { useTheme } from '@/theme/theme-provider';
+import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { XCircle, CheckCircle, AlertCircle, Info } from "lucide-react";
+import { useTheme } from "@/theme/theme-provider";
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme } = useTheme();

@@ -1,5 +1,10 @@
-import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import { datasetKeys } from './keys';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useInfiniteQuery,
+} from "@tanstack/react-query";
+import { datasetKeys } from "./keys";
 import {
   getDatasets,
   uploadDataset,
@@ -7,11 +12,13 @@ import {
   getSupportedDataSourceTypes,
   getDatasetById,
   downloadDataset,
-} from './api-requests';
-import { useState } from 'react';
-import { dictionaryKeys } from '../dictionaries/keys';
-import { DictionaryTable } from '../dictionaries/types';
-import { AxiosError } from 'axios';
+} from "./api-requests";
+import { useState } from "react";
+import { dictionaryKeys } from "../dictionaries/keys";
+import { DictionaryTable } from "../dictionaries/types";
+import { AxiosError } from "axios";
+import { ApiError } from "@/state/types";
+import { Dataset } from "./api-requests";
 
 interface FileUploadResponse {
   filename?: string;
@@ -29,8 +36,13 @@ export interface UploadError extends Error {
   isAxiosError?: boolean;
 }
 
+type DatasetsResponse = {
+  local: Dataset[];
+  remote: Dataset[];
+};
+
 export const useFetchDatasets = ({ limit = 100 } = {}) => {
-  const queryResult = useQuery({
+  const queryResult = useQuery<DatasetsResponse, AxiosError<ApiError>>({
     queryKey: datasetKeys.list(limit),
     queryFn: async ({ signal }) => {
       const [local, remote] = await Promise.all([
@@ -40,6 +52,12 @@ export const useFetchDatasets = ({ limit = 100 } = {}) => {
       return { local: local, remote: remote };
     },
     refetchInterval: 5 * 60 * 1000,
+    retry: (failureCount, error) => {
+      if (error.response?.data?.detail?.code === "USER_ACCESS_DENIED") {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
 
   return queryResult;
@@ -59,13 +77,13 @@ export const useInfiniteDatasetById = (
   options?: {
     pageSize?: number;
     enabled?: boolean;
-  }
+  },
 ) => {
   const pageSize = options?.pageSize || 1000;
   const enabled = options?.enabled !== false && !!datasetId;
 
   return useInfiniteQuery({
-    queryKey: datasetKeys.byId(datasetId || '', pageSize),
+    queryKey: datasetKeys.byId(datasetId || "", pageSize),
     queryFn: ({ pageParam = 0 }) =>
       getDatasetById({
         datasetId: datasetId!,
@@ -111,17 +129,21 @@ export const useFileUploadMutation = ({
         files,
         catalogIds,
         dataSource,
-        onUploadProgress: progressEvent => {
+        onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
-            const prg = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            const prg = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total,
+            );
             setProgress(prg);
           }
         },
       });
       if (Array.isArray(response)) {
-        const datasetsWithError = response.filter((file: FileUploadResponse) => file.error);
+        const datasetsWithError = response.filter(
+          (file: FileUploadResponse) => file.error,
+        );
         if (datasetsWithError.length > 0) {
-          let message = '';
+          let message = "";
           for (const datasetWithError of datasetsWithError) {
             message = `Error uploading ${
               datasetWithError.filename || datasetWithError.dataset_name
@@ -140,7 +162,7 @@ export const useFileUploadMutation = ({
       const previousDictionaries =
         queryClient.getQueryData<DictionaryTable[]>(dictionaryKeys.all) || [];
 
-      const placeholderDictionaries: DictionaryTable[] = files.map(file => ({
+      const placeholderDictionaries: DictionaryTable[] = files.map((file) => ({
         name: file.name,
         in_progress: true,
         column_descriptions: [],
@@ -153,7 +175,7 @@ export const useFileUploadMutation = ({
 
       return { previousDictionaries };
     },
-    onSuccess: async data => {
+    onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: dictionaryKeys.all });
       onSuccess(data);
     },
@@ -161,7 +183,7 @@ export const useFileUploadMutation = ({
       if (context?.previousDictionaries) {
         queryClient.setQueryData<DictionaryTable[]>(
           dictionaryKeys.all,
-          context.previousDictionaries
+          context.previousDictionaries,
         );
       }
 
@@ -169,7 +191,11 @@ export const useFileUploadMutation = ({
 
       if (uploadError.responseData) {
         uploadError.response = { data: uploadError.responseData };
-      } else if ('isAxiosError' in error && error.isAxiosError && (error as AxiosError).response) {
+      } else if (
+        "isAxiosError" in error &&
+        error.isAxiosError &&
+        (error as AxiosError).response
+      ) {
         const axiosError = error as AxiosError;
         uploadError.response = {
           data: axiosError.response?.data,
@@ -178,13 +204,18 @@ export const useFileUploadMutation = ({
 
       onError(uploadError);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: datasetKeys.all }),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: datasetKeys.all }),
   });
 
   return { ...mutation, progress };
 };
 
-export const useDeleteAllDatasets = ({ onSuccess }: { onSuccess?: () => void }) => {
+export const useDeleteAllDatasets = ({
+  onSuccess,
+}: {
+  onSuccess?: () => void;
+}) => {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: () => deleteAllDatasets(),

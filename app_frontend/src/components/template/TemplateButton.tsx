@@ -1,20 +1,19 @@
 // Template Selection Button Component
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons/faWandMagicSparkles';
-import { useTranslation } from '@/i18n';
-import { cn } from '@/lib/utils';
-import type { PromptTemplate } from '@/api/templates/types';
-import { TemplateSelector } from './TemplateSelector';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { WandSparkles } from "lucide-react";
+import { useTranslation } from "@/i18n";
+import { cn } from "@/lib/utils";
+import type { PromptTemplate } from "@/api/templates/types";
+import { TemplateSelector } from "./TemplateSelector";
 
 interface TemplateButtonProps {
   onSelectTemplate: (template: PromptTemplate) => void;
   onSendDirectly?: (message: string) => void;
-  mode?: 'select' | 'send';
-  variant?: 'default' | 'outline' | 'ghost';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
+  mode?: "select" | "send";
+  variant?: "primary" | "secondary" | "destructive" | "ghost" | "link";
+  size?: "default" | "sm" | "lg" | "icon";
   className?: string;
   disabled?: boolean;
   showIcon?: boolean;
@@ -24,13 +23,13 @@ interface TemplateButtonProps {
 export const TemplateButton = ({
   onSelectTemplate,
   onSendDirectly,
-  mode = 'select',
-  variant = 'outline',
-  size = 'sm',
-  className = '',
+  mode = "select",
+  variant = "secondary",
+  size = "sm",
+  className = "",
   disabled = false,
   showIcon = true,
-  testId = 'template-button',
+  testId = "template-button",
 }: TemplateButtonProps) => {
   const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,7 +39,7 @@ export const TemplateButton = ({
       onSelectTemplate(template);
       setIsModalOpen(false);
     } catch (error) {
-      console.error('Error selecting template:', error);
+      console.error("Error selecting template:", error);
     }
   };
 
@@ -51,7 +50,7 @@ export const TemplateButton = ({
         setIsModalOpen(false);
       }
     } catch (error) {
-      console.error('Error sending template directly:', error);
+      console.error("Error sending template directly:", error);
     }
   };
 
@@ -59,7 +58,7 @@ export const TemplateButton = ({
     try {
       setIsModalOpen(true);
     } catch (error) {
-      console.error('Error opening template modal:', error);
+      console.error("Error opening template modal:", error);
     }
   };
 
@@ -68,13 +67,13 @@ export const TemplateButton = ({
       <Button
         variant={variant}
         size={size}
-        className={cn('gap-2', className)}
+        className={cn("gap-2", className)}
         onClick={handleOpenModal}
         disabled={disabled}
         data-testid={testId}
       >
-        {showIcon && <FontAwesomeIcon icon={faWandMagicSparkles} />}
-        {mode === 'send' ? t('Quick Ask') : t('Select Template')}
+        {showIcon && <WandSparkles />}
+        {mode === "send" ? t("Quick Ask") : t("Select Template")}
       </Button>
 
       <TemplateSelector
