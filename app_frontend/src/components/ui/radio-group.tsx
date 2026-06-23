@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
-import { CircleIcon } from 'lucide-react';
+import * as React from "react";
+import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
+import { CircleIcon } from "lucide-react";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 function RadioGroup({
   className,
@@ -13,7 +13,7 @@ function RadioGroup({
   return (
     <RadioGroupPrimitive.Root
       data-slot="radio-group"
-      className={cn('grid gap-3', className)}
+      className={cn("grid gap-3", className)}
       {...props}
     />
   );
@@ -28,11 +28,11 @@ function RadioGroupItem({
       data-slot="radio-group-item"
       className={cn(
         // base
-        'peer aspect-square size-4 shrink-0 rounded-full text-accent outline-none',
+        "peer aspect-square size-4 shrink-0 rounded-full text-accent outline-none",
         // borders
-        'border border-primary shadow-xs transition-[color,box-shadow]',
+        "border border-primary shadow-xs transition-[color,box-shadow]",
         // focus
-        'focus-visible:border-ring focus-visible:ring-[1px] focus-visible:ring-ring',
+        "focus-visible:border-ring focus-visible:ring-[1px] focus-visible:ring-ring",
         // invalid
         `
           aria-invalid:border-destructive aria-invalid:ring-destructive/20
@@ -44,14 +44,14 @@ function RadioGroupItem({
           disabled:[&_[data-slot=radio-group-indicator]_svg]:fill-muted-foreground
         `,
         // checked
-        'enabled:data-[state=checked]:border-accent',
+        "enabled:data-[state=checked]:border-accent",
         // hover
         `
           enabled:hover:border-[color-mix(in_srgb,var(--accent)_80%,white)] enabled:hover:text-[color-mix(in_srgb,var(--accent)_80%,white)]
           enabled:hover:data-[state=checked]:border-[color-mix(in_srgb,var(--accent)_80%,white)]
           enabled:hover:[&_[data-slot=radio-group-indicator]_svg]:fill-[color-mix(in_srgb,var(--accent)_80%,white)]
         `,
-        className
+        className,
       )}
       {...props}
     >

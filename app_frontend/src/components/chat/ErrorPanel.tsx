@@ -1,13 +1,10 @@
-import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons/faExclamationTriangle';
-import { CollapsiblePanel } from './CollapsiblePanel';
-import { ICodeExecutionError } from '@/api/chat-messages/types';
-import { useTranslation } from '@/i18n';
-// @ts-expect-error ???
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-// @ts-expect-error ???
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import React from "react";
+import { TriangleAlert } from "lucide-react";
+import { CollapsiblePanel } from "./CollapsiblePanel";
+import { ICodeExecutionError } from "@/api/chat-messages/types";
+import { useTranslation } from "@/i18n";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface ErrorPanelProps {
   attempts?: number | null;
@@ -18,7 +15,7 @@ interface ErrorPanelProps {
 export const ErrorPanel: React.FC<ErrorPanelProps> = ({
   attempts,
   errors,
-  componentType = 'Component',
+  componentType = "Component",
 }) => {
   const { t } = useTranslation();
   if (!errors || errors.length === 0) return null;
@@ -26,14 +23,16 @@ export const ErrorPanel: React.FC<ErrorPanelProps> = ({
     <>
       {attempts && (
         <h2 className="mb-2">
-          {t('Failed to generate valid code after {{attempts}} attempts', { attempts })}
+          {t("Failed to generate valid code after {{attempts}} attempts", {
+            attempts,
+          })}
         </h2>
       )}
-      {errors.map(e => {
+      {errors.map((e) => {
         const { code, exception_str, stderr, stdout, traceback_str } = e;
         const hasDetails = !!(code || stderr || stdout || traceback_str);
         const error = `${componentType} Error: ${
-          exception_str || t('An error occurred during execution')
+          exception_str || t("An error occurred during execution")
         }`;
 
         return (
@@ -41,7 +40,7 @@ export const ErrorPanel: React.FC<ErrorPanelProps> = ({
             <CollapsiblePanel
               header={
                 <div className="flex items-center text-destructive">
-                  <FontAwesomeIcon icon={faExclamationTriangle} className="mr-2 flex-shrink-0" />
+                  <TriangleAlert className="mr-2 size-4 flex-shrink-0" />
                   <span className="font-semibold">{error}</span>
                 </div>
               }
@@ -49,8 +48,10 @@ export const ErrorPanel: React.FC<ErrorPanelProps> = ({
               <div className="space-y-4">
                 {code && (
                   <div>
-                    <h4 className="font-semibold mb-2">{t('Code that caused the error:')}</h4>
-                    <div className="overflow-x-auto overflow-y-auto max-h-[500px]">
+                    <h4 className="mb-2 font-semibold">
+                      {t("Code that caused the error:")}
+                    </h4>
+                    <div className="max-h-[500px] overflow-x-auto overflow-y-auto">
                       <SyntaxHighlighter
                         language="python"
                         style={oneDark}
@@ -67,8 +68,8 @@ export const ErrorPanel: React.FC<ErrorPanelProps> = ({
 
                 {traceback_str && (
                   <div>
-                    <h4 className="font-semibold mb-2">{t('Traceback:')}</h4>
-                    <div className="overflow-x-auto overflow-y-auto max-h-[300px]">
+                    <h4 className="mb-2 font-semibold">{t("Traceback:")}</h4>
+                    <div className="max-h-[300px] overflow-x-auto overflow-y-auto">
                       <SyntaxHighlighter
                         language="python"
                         style={oneDark}
@@ -84,24 +85,32 @@ export const ErrorPanel: React.FC<ErrorPanelProps> = ({
 
                 {stdout && (
                   <div>
-                    <h4 className="font-semibold mb-2">{t('Standard Output:')}</h4>
+                    <h4 className="mb-2 font-semibold">
+                      {t("Standard Output:")}
+                    </h4>
                     <div className="max-h-[300px] overflow-x-auto overflow-y-auto">
-                      <pre className="p-2 rounded whitespace-pre">{stdout}</pre>
+                      <pre className="rounded p-2 whitespace-pre">{stdout}</pre>
                     </div>
                   </div>
                 )}
 
                 {stderr && (
                   <div>
-                    <h4 className="font-semibold mb-2">{t('Standard Error:')}</h4>
-                    <div className="max-h-[300px] overflow-x-auto overflow-y-auto max-w-full">
-                      <pre className="p-2 rounded whitespace-pre text-destructive">{stderr}</pre>
+                    <h4 className="mb-2 font-semibold">
+                      {t("Standard Error:")}
+                    </h4>
+                    <div className="max-h-[300px] max-w-full overflow-x-auto overflow-y-auto">
+                      <pre className="rounded p-2 whitespace-pre text-destructive">
+                        {stderr}
+                      </pre>
                     </div>
                   </div>
                 )}
 
                 {!hasDetails && (
-                  <p className="italic">{t('No additional error details available.')}</p>
+                  <p className="italic">
+                    {t("No additional error details available.")}
+                  </p>
                 )}
               </div>
             </CollapsiblePanel>

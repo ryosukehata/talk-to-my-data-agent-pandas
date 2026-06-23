@@ -1,13 +1,13 @@
-import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 const ALERT_VARIANT = {
-  destructive: 'destructive',
-  info: 'info',
-  warning: 'warning',
-  success: 'success',
+  destructive: "destructive",
+  info: "info",
+  warning: "warning",
+  success: "success",
 };
 
 const alertVariants = cva(
@@ -41,14 +41,14 @@ const alertVariants = cva(
     defaultVariants: {
       variant: ALERT_VARIANT.info,
     },
-  }
+  },
 );
 
 function Alert({
   className,
   variant,
   ...props
-}: React.ComponentProps<'div'> & VariantProps<typeof alertVariants>) {
+}: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
   return (
     <div
       data-slot="alert"
@@ -59,17 +59,20 @@ function Alert({
   );
 }
 
-function AlertTitle({ className, ...props }: React.ComponentProps<'div'>) {
+function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="alert-title"
-      className={cn('mb-1 font-normal text-primary', className)}
+      className={cn("mb-1 font-normal text-primary", className)}
       {...props}
     />
   );
 }
 
-function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) {
+function AlertDescription({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
@@ -77,14 +80,14 @@ function AlertDescription({ className, ...props }: React.ComponentProps<'div'>) 
           text-xs text-secondary-foreground
           [&_p]:leading-relaxed
         `,
-        className
+        className,
       )}
       {...props}
     />
   );
 }
 
-function AlertFooter({ className, ...props }: React.ComponentProps<'div'>) {
+function AlertFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="alert-footer"
@@ -94,7 +97,7 @@ function AlertFooter({ className, ...props }: React.ComponentProps<'div'>) {
           [&>*:first-child]:pl-0
           [&>a]:no-underline
         `,
-        className
+        className,
       )}
       {...props}
     />

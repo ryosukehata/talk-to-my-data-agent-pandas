@@ -6,18 +6,24 @@
  * Report status enum
  */
 export type ReportStatus =
-  | 'pending'
-  | 'refining'
-  | 'chat_processing'
-  | 'completed'
-  | 'generating_word'
-  | 'done'
-  | 'error';
+  | "pending"
+  | "refining"
+  | "chat_processing"
+  | "completed"
+  | "generating_word"
+  | "done"
+  | "error";
 
 /**
  * Question status enum
  */
-export type QuestionStatus = 'pending' | 'refining' | 'ready' | 'running' | 'completed' | 'error';
+export type QuestionStatus =
+  | "pending"
+  | "refining"
+  | "ready"
+  | "running"
+  | "completed"
+  | "error";
 
 /**
  * A question in a report

@@ -30,10 +30,10 @@ interface AppStateActions {
 export type AppState = AppStateData & AppStateActions;
 
 export type Action =
-  | { type: 'HIDE_WELCOME_MODAL' }
-  | { type: 'SET_COLLAPSIBLE_PANEL_DEFAULT_OPEN'; payload: boolean }
-  | { type: 'SET_ENABLE_CHART_GENERATION'; payload: boolean }
-  | { type: 'SET_ENABLE_BUSINESS_INSIGHTS'; payload: boolean }
-  | { type: 'SET_INCLUDE_CSV_BOM'; payload: boolean }
-  | { type: 'SET_DATA_SOURCE'; payload: string }
-  | { type: 'SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN'; payload: boolean };
+  | { type: "HIDE_WELCOME_MODAL" }
+  | { type: "SET_COLLAPSIBLE_PANEL_DEFAULT_OPEN"; payload: boolean }
+  | { type: "SET_ENABLE_CHART_GENERATION"; payload: boolean }
+  | { type: "SET_ENABLE_BUSINESS_INSIGHTS"; payload: boolean }
+  | { type: "SET_INCLUDE_CSV_BOM"; payload: boolean }
+  | { type: "SET_DATA_SOURCE"; payload: string }
+  | { type: "SET_EXPAND_GRAPHS_INSIGHTS_DEFAULT_OPEN"; payload: boolean };

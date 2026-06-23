@@ -2,4 +2,4 @@
  * Refiner components exports
  */
 
-export { RefinerButton } from './RefinerButton';
+export { RefinerButton } from "./RefinerButton";

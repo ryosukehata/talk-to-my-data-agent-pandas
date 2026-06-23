@@ -1,3 +1,3 @@
 export const dictionaryKeys = {
-  all: ['generatedDictionaries'],
+  all: ["generatedDictionaries"],
 };

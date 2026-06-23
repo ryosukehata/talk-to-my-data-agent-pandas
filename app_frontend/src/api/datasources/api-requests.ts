@@ -1,4 +1,4 @@
-import apiClient from '../apiClient';
+import apiClient from "../apiClient";
 
 type ExternalDataSource = {
   data_store_id: string;
@@ -12,7 +12,9 @@ export function externalDataSourceName({
   database_schema,
   database_table,
 }: ExternalDataSource): string {
-  return [database_catalog, database_schema, database_table].filter(x => x).join('.');
+  return [database_catalog, database_schema, database_table]
+    .filter((x) => x)
+    .join(".");
 }
 
 export type ExternalDataStore = {
@@ -22,16 +24,23 @@ export type ExternalDataStore = {
   defined_data_sources: ExternalDataSource[];
 };
 
-export async function listAvailableExternalDataStores(): Promise<ExternalDataStore[]> {
-  const { data } = await apiClient.get<ExternalDataStore[]>('/v1/available-external-data-stores');
+export async function listAvailableExternalDataStores(): Promise<
+  ExternalDataStore[]
+> {
+  const { data } = await apiClient.get<ExternalDataStore[]>(
+    "/v1/available-external-data-stores",
+  );
   return data;
 }
 
 export async function selectSourcesForDataStore(
   dataStoreId: string,
-  dataSources: ExternalDataSource[]
+  dataSources: ExternalDataSource[],
 ): Promise<void> {
-  await apiClient.put(`/v1/external-data-stores/${dataStoreId}/external-data-sources/`, {
-    selected_data_sources: dataSources,
-  });
+  await apiClient.put(
+    `/v1/external-data-stores/${dataStoreId}/external-data-sources/`,
+    {
+      selected_data_sources: dataSources,
+    },
+  );
 }

@@ -1,19 +1,19 @@
-import * as React from 'react';
-import { Command as CommandPrimitive } from 'cmdk';
-import { Search } from 'lucide-react';
+import * as React from "react";
+import { Command as CommandPrimitive } from "cmdk";
+import { Search } from "lucide-react";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 
 function CommandDialog({
-  title = 'Command Palette',
-  description = 'Search for a command to run...',
+  title = "Command Palette",
+  description = "Search for a command to run...",
   children,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
@@ -27,7 +27,7 @@ function CommandDialog({
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
       <DialogContent className="overflow-hidden p-0">
-        <Command className="[&_[cmdk-group-heading]]:text-muted-foreground **:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+        <Command className="**:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:size-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:size-5">
           {children}
         </Command>
       </DialogContent>
@@ -35,16 +35,19 @@ function CommandDialog({
   );
 }
 
-function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
+function Command({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
       data-slot="command"
       className={cn(
         // Background & Text
-        'bg-input text-secondary-foreground',
+        "bg-input text-secondary-foreground",
         // Shape & Border
-        'flex h-full w-full flex-col overflow-hidden rounded-md border',
-        className
+        "flex size-full flex-col overflow-hidden rounded-md border",
+        className,
       )}
       {...props}
     />
@@ -56,7 +59,10 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    <div data-slot="command-input-wrapper" className="flex items-center border-b px-3">
+    <div
+      data-slot="command-input-wrapper"
+      className="flex items-center border-b px-3"
+    >
       <Search className="mr-2 size-4 shrink-0 text-muted-foreground" />
       <CommandPrimitive.Input
         data-slot="command-input"
@@ -66,7 +72,7 @@ function CommandInput({
             placeholder:text-muted-foreground
             disabled:cursor-not-allowed disabled:opacity-50
           `,
-          className
+          className,
         )}
         {...props}
       />
@@ -74,17 +80,25 @@ function CommandInput({
   );
 }
 
-function CommandList({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.List>) {
+function CommandList({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive.List>) {
   return (
     <CommandPrimitive.List
       data-slot="command-list"
-      className={cn('max-h-[300px] overflow-y-auto overflow-x-hidden p-1', className)}
+      className={cn(
+        "max-h-[300px] overflow-x-hidden overflow-y-auto p-1",
+        className,
+      )}
       {...props}
     />
   );
 }
 
-function CommandEmpty({ ...props }: React.ComponentProps<typeof CommandPrimitive.Empty>) {
+function CommandEmpty({
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive.Empty>) {
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
@@ -108,7 +122,7 @@ function CommandGroup({
           [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium
           [&_[cmdk-group-heading]]:text-muted-foreground
         `,
-        className
+        className,
       )}
       {...props}
     />
@@ -122,13 +136,16 @@ function CommandSeparator({
   return (
     <CommandPrimitive.Separator
       data-slot="command-separator"
-      className={cn('-mx-1 h-px bg-border', className)}
+      className={cn("-mx-1 h-px bg-border", className)}
       {...props}
     />
   );
 }
 
-function CommandItem({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.Item>) {
+function CommandItem({
+  className,
+  ...props
+}: React.ComponentProps<typeof CommandPrimitive.Item>) {
   return (
     <CommandPrimitive.Item
       data-slot="command-item"
@@ -137,23 +154,29 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
           relative flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-foreground outline-hidden
           select-none
           hover:bg-secondary
-          data-[selected=true]:bg-secondary
-          data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[disabled=true]:text-muted-foreground
+          data-[disabled=true]:pointer-events-none
+          data-[disabled=true]:text-muted-foreground data-[disabled=true]:opacity-50 data-[selected=true]:bg-secondary
           [&_svg]:pointer-events-none [&_svg]:shrink-0
           [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground
         `,
-        className
+        className,
       )}
       {...props}
     />
   );
 }
 
-function CommandShortcut({ className, ...props }: React.ComponentProps<'span'>) {
+function CommandShortcut({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="command-shortcut"
-      className={cn('ml-auto text-xs tracking-widest text-muted-foreground', className)}
+      className={cn(
+        "ml-auto text-xs tracking-widest text-muted-foreground",
+        className,
+      )}
       {...props}
     />
   );

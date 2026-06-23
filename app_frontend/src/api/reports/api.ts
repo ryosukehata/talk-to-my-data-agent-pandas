@@ -2,7 +2,7 @@
  * Report Builder API functions
  */
 
-import apiClient from '@/api/apiClient';
+import apiClient from "@/api/apiClient";
 import {
   CreateReportRequest,
   CreateReportResponse,
@@ -13,20 +13,22 @@ import {
   UpdateQuestionRequest,
   UpdateQuestionResponse,
   QuestionStatus,
-} from './types';
+} from "./types";
 
 /**
  * List all reports for the current user
  */
 export const listReports = async (): Promise<ListReportsResponse> => {
-  const response = await apiClient.get('/v1/reports');
+  const response = await apiClient.get("/v1/reports");
   return response.data;
 };
 
 /**
  * Get a specific report by ID
  */
-export const getReport = async (reportId: string): Promise<ReportDetailResponse> => {
+export const getReport = async (
+  reportId: string,
+): Promise<ReportDetailResponse> => {
   const response = await apiClient.get(`/v1/reports/${reportId}`);
   return response.data;
 };
@@ -34,8 +36,10 @@ export const getReport = async (reportId: string): Promise<ReportDetailResponse>
 /**
  * Create a new report with auto-generated questions
  */
-export const createReport = async (request: CreateReportRequest): Promise<CreateReportResponse> => {
-  const response = await apiClient.post('/v1/reports', request);
+export const createReport = async (
+  request: CreateReportRequest,
+): Promise<CreateReportResponse> => {
+  const response = await apiClient.post("/v1/reports", request);
   return response.data;
 };
 
@@ -45,11 +49,11 @@ export const createReport = async (request: CreateReportRequest): Promise<Create
 export const updateQuestion = async (
   reportId: string,
   questionId: string,
-  request: UpdateQuestionRequest
+  request: UpdateQuestionRequest,
 ): Promise<UpdateQuestionResponse> => {
   const response = await apiClient.patch(
     `/v1/reports/${reportId}/questions/${questionId}`,
-    request
+    request,
   );
   return response.data;
 };
@@ -57,18 +61,23 @@ export const updateQuestion = async (
 export const updateQuestionStatus = async (
   reportId: string,
   questionId: string,
-  status: QuestionStatus
+  status: QuestionStatus,
 ): Promise<UpdateQuestionResponse> => {
-  const response = await apiClient.patch(`/v1/reports/${reportId}/questions/${questionId}`, {
-    status,
-  });
+  const response = await apiClient.patch(
+    `/v1/reports/${reportId}/questions/${questionId}`,
+    {
+      status,
+    },
+  );
   return response.data;
 };
 
 /**
  * Execute all questions in a report (start chat generation)
  */
-export const executeQuestions = async (reportId: string): Promise<ExecuteQuestionsResponse> => {
+export const executeQuestions = async (
+  reportId: string,
+): Promise<ExecuteQuestionsResponse> => {
   const response = await apiClient.post(`/v1/reports/${reportId}/execute`);
   return response.data;
 };
@@ -76,27 +85,33 @@ export const executeQuestions = async (reportId: string): Promise<ExecuteQuestio
 /**
  * Generate Word document for a completed report
  */
-export const generateWord = async (reportId: string): Promise<GenerateWordResponse> => {
-  const response = await apiClient.post(`/v1/reports/${reportId}/generate-word`);
+export const generateWord = async (
+  reportId: string,
+): Promise<GenerateWordResponse> => {
+  const response = await apiClient.post(
+    `/v1/reports/${reportId}/generate-word`,
+  );
   return response.data;
 };
 
-export const getReportSummary = async (reportId: string): Promise<ReportDetailResponse> => {
+export const getReportSummary = async (
+  reportId: string,
+): Promise<ReportDetailResponse> => {
   const response = await apiClient.get(`/v1/reports/${reportId}`);
   return response.data;
 };
 
 export const downloadWord = async (reportId: string): Promise<void> => {
   const response = await apiClient.get(`/v1/reports/${reportId}/download`, {
-    responseType: 'blob',
+    responseType: "blob",
   });
 
   if (response.status !== 200) {
-    throw new Error('Failed to download Word document');
+    throw new Error("Failed to download Word document");
   }
 
   const url = window.URL.createObjectURL(response.data);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
   link.download = `report_${reportId}.docx`;
   document.body.appendChild(link);

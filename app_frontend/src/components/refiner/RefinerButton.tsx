@@ -4,13 +4,13 @@
  * ユーザーの質問をAIで洗練するためのボタンコンポーネント
  */
 
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Sparkles, Loader2 } from 'lucide-react';
-import { useRefineQuestions } from '@/api/refiner';
-import { useFetchFeatureFlags } from '@/api/feature-flag';
-import { useTranslation } from '@/i18n';
-import { RefinedQuestion } from '@/api/refiner/types';
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Loader2 } from "lucide-react";
+import { useRefineQuestions } from "@/api/refiner";
+import { useFetchFeatureFlags } from "@/api/feature-flag";
+import { useTranslation } from "@/i18n";
+import { RefinedQuestion } from "@/api/refiner/types";
 
 interface RefinerButtonProps {
   /** 現在の入力テキストを取得するためのref */
@@ -34,17 +34,19 @@ const createFormatRefinedMessage =
   (t: (key: string) => string) =>
   (question: RefinedQuestion): string => {
     const parts = [
-      `${t('Question')}: ${question.refined_question}`,
-      '',
-      `${t('Reasoning')}: ${question.reasoning}`,
+      `${t("Question")}: ${question.refined_question}`,
+      "",
+      `${t("Reasoning")}: ${question.reasoning}`,
     ];
 
     if (question.relevant_columns && question.relevant_columns.length > 0) {
-      parts.push('');
-      parts.push(`${t('Relevant Columns')}: ${question.relevant_columns.join(', ')}`);
+      parts.push("");
+      parts.push(
+        `${t("Relevant Columns")}: ${question.relevant_columns.join(", ")}`,
+      );
     }
 
-    return parts.join('\n');
+    return parts.join("\n");
   };
 
 export const RefinerButton: React.FC<RefinerButtonProps> = ({
@@ -61,9 +63,11 @@ export const RefinerButton: React.FC<RefinerButtonProps> = ({
   const formatRefinedMessage = createFormatRefinedMessage(t);
 
   const { mutate: refineQuestions, isPending } = useRefineQuestions({
-    onSuccess: data => {
+    onSuccess: (data) => {
       if (data.success && data.refined_questions.length > 0) {
-        const formattedMessage = formatRefinedMessage(data.refined_questions[0]);
+        const formattedMessage = formatRefinedMessage(
+          data.refined_questions[0],
+        );
 
         // autoSendが有効な場合は直接送信、そうでなければ入力欄に表示
         if (featureFlags?.refinerAutoSend && onAutoSend) {
@@ -73,8 +77,8 @@ export const RefinerButton: React.FC<RefinerButtonProps> = ({
         }
       }
     },
-    onError: error => {
-      console.error('Failed to refine question:', error);
+    onError: (error) => {
+      console.error("Failed to refine question:", error);
     },
   });
 
@@ -84,7 +88,7 @@ export const RefinerButton: React.FC<RefinerButtonProps> = ({
   }
 
   const getCurrentInput = (): string => {
-    return inputRef.current?.value?.trim() || '';
+    return inputRef.current?.value?.trim() || "";
   };
 
   const handleClick = () => {
@@ -103,7 +107,7 @@ export const RefinerButton: React.FC<RefinerButtonProps> = ({
 
   return (
     <Button
-      variant="outline"
+      variant="secondary"
       size="sm"
       onClick={handleClick}
       disabled={isDisabled}
@@ -112,13 +116,13 @@ export const RefinerButton: React.FC<RefinerButtonProps> = ({
     >
       {isPending ? (
         <>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          {t('Refining...')}
+          <Loader2 className="size-4 animate-spin" />
+          {t("Refining...")}
         </>
       ) : (
         <>
-          <Sparkles className="h-4 w-4" />
-          {t('Refine Question')}
+          <Sparkles className="size-4" />
+          {t("Refine Question")}
         </>
       )}
     </Button>

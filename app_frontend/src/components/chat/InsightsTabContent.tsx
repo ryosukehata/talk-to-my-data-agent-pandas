@@ -1,8 +1,8 @@
-import React from 'react';
-import { HeaderSection } from './HeaderSection';
-import { SuggestedQuestionsSection } from './SuggestedQuestionsSection';
-import { MarkdownContent } from './MarkdownContent';
-import { useTranslation } from '@/i18n';
+import React from "react";
+import { HeaderSection } from "./HeaderSection";
+import { SuggestedQuestionsSection } from "./SuggestedQuestionsSection";
+import { MarkdownContent } from "./MarkdownContent";
+import { useTranslation } from "@/i18n";
 
 interface InsightsTabContentProps {
   additionalInsights?: string | null;
@@ -22,7 +22,7 @@ export const InsightsTabContent: React.FC<InsightsTabContentProps> = ({
   return (
     <>
       {additionalInsights && (
-        <HeaderSection title={t('Data insights')}>
+        <HeaderSection title={t("Data insights")}>
           <MarkdownContent content={additionalInsights} />
         </HeaderSection>
       )}

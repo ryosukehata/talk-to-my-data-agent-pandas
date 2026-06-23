@@ -17,7 +17,7 @@ upstream `v11.5.3` の frontend 挙動修正を、現行 fork の template / cus
 ## 見送り
 
 - upstream の Settings modal 全面 redesign は、この fork の template management / custom prompt 操作と衝突が大きいため見送る。
-- FontAwesome から Lucide への全面置換、theme tokens の大規模差分は別 PR とする。
+- FontAwesome から Lucide への全面置換、theme tokens / UI primitives / prettier 設定の upstream 追従は、2026-06-23 の追加対応で取り込み済み。
 - frontend workflow / coverage reporting は infra PR で扱う。
 
 ## TDD
@@ -56,6 +56,17 @@ upstream `v11.5.3` の frontend 挙動修正を、現行 fork の template / cus
   - `npm run lint && npm run test && npm run knip`: passed。lintは既存warning 6件のみ、Vitestは 134 passed、knipはconfiguration hintsのみ。
   - `npm run build`: passed。
   - `DATAROBOT_API_TOKEN=token DATAROBOT_ENDPOINT=endpoint uv run --all-extras --dev pytest tests/test_main.py tests/test_v1153_backend_compat.py`: 18 passed, 3 skipped。
+- 2026-06-23 frontend upstream追加追従
+  - Vite Codespaces dev base を upstream `v11.5.3` と同じ `5173` 基準へ戻し、fork独自の static `8080` proxy / `_dr_env.js` dev proxy を削除。
+  - `index.html` は local `window.ENV.APP_VERSION = "local"` の inline fallback へ戻し、`_dr_env.js` は build external のみ維持。
+  - theme tokens / theme provider / 既存 UI primitives を upstream `v11.5.3` に合わせ、fork独自機能で使う追加 primitive は維持。
+  - FontAwesome 依存と import を削除し、既存画面の icon を `lucide-react` へ置換。
+  - `axios` manifest を `>=1.13.5 <1.14.0` に更新し、`eslint-plugin-better-tailwindcss` と upstream prettier script 設定を復帰。
+  - `Start your first chart here` を `Start your first chat here` に修正し、各 locale の翻訳も更新。
+  - upstream Button / Badge variant 変更に合わせ、呼び出し側とテスト期待値を更新。
+  - `react-syntax-highlighter` は現行依存に型定義がないため、`vite-env.d.ts` に最小 ambient declaration を追加して build を安定化。
+  - `npm install --package-lock=false`: passed。ローカル Node 24 では `i18next-parser` の engine warning と npm audit warning が出る。
+  - `npm run prettier && npm run lint && npm run test && npm run knip && npm run build`: passed。lintは既存warning 4件のみ、Vitestは 134 passed、knipはconfiguration hintsのみ、buildは既存chunk size warningのみ。
 - `./node_modules/.bin/vitest --run tests/components/AddDataModal.test.tsx tests/components/NewChatModal.test.tsx tests/components/RenameChatModal.test.tsx tests/components/SettingsModal.test.tsx tests/components/DatasetCardActionBar.test.tsx`: 16 passed
 - `./node_modules/.bin/tsc -b tsconfig.app.json`: passed
 - `./node_modules/.bin/eslint .`: passed with existing warnings only

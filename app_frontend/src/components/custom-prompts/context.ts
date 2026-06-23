@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createContext } from "react";
 
 export interface CustomPromptStateContextType {
   isSaving: boolean;
@@ -7,6 +7,6 @@ export interface CustomPromptStateContextType {
   setPendingUpdate: (pending: boolean) => void;
 }
 
-export const CustomPromptStateContext = createContext<CustomPromptStateContextType | undefined>(
-  undefined
-);
+export const CustomPromptStateContext = createContext<
+  CustomPromptStateContextType | undefined
+>(undefined);

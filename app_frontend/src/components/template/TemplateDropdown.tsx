@@ -1,6 +1,6 @@
 // Compact Dropdown Template Selector
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,13 +12,13 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuPortal,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useTranslation } from '@/i18n';
-import { cn } from '@/lib/utils';
-import { ChevronDown, Sparkles } from 'lucide-react';
-import type { PromptTemplate } from '@/api/templates/types';
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "@/i18n";
+import { cn } from "@/lib/utils";
+import { ChevronDown, Sparkles } from "lucide-react";
+import type { PromptTemplate } from "@/api/templates/types";
 
 interface TemplateDropdownProps {
   templates: PromptTemplate[];
@@ -33,7 +33,7 @@ export const TemplateDropdown = ({
   categories,
   onSelectTemplate,
   disabled = false,
-  className = '',
+  className = "",
 }: TemplateDropdownProps) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -47,7 +47,7 @@ export const TemplateDropdown = ({
       acc[template.category].push(template);
       return acc;
     },
-    {} as Record<string, PromptTemplate[]>
+    {} as Record<string, PromptTemplate[]>,
   );
 
   const handleSelect = (template: PromptTemplate) => {
@@ -58,21 +58,29 @@ export const TemplateDropdown = ({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled} className={cn('gap-2', className)}>
-          <Sparkles className="w-4 h-4" />
-          {t('Templates')}
-          <ChevronDown className="w-3 h-3" />
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={disabled}
+          className={cn("gap-2", className)}
+        >
+          <Sparkles className="size-4" />
+          {t("Templates")}
+          <ChevronDown className="size-3" />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent className="w-80 max-h-96 overflow-y-auto" align="start">
+      <DropdownMenuContent
+        className="max-h-96 w-80 overflow-y-auto"
+        align="start"
+      >
         <DropdownMenuLabel className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4" />
-          {t('Prompt Templates')}
+          <Sparkles className="size-4" />
+          {t("Prompt Templates")}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {categories.map(category => {
+        {categories.map((category) => {
           const categoryTemplates = groupedTemplates[category] || [];
 
           if (categoryTemplates.length === 0) return null;
@@ -81,21 +89,23 @@ export const TemplateDropdown = ({
             <DropdownMenuSub key={category}>
               <DropdownMenuSubTrigger className="flex items-center justify-between">
                 <span>{category}</span>
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="default" className="text-xs">
                   {categoryTemplates.length}
                 </Badge>
               </DropdownMenuSubTrigger>
 
               <DropdownMenuPortal>
-                <DropdownMenuSubContent className="w-72 max-h-80 overflow-y-auto">
-                  {categoryTemplates.map(template => (
+                <DropdownMenuSubContent className="max-h-80 w-72 overflow-y-auto">
+                  {categoryTemplates.map((template) => (
                     <DropdownMenuItem
                       key={template.name}
                       onClick={() => handleSelect(template)}
-                      className="flex-col items-start p-3 cursor-pointer"
+                      className="cursor-pointer flex-col items-start p-3"
                     >
-                      <div className="font-medium text-sm mb-1 line-clamp-1">{template.name}</div>
-                      <div className="text-xs text-muted-foreground line-clamp-2">
+                      <div className="mb-1 line-clamp-1 text-sm font-medium">
+                        {template.name}
+                      </div>
+                      <div className="line-clamp-2 text-xs text-muted-foreground">
                         {template.description}
                       </div>
                     </DropdownMenuItem>
@@ -108,8 +118,8 @@ export const TemplateDropdown = ({
 
         {/* 全テンプレートが空の場合 */}
         {templates.length === 0 && (
-          <DropdownMenuItem disabled className="text-center py-4">
-            {t('No templates available')}
+          <DropdownMenuItem disabled className="py-4 text-center">
+            {t("No templates available")}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

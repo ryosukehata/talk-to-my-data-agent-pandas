@@ -8,7 +8,7 @@ import {
   useQueryClient,
   UseQueryOptions,
   UseMutationOptions,
-} from '@tanstack/react-query';
+} from "@tanstack/react-query";
 import {
   listReports,
   getReport,
@@ -19,7 +19,7 @@ import {
   generateWord,
   deleteReport,
   downloadWord,
-} from './api';
+} from "./api";
 import {
   CreateReportRequest,
   CreateReportResponse,
@@ -31,15 +31,18 @@ import {
   UpdateQuestionRequest,
   UpdateQuestionResponse,
   QuestionStatus,
-} from './types';
+} from "./types";
 
-export const REPORTS_QUERY_KEY = ['reports'];
+export const REPORTS_QUERY_KEY = ["reports"];
 
 /**
  * Hook to fetch all reports
  */
 export const useReports = <T = ListReportsResponse>(
-  options?: Omit<UseQueryOptions<ListReportsResponse, Error, T>, 'queryKey' | 'queryFn'>
+  options?: Omit<
+    UseQueryOptions<ListReportsResponse, Error, T>,
+    "queryKey" | "queryFn"
+  >,
 ) => {
   return useQuery<ListReportsResponse, Error, T>({
     queryKey: REPORTS_QUERY_KEY,
@@ -53,7 +56,10 @@ export const useReports = <T = ListReportsResponse>(
  */
 export const useReport = (
   reportId: string,
-  options?: Omit<UseQueryOptions<ReportDetailResponse, Error>, 'queryKey' | 'queryFn'>
+  options?: Omit<
+    UseQueryOptions<ReportDetailResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
 ) => {
   return useQuery<ReportDetailResponse, Error>({
     queryKey: [...REPORTS_QUERY_KEY, reportId],
@@ -67,7 +73,11 @@ export const useReport = (
  * Hook to create a new report
  */
 export const useCreateReport = (
-  options?: UseMutationOptions<CreateReportResponse, Error, CreateReportRequest>
+  options?: UseMutationOptions<
+    CreateReportResponse,
+    Error,
+    CreateReportRequest
+  >,
 ) => {
   const queryClient = useQueryClient();
 
@@ -89,7 +99,7 @@ export const useUpdateQuestion = (
     UpdateQuestionResponse,
     Error,
     { reportId: string; questionId: string; request: UpdateQuestionRequest }
-  >
+  >,
 ) => {
   const queryClient = useQueryClient();
 
@@ -102,7 +112,9 @@ export const useUpdateQuestion = (
       updateQuestion(reportId, questionId, request),
     onSuccess: (_, variables) => {
       // Invalidate specific report to refetch
-      queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, variables.reportId] });
+      queryClient.invalidateQueries({
+        queryKey: [...REPORTS_QUERY_KEY, variables.reportId],
+      });
     },
     ...options,
   });
@@ -112,7 +124,7 @@ export const useUpdateQuestion = (
  * Hook to execute questions in a report
  */
 export const useExecuteQuestions = (
-  options?: UseMutationOptions<ExecuteQuestionsResponse, Error, string>
+  options?: UseMutationOptions<ExecuteQuestionsResponse, Error, string>,
 ) => {
   const queryClient = useQueryClient();
 
@@ -120,7 +132,9 @@ export const useExecuteQuestions = (
     mutationFn: executeQuestions,
     onSuccess: (_, reportId) => {
       // Invalidate specific report to refetch
-      queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, reportId] });
+      queryClient.invalidateQueries({
+        queryKey: [...REPORTS_QUERY_KEY, reportId],
+      });
       queryClient.invalidateQueries({ queryKey: REPORTS_QUERY_KEY });
     },
     ...options,
@@ -131,21 +145,25 @@ export const useExecuteQuestions = (
  * Hook to generate Word document
  */
 export const useGenerateWord = (
-  options?: UseMutationOptions<GenerateWordResponse, Error, string>
+  options?: UseMutationOptions<GenerateWordResponse, Error, string>,
 ) => {
   const queryClient = useQueryClient();
 
   return useMutation<GenerateWordResponse, Error, string>({
     mutationFn: generateWord,
     onSuccess: (_, reportId) => {
-      queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, reportId] });
+      queryClient.invalidateQueries({
+        queryKey: [...REPORTS_QUERY_KEY, reportId],
+      });
       queryClient.invalidateQueries({ queryKey: REPORTS_QUERY_KEY });
     },
     ...options,
   });
 };
 
-export const useDownloadWord = (options?: UseMutationOptions<void, Error, string>) => {
+export const useDownloadWord = (
+  options?: UseMutationOptions<void, Error, string>,
+) => {
   return useMutation<void, Error, string>({
     mutationFn: downloadWord,
     ...options,
@@ -155,7 +173,9 @@ export const useDownloadWord = (options?: UseMutationOptions<void, Error, string
 /**
  * Hook to delete a report
  */
-export const useDeleteReport = (options?: UseMutationOptions<void, Error, string>) => {
+export const useDeleteReport = (
+  options?: UseMutationOptions<void, Error, string>,
+) => {
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, string>({
@@ -179,7 +199,7 @@ export const useUpdateQuestionStatus = (
     UpdateQuestionResponse,
     Error,
     { reportId: string; questionId: string; status: QuestionStatus }
-  >
+  >,
 ) => {
   const queryClient = useQueryClient();
 
@@ -191,7 +211,9 @@ export const useUpdateQuestionStatus = (
     mutationFn: ({ reportId, questionId, status }) =>
       updateQuestionStatus(reportId, questionId, status),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: [...REPORTS_QUERY_KEY, variables.reportId] });
+      queryClient.invalidateQueries({
+        queryKey: [...REPORTS_QUERY_KEY, variables.reportId],
+      });
     },
     ...options,
   });

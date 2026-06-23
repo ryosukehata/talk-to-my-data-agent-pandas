@@ -2,11 +2,11 @@
  * Question Refiner hooks using React Query
  */
 
-import { useMutation, UseMutationOptions } from '@tanstack/react-query';
-import { refineQuestions } from './api';
-import { RefineQuestionsRequest, RefineQuestionsResponse } from './types';
+import { useMutation, UseMutationOptions } from "@tanstack/react-query";
+import { refineQuestions } from "./api";
+import { RefineQuestionsRequest, RefineQuestionsResponse } from "./types";
 
-export const REFINER_QUERY_KEY = ['refiner'];
+export const REFINER_QUERY_KEY = ["refiner"];
 
 /**
  * Hook to refine questions using the refiner API
@@ -27,7 +27,11 @@ export const REFINER_QUERY_KEY = ['refiner'];
  * ```
  */
 export const useRefineQuestions = (
-  options?: UseMutationOptions<RefineQuestionsResponse, Error, RefineQuestionsRequest>
+  options?: UseMutationOptions<
+    RefineQuestionsResponse,
+    Error,
+    RefineQuestionsRequest
+  >,
 ) => {
   return useMutation<RefineQuestionsResponse, Error, RefineQuestionsRequest>({
     mutationFn: refineQuestions,

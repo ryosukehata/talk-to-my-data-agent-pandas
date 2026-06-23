@@ -1,11 +1,11 @@
-import '@testing-library/jest-dom';
-import { ReactNode } from 'react';
-import { render } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
-import { AppStateProvider } from '@/state';
-import { CustomPromptStateProvider } from '@/components/custom-prompts/CustomPromptStateContext';
-import { vi } from 'vitest';
+import "@testing-library/jest-dom";
+import { ReactNode } from "react";
+import { render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
+import { AppStateProvider } from "@/state";
+import { CustomPromptStateProvider } from "@/components/custom-prompts/CustomPromptStateContext";
+import { vi } from "vitest";
 
 const createTestQueryClient = () =>
   new QueryClient({
@@ -26,7 +26,7 @@ export function renderWithProviders(children: ReactNode) {
           <AppStateProvider>{children}</AppStateProvider>
         </CustomPromptStateProvider>
       </QueryClientProvider>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -38,14 +38,14 @@ export function mockScrollIntoView() {
   const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
   const scrollIntoViewMock = vi.fn();
 
-  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
     configurable: true,
     value: scrollIntoViewMock,
     writable: true,
   });
 
   return () => {
-    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
       value: originalScrollIntoView,
       writable: true,

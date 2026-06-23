@@ -1,16 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createCustomPrompt,
   getCustomPrompts,
   getCustomPromptByName,
   deleteCustomPrompt,
   getCustomPromptNames,
-} from './api-requests';
-import { customPromptsKeys } from './keys';
-import { CustomPromptResponse } from './types';
+} from "./api-requests";
+import { customPromptsKeys } from "./keys";
+import { CustomPromptResponse } from "./types";
 
 // ローカルストレージにキャッシュするためのキー
-const CUSTOM_PROMPTS_CACHE_KEY = 'custom_prompts_cache';
+const CUSTOM_PROMPTS_CACHE_KEY = "custom_prompts_cache";
 
 // キャッシュヘルパー関数
 const saveToCache = (data: CustomPromptResponse[]) => {
@@ -20,10 +20,10 @@ const saveToCache = (data: CustomPromptResponse[]) => {
       JSON.stringify({
         data,
         timestamp: Date.now(),
-      })
+      }),
     );
   } catch (error) {
-    console.warn('Failed to save custom prompts to cache:', error);
+    console.warn("Failed to save custom prompts to cache:", error);
   }
 };
 
@@ -35,7 +35,7 @@ const getFromCache = (): CustomPromptResponse[] | null => {
       return data;
     }
   } catch (error) {
-    console.warn('Failed to load custom prompts from cache:', error);
+    console.warn("Failed to load custom prompts from cache:", error);
   }
   return null;
 };
@@ -62,15 +62,18 @@ export const useFetchCustomPrompts = (options?: { enabled?: boolean }) => {
         saveToCache(result.custom_prompts);
         return result;
       } catch (error) {
-        console.warn('Failed to fetch custom prompts, trying cache fallback:', error);
+        console.warn(
+          "Failed to fetch custom prompts, trying cache fallback:",
+          error,
+        );
         // エラー時はキャッシュからフォールバック
         const cachedData = getFromCache();
         if (cachedData) {
-          console.log('Using cached custom prompts data');
+          console.log("Using cached custom prompts data");
           return { custom_prompts: cachedData };
         }
         // キャッシュもない場合は空のリストを返す
-        console.log('No cache available, returning empty list');
+        console.log("No cache available, returning empty list");
         return { custom_prompts: [] };
       }
     },

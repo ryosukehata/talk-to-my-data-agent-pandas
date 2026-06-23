@@ -1,4 +1,4 @@
-import apiClient from '../apiClient';
+import apiClient from "../apiClient";
 
 export type DatabaseTables = Record<string, string>;
 export type DatabaseSchemas = Record<string, string>;
@@ -8,13 +8,20 @@ export const getDatabaseSchemas = async ({
 }: {
   signal?: AbortSignal;
 }): Promise<DatabaseSchemas> => {
-  const { data } = await apiClient.get<DatabaseSchemas>(`/v1/database/schemas`, {
-    signal,
-  });
+  const { data } = await apiClient.get<DatabaseSchemas>(
+    `/v1/database/schemas`,
+    {
+      signal,
+    },
+  );
   return data;
 };
 
-export const getDefaultSchema = async ({ signal }: { signal?: AbortSignal }): Promise<string> => {
+export const getDefaultSchema = async ({
+  signal,
+}: {
+  signal?: AbortSignal;
+}): Promise<string> => {
   const { data } = await apiClient.get<string>(`/v1/database/default-schema`, {
     signal,
   });
@@ -45,13 +52,19 @@ export const loadFromDatabase = async ({
   schema?: string;
   signal?: AbortSignal;
 }): Promise<string[]> => {
-  const payload: { table_names: string[]; schema_name?: string } = { table_names: tableNames };
+  const payload: { table_names: string[]; schema_name?: string } = {
+    table_names: tableNames,
+  };
   if (schema) {
     payload.schema_name = schema;
   }
 
-  const { data } = await apiClient.post<string[]>('/v1/database/select', payload, {
-    signal,
-  });
+  const { data } = await apiClient.post<string[]>(
+    "/v1/database/select",
+    payload,
+    {
+      signal,
+    },
+  );
   return data;
 };
