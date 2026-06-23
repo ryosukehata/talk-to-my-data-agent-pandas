@@ -1,0 +1,45 @@
+---
+# https://taskfile.dev
+version: '3'
+
+env:
+  SRCDIR: ./src/
+
+tasks:
+  install:
+    desc: "🔧 Install dependencies"
+    cmds:
+      - echo "🔧 Installing dependencies.."
+      - uv sync --all-extras --dev
+  build:
+    desc: "🏗️  Build React code"
+    cmds:
+      - uv build
+  lint:
+    silent: true
+    desc: "🧹 Run linters"
+    cmds:
+      - echo "🧹 Running linters.."
+      - uv run ruff format "$SRCDIR"
+      - uv run ruff check "$SRCDIR" --fix
+
+  lint-check:
+    desc: 🧹 Check whether the codebase is linted
+    cmds:
+      - echo "🧹 Linting"
+      - uv run ruff format --check "$SRCDIR"
+      - uv run ruff check "$SRCDIR"
+
+  test:
+    silent: true
+    desc: "🧪 Run tests"
+    cmds:
+      - echo "🧪 Running tests.."
+      - |
+        set +e
+        uv run pytest --cov --cov-report=html --cov-report=term --cov-report xml:.coverage.xml
+        pytest_status=$?
+        set -e
+        if [ "$pytest_status" -ne 0 ] && [ "$pytest_status" -ne 5 ]; then
+          exit "$pytest_status"
+        fi

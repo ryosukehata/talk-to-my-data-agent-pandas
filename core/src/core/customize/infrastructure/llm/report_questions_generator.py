@@ -10,6 +10,9 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import cast
 
+from datarobot_genai.core.utils.token_tracking import TokenUsageTracker
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+
 from core.constants import ALTERNATIVE_LLM_BIG
 from core.customize.domain.report.domain import (
     ReportQuestionsGenerationResult,
@@ -17,8 +20,6 @@ from core.customize.domain.report.domain import (
 from core.customize.infrastructure.llm.timeout import get_llm_timeout_seconds
 from core.llm_client import AsyncLLMClient
 from core.logging_helper import get_logger
-from core.token_tracking import TokenUsageTracker
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
 logger = get_logger(__name__)
 REPORT_BUILDER_TIMEOUT_ENV = "REPORT_BUILDER_LLM_TIMEOUT_SECONDS"

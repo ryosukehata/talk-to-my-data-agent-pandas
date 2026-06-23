@@ -1,9 +1,9 @@
-import React from 'react';
-import { HeaderSection } from './HeaderSection';
-import { PlotPanel } from './PlotPanel';
-import { MarkdownContent } from './MarkdownContent';
-import { parsePlotData } from './utils';
-import { useTranslation } from '@/i18n';
+import React from "react";
+import { HeaderSection } from "./HeaderSection";
+import { PlotPanel } from "./PlotPanel";
+import { MarkdownContent } from "./MarkdownContent";
+import { parsePlotData } from "./utils";
+import { useTranslation } from "@/i18n";
 
 interface SummaryTabContentProps {
   bottomLine?: string;
@@ -11,7 +11,11 @@ interface SummaryTabContentProps {
   fig2: string;
 }
 
-export const SummaryTabContent: React.FC<SummaryTabContentProps> = ({ bottomLine, fig1, fig2 }) => {
+export const SummaryTabContent: React.FC<SummaryTabContentProps> = ({
+  bottomLine,
+  fig1,
+  fig2,
+}) => {
   const { t } = useTranslation();
   const plot1 = parsePlotData(fig1);
   const plot2 = parsePlotData(fig2);
@@ -19,7 +23,7 @@ export const SummaryTabContent: React.FC<SummaryTabContentProps> = ({ bottomLine
   return (
     <div>
       {bottomLine && (
-        <HeaderSection title={t('Bottom line')}>
+        <HeaderSection title={t("Bottom line")}>
           <MarkdownContent content={bottomLine} />
         </HeaderSection>
       )}

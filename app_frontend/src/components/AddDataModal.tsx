@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { useTranslation } from '@/i18n';
+import { useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/i18n";
 
 import {
   Dialog,
@@ -10,51 +10,74 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
-import { DataSourceSelector } from './DataSourceSelector';
-import { DATA_SOURCES, NEW_DATA_STORE } from '@/constants/dataSources';
-import { MultiSelect } from '@/components/ui-custom/multi-select';
-import { useState, useEffect } from 'react';
-import { FileUploader } from './ui-custom/file-uploader';
-import { useFetchDatasets } from '@/api/datasets/hooks';
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { DataSourceSelector } from "./DataSourceSelector";
+import { DATA_SOURCES, NEW_DATA_STORE } from "@/constants/dataSources";
+import { MultiSelect } from "@/components/ui-custom/multi-select";
+import { useState, useEffect } from "react";
+import { FileUploader } from "./ui-custom/file-uploader";
+import { useFetchDatasets } from "@/api/datasets/hooks";
 import {
   useGetDatabaseSchemas,
   useGetDatabaseTables,
   useLoadFromDatabaseMutation,
   useGetDefaultSchema,
-} from '@/api/database/hooks';
-import { useFileUploadMutation, UploadError } from '@/api/datasets/hooks';
-import { Separator } from '@radix-ui/react-separator';
-import { Loader2 } from 'lucide-react';
-import { useAppState } from '@/state/hooks';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AxiosError } from 'axios';
-import { localizeException } from '@/api/exceptions';
-import { Label } from '@/components/ui/label';
-import { useListAvailableDataStores, useSelectDataSourcesMutation } from '@/api/datasources/hooks';
-import { externalDataSourceName, ExternalDataStore } from '@/api/datasources/api-requests';
-import { SingleSelect } from './ui-custom/single-select';
+} from "@/api/database/hooks";
+import { useFileUploadMutation, UploadError } from "@/api/datasets/hooks";
+import { Separator } from "@radix-ui/react-separator";
+import { ExternalLink, Loader2, Plus } from "lucide-react";
+import { useAppState } from "@/state/hooks";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AxiosError } from "axios";
+import { localizeException } from "@/api/exceptions";
+import { Label } from "@/components/ui/label";
+import {
+  useListAvailableDataStores,
+  useSelectDataSourcesMutation,
+} from "@/api/datasources/hooks";
+import {
+  externalDataSourceName,
+  ExternalDataStore,
+} from "@/api/datasources/api-requests";
+import { SingleSelect } from "./ui-custom/single-select";
 
 export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
-  const { data, isLoading: isLoadingDatasets } = useFetchDatasets();
+  const {
+    data,
+    isLoading: isLoadingDatasets,
+    error: datasetRegistryError,
+  } = useFetchDatasets();
   const availableDataStores = useListAvailableDataStores();
   const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
-  const [selectedSchema, setSelectedSchema] = useState<string>('');
+  const [selectedSchema, setSelectedSchema] = useState<string>("");
   const { data: dbSchemas } = useGetDatabaseSchemas();
   const { data: defaultSchema } = useGetDefaultSchema();
-  const { data: dbTables, isLoading: isLoadingTables } = useGetDatabaseTables(selectedSchema);
+  const { data: dbTables, isLoading: isLoadingTables } =
+    useGetDatabaseTables(selectedSchema);
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
-  const [selectedDataStoreId, setSelectedDataStoreId] = useState<string | null>(null);
-  const [selectedExternalDataSources, setSelectedExternalDataSources] = useState<string[]>([]);
+  const [selectedDataStoreId, setSelectedDataStoreId] = useState<string | null>(
+    null,
+  );
+  const [selectedExternalDataSources, setSelectedExternalDataSources] =
+    useState<string[]>([]);
   const { setDataSource, dataSource } = useAppState();
   const [files, setFiles] = useState<File[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { t } = useTranslation();
+  const accessDenied = useMemo(
+    () => ({
+      datasetRegistry:
+        datasetRegistryError?.response?.data?.detail?.code ===
+        "USER_ACCESS_DENIED",
+      dataStore:
+        availableDataStores.error?.response?.data?.detail?.code ===
+        "USER_ACCESS_DENIED",
+    }),
+    [availableDataStores.error, datasetRegistryError],
+  );
   const selectedAvailableDataStore: ExternalDataStore | null = useMemo(() => {
     if (availableDataStores?.data) {
       for (const store of availableDataStores.data) {
@@ -80,7 +103,13 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   // Reset error when selected items change, new revalidation will occure on 'Save selections' button click
   useEffect(() => {
     setError(null);
-  }, [files, selectedDatasets, selectedTables, selectedExternalDataSources, selectedDataStoreId]);
+  }, [
+    files,
+    selectedDatasets,
+    selectedTables,
+    selectedExternalDataSources,
+    selectedDataStoreId,
+  ]);
 
   const { mutate, progress } = useFileUploadMutation({
     onSuccess: () => {
@@ -92,7 +121,9 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
       setIsPending(false);
       console.error(error);
       setError(
-        localizeException(t, error) || error.message || t('An error occurred while uploading files')
+        localizeException(t, error) ||
+          error.message ||
+          t("An error occurred while uploading files"),
       );
     },
   });
@@ -136,7 +167,9 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
       console.error(error);
 
       setError(
-        localizeException(t, error) || error.message || t('An error occurred while uploading files')
+        localizeException(t, error) ||
+          error.message ||
+          t("An error occurred while uploading files"),
       );
     },
   });
@@ -144,7 +177,7 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
   return (
     <Dialog
       defaultOpen={isOpen}
-      onOpenChange={open => {
+      onOpenChange={(open) => {
         if (isPending) return;
         setIsOpen(open);
         setError(null);
@@ -158,51 +191,78 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
         <Button
           variant="secondary"
           testId="add-data-button"
-          className={cn(highlight && 'animate-[var(--animation-blink-border-and-shadow)]', 'mr-2')}
+          className={cn(
+            highlight && "animate-(--animation-blink-border-and-shadow)",
+            "mr-2",
+          )}
         >
-          <FontAwesomeIcon icon={faPlus} /> {t('Add Data')}
+          <Plus /> {t("Add Data")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
-          <DialogTitle>{t('Add Data')}</DialogTitle>
+          <DialogTitle>{t("Add Data")}</DialogTitle>
           <Separator className="border-t" />
           <DialogDescription />
         </DialogHeader>
-        <DataSourceSelector value={dataSource} onChange={setDataSource} />
+        <DataSourceSelector
+          accessDenied={accessDenied}
+          value={dataSource}
+          onChange={setDataSource}
+        />
         <Separator className="my-4 border-t" />
         {dataSource == DATA_SOURCES.FILE && (
           <>
-            <div className="h-10 flex-col justify-start items-start inline-flex">
-              <div className="mn-label-large">{t('Local files')}</div>
+            <div className="inline-flex h-10 flex-col items-start justify-start">
+              <div className="mn-label-large">{t("Local files")}</div>
               <div className="body-secondary">
-                {t('Select one or more CSV, XLSX, XLS files, up to 200MB.')}
+                {t("Select one or more CSV, XLSX, XLS files, up to 200MB.")}
               </div>
             </div>
             <FileUploader onFilesChange={setFiles} progress={progress} />
-            <h4>{t('Data Registry')}</h4>
-            <h6>{t('Select one or more catalog items')}</h6>
-            <MultiSelect
-              options={
-                data && data.local
-                  ? data.local.map(i => ({
-                      label: i.name,
-                      value: i.id,
-                      postfix: i.size,
-                    }))
-                  : []
-              }
-              onValueChange={setSelectedDatasets}
-              defaultValue={selectedDatasets}
-              placeholder={t('Select one or more items.')}
-              variant="inverted"
-              modalPopover
-              animation={2}
-              maxCount={3}
-            />
+            <p className="caption-01">
+              {t(
+                "Do not upload datasets containing sensitive personal information such as social security numbers, financial account data, health records, or government IDs.",
+              )}
+              <a
+                href="https://www.datarobot.com/privacy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 anchor text-xs leading-4"
+              >
+                {t("Privacy Policy")}
+                <ExternalLink className="ml-0.5 inline size-2.5 align-[-1px]" />
+              </a>
+            </p>
+            {!accessDenied.datasetRegistry && (
+              <>
+                <h4>{t("Data Registry")}</h4>
+                <h6>{t("Select one or more catalog items")}</h6>
+                <MultiSelect
+                  options={
+                    data && data.local
+                      ? data.local.map((i) => ({
+                          label: i.name,
+                          value: i.id,
+                          postfix: i.size,
+                        }))
+                      : []
+                  }
+                  onValueChange={setSelectedDatasets}
+                  defaultValue={selectedDatasets}
+                  placeholder={t("Select one or more items.")}
+                  variant="inverted"
+                  modalPopover
+                  animation={2}
+                  maxCount={3}
+                />
+              </>
+            )}
             {error && (
               <Alert variant="destructive">
-                <AlertDescription className="max-h-[300px] overflow-auto">{error}</AlertDescription>
+                <AlertDescription className="max-h-[300px] overflow-auto">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
           </>
@@ -212,18 +272,18 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
           <>
             <div className="space-y-4">
               <div>
-                <h4>{t('Database Schema')}</h4>
-                <h6>{t('Select a schema (optional)')}</h6>
+                <h4>{t("Database Schema")}</h4>
+                <h6>{t("Select a schema (optional)")}</h6>
                 <div className="flex flex-col space-y-2">
-                  <Label htmlFor="schema-select">{t('Schema')}</Label>
+                  <Label htmlFor="schema-select">{t("Schema")}</Label>
                   <select
                     id="schema-select"
                     value={selectedSchema}
-                    onChange={e => {
+                    onChange={(e) => {
                       setSelectedSchema(e.target.value);
                       setSelectedTables([]); // Reset selected tables when schema changes
                     }}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {dbSchemas &&
                       Object.entries(dbSchemas).map(([name, description]) => (
@@ -236,26 +296,33 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
               </div>
 
               <div>
-                <h4>{t('Database Tables')}</h4>
-                <h6>{t('Select one or more tables')}</h6>
+                <h4>{t("Database Tables")}</h4>
+                <h6>{t("Select one or more tables")}</h6>
                 {isLoadingTables ? (
                   <div className="flex items-center justify-center space-x-2 py-4">
-                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                    <span className="text-sm text-muted-foreground">{t('Loading tables...')}</span>
+                    <Loader2
+                      className="size-4 animate-spin"
+                      aria-hidden="true"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {t("Loading tables...")}
+                    </span>
                   </div>
                 ) : (
                   <MultiSelect
                     options={
                       dbTables
-                        ? Object.entries(dbTables).map(([name, description]) => ({
-                            label: formatTableOption(name, description),
-                            value: name,
-                          }))
+                        ? Object.entries(dbTables).map(
+                            ([name, description]) => ({
+                              label: formatTableOption(name, description),
+                              value: name,
+                            }),
+                          )
                         : []
                     }
                     onValueChange={setSelectedTables}
                     defaultValue={selectedTables}
-                    placeholder={t('Select one or more tables.')}
+                    placeholder={t("Select one or more tables.")}
                     variant="inverted"
                     testId="database-table-select"
                     modalPopover
@@ -270,30 +337,42 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
 
         {dataSource == DATA_SOURCES.REMOTE_CATALOG && (
           <>
-            <h4>{t('Data Registry')}</h4>
-            <h6>{t('Select one or more catalog items')}</h6>
-            <MultiSelect
-              isLoading={isLoadingDatasets}
-              options={
-                data && data.remote
-                  ? data.remote.map(i => ({
-                      label: i.name,
-                      value: i.id,
-                      postfix: i.size,
-                    }))
-                  : []
-              }
-              onValueChange={setSelectedDatasets}
-              defaultValue={selectedDatasets}
-              placeholder={t('Select one or more items.')}
-              variant="inverted"
-              modalPopover
-              animation={2}
-              maxCount={3}
-            />
+            <h4>{t("Data Registry")}</h4>
+            <h6>{t("Select one or more catalog items")}</h6>
+            {accessDenied.datasetRegistry ? (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {t(
+                    "Data Registry is unavailable due to seat license restrictions. Please contact your DataRobot administrator.",
+                  )}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <MultiSelect
+                isLoading={isLoadingDatasets}
+                options={
+                  data && data.remote
+                    ? data.remote.map((i) => ({
+                        label: i.name,
+                        value: i.id,
+                        postfix: i.size,
+                      }))
+                    : []
+                }
+                onValueChange={setSelectedDatasets}
+                defaultValue={selectedDatasets}
+                placeholder={t("Select one or more items.")}
+                variant="inverted"
+                modalPopover
+                animation={2}
+                maxCount={3}
+              />
+            )}
             {error && (
               <Alert variant="destructive">
-                <AlertDescription className="max-h-[300px] overflow-auto">{error}</AlertDescription>
+                <AlertDescription className="max-h-[300px] overflow-auto">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
           </>
@@ -301,44 +380,48 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
 
         {dataSource == NEW_DATA_STORE && availableDataStores && (
           <>
-            <h4>{t('Add External Data Source')}</h4>
-            <h6>{t('Select a data store')}</h6>
+            <h4>{t("Add External Data Source")}</h4>
+            <h6>{t("Select a data store")}</h6>
             <SingleSelect
               isLoading={availableDataStores.isLoading}
               options={
                 availableDataStores?.data
-                  ? availableDataStores.data.map(d => ({
+                  ? availableDataStores.data.map((d) => ({
                       label: d.canonical_name,
                       value: d.id,
                     }))
                   : []
               }
               onValueChange={setSelectedDataStoreId}
-              defaultValue={selectedDataStoreId || ''}
-              placeholder={t('Select one or more items.')}
+              defaultValue={selectedDataStoreId || ""}
+              placeholder={t("Select one or more items.")}
               variant="inverted"
               modalPopover
               animation={2}
             />
-            <h6>{t('Select one or more data sources')}</h6>
+            <h6>{t("Select one or more data sources")}</h6>
             <MultiSelect
               options={
-                selectedAvailableDataStore && selectedAvailableDataStore.defined_data_sources
-                  ? selectedAvailableDataStore.defined_data_sources.map(d => ({
-                      label: externalDataSourceName(d),
-                      value: externalDataSourceName(d),
-                    }))
+                selectedAvailableDataStore &&
+                selectedAvailableDataStore.defined_data_sources
+                  ? selectedAvailableDataStore.defined_data_sources.map(
+                      (d) => ({
+                        label: externalDataSourceName(d),
+                        value: externalDataSourceName(d),
+                      }),
+                    )
                   : []
               }
               onValueChange={setSelectedExternalDataSources}
               defaultValue={selectedExternalDataSources}
               disabled={
-                selectedAvailableDataStore === undefined || selectedAvailableDataStore === null
+                selectedAvailableDataStore === undefined ||
+                selectedAvailableDataStore === null
               }
               placeholder={
                 selectedAvailableDataStore
-                  ? t('Select one or more items.')
-                  : t('First select a data store.')
+                  ? t("Select one or more items.")
+                  : t("First select a data store.")
               }
               variant="inverted"
               modalPopover
@@ -347,17 +430,23 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             />
             {error && (
               <Alert variant="destructive">
-                <AlertDescription className="max-h-[300px] overflow-auto">{error}</AlertDescription>
+                <AlertDescription className="max-h-[300px] overflow-auto">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
           </>
         )}
-        <Separator className="border-t mt-6" />
+        <Separator className="mt-6 border-t" />
         <DialogFooter>
-          <div className="flex gap-2 w-full items-center">
+          <div className="flex w-full items-center gap-2">
             <div className="flex-1" />
-            <Button disabled={isPending} variant={'ghost'} onClick={() => setIsOpen(false)}>
-              {t('Cancel')}
+            <Button
+              disabled={isPending}
+              variant={"ghost"}
+              onClick={() => setIsOpen(false)}
+            >
+              {t("Cancel")}
             </Button>
             <Button
               type="submit"
@@ -374,18 +463,25 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
                       schema: selectedSchema || undefined,
                     });
                   }
-                } else if (dataSource === NEW_DATA_STORE && selectedAvailableDataStore) {
+                } else if (
+                  dataSource === NEW_DATA_STORE &&
+                  selectedAvailableDataStore
+                ) {
                   selectDataSources({
                     selectedDataStore: selectedAvailableDataStore,
                     selectedDataSourceNames: selectedExternalDataSources,
                   });
                 } else {
-                  mutate({ files, catalogIds: selectedDatasets, dataSource: dataSource });
+                  mutate({
+                    files,
+                    catalogIds: selectedDatasets,
+                    dataSource: dataSource,
+                  });
                 }
               }}
             >
-              {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              {t('Save selections')}
+              {isPending && <Loader2 className="size-4 animate-spin" />}
+              {t("Save selections")}
             </Button>
           </div>
         </DialogFooter>

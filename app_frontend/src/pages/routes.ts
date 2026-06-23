@@ -1,10 +1,10 @@
 export const ROUTES = {
-  DATA: '/data',
-  CHATS: '/chats',
-  CHAT_WITH_ID: '/chats/:chatId',
-  DATA_WITH_ID: '/data/:dataId',
-  REPORTS: '/reports',
-  REPORT_WITH_ID: '/reports/:reportId',
+  DATA: "/data",
+  CHATS: "/chats",
+  CHAT_WITH_ID: "/chats/:chatId",
+  DATA_WITH_ID: "/data/:dataId",
+  REPORTS: "/reports",
+  REPORT_WITH_ID: "/reports/:reportId",
 };
 
 export const generateChatRoute = (chatId?: string) => {

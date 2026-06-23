@@ -1,9 +1,9 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { test, describe, expect, vi, beforeEach } from 'vitest';
-import { Chats } from '@/pages/Chats';
-import { renderWithProviders, mockScrollIntoView } from '../test-utils';
+import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { test, describe, expect, vi, beforeEach } from "vitest";
+import { Chats } from "@/pages/Chats";
+import { renderWithProviders, mockScrollIntoView } from "../test-utils";
 
-vi.mock('@/api/chat-messages/hooks', () => ({
+vi.mock("@/api/chat-messages/hooks", () => ({
   useFetchAllChats: vi.fn(),
   useFetchAllMessages: vi.fn(),
   useDeleteChat: vi.fn(),
@@ -14,16 +14,16 @@ vi.mock('@/api/chat-messages/hooks', () => ({
   usePollInProgressMessage: vi.fn(),
 }));
 
-vi.mock('@/api/dictionaries/hooks', () => ({
+vi.mock("@/api/dictionaries/hooks", () => ({
   useGeneratedDictionaries: vi.fn(() => ({ data: [] })),
 }));
 
-vi.mock('@/api/cleansed-datasets/hooks', () => ({
+vi.mock("@/api/cleansed-datasets/hooks", () => ({
   useMultipleDatasetMetadata: vi.fn(() => ({ data: [] })),
 }));
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual("react-router-dom");
   return {
     ...actual,
     useParams: vi.fn(),
@@ -39,8 +39,8 @@ import {
   usePostMessage,
   useExport,
   usePollInProgressMessage,
-} from '@/api/chat-messages/hooks';
-import { useParams, useNavigate } from 'react-router-dom';
+} from "@/api/chat-messages/hooks";
+import { useParams, useNavigate } from "react-router-dom";
 
 const mockUseFetchAllChats = vi.mocked(useFetchAllChats);
 const mockUseFetchAllMessages = vi.mocked(useFetchAllMessages);
@@ -52,7 +52,7 @@ const mockUsePollInProgressMessage = vi.mocked(usePollInProgressMessage);
 const mockUseParams = vi.mocked(useParams);
 const mockUseNavigate = vi.mocked(useNavigate);
 
-describe('Chats Component', () => {
+describe("Chats Component", () => {
   let cleanupScrollMock: () => void;
   const mockNavigate = vi.fn();
   const mockDeleteChat = vi.fn();
@@ -60,9 +60,9 @@ describe('Chats Component', () => {
 
   const mockChats = [
     {
-      id: 'chat-1',
-      name: 'Test Chat',
-      created_at: '2024-01-01T00:00:00Z',
+      id: "chat-1",
+      name: "Test Chat",
+      created_at: "2024-01-01T00:00:00Z",
     },
   ];
 
@@ -102,14 +102,14 @@ describe('Chats Component', () => {
   });
 
   const setupChatContext = () => {
-    mockUseParams.mockReturnValue({ chatId: 'chat-1' });
+    mockUseParams.mockReturnValue({ chatId: "chat-1" });
     mockUseFetchAllChats.mockReturnValue({
       data: mockChats,
       isLoading: false,
     } as any);
   };
 
-  test('renders InitialPrompt when no messages exist', () => {
+  test("renders InitialPrompt when no messages exist", () => {
     mockUseParams.mockReturnValue({ chatId: undefined });
     mockUseFetchAllChats.mockReturnValue({
       data: [],
@@ -118,11 +118,11 @@ describe('Chats Component', () => {
 
     renderWithProviders(<Chats />);
 
-    expect(screen.getByTestId('initial-prompt')).toBeInTheDocument();
-    expect(screen.queryByTestId('user-prompt')).not.toBeInTheDocument();
+    expect(screen.getByTestId("initial-prompt")).toBeInTheDocument();
+    expect(screen.queryByTestId("user-prompt")).not.toBeInTheDocument();
   });
 
-  test('renders loading state when messages are pending', () => {
+  test("renders loading state when messages are pending", () => {
     mockUseParams.mockReturnValue({ chatId: undefined });
     mockUseFetchAllChats.mockReturnValue({
       data: [],
@@ -136,16 +136,16 @@ describe('Chats Component', () => {
 
     renderWithProviders(<Chats />);
 
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
 
-  test('renders user message and user prompt when messages exist', () => {
+  test("renders user message and user prompt when messages exist", () => {
     const mockMessages = [
       {
-        id: 'msg-1',
-        role: 'user' as const,
-        content: 'Hello',
-        created_at: '2024-01-01T00:00:00Z',
+        id: "msg-1",
+        role: "user" as const,
+        content: "Hello",
+        created_at: "2024-01-01T00:00:00Z",
         components: [],
         in_progress: false,
       },
@@ -159,49 +159,49 @@ describe('Chats Component', () => {
 
     renderWithProviders(<Chats />);
 
-    expect(screen.getByTestId('user-message-msg-1')).toBeInTheDocument();
-    expect(screen.getByText('Hello')).toBeInTheDocument();
-    expect(screen.getByTestId('user-prompt')).toBeInTheDocument();
+    expect(screen.getByTestId("user-message-msg-1")).toBeInTheDocument();
+    expect(screen.getByText("Hello")).toBeInTheDocument();
+    expect(screen.getByTestId("user-prompt")).toBeInTheDocument();
   });
 
-  test('renders chat header with actions when active chat exists', () => {
+  test("renders chat header with actions when active chat exists", () => {
     renderWithProviders(<Chats />);
 
-    expect(screen.getByText('Test Chat')).toBeInTheDocument();
-    expect(screen.getByTestId('delete-all-chats-button')).toBeInTheDocument();
-    expect(screen.getByText('Export chat')).toBeInTheDocument();
+    expect(screen.getByText("Test Chat")).toBeInTheDocument();
+    expect(screen.getByTestId("delete-all-chats-button")).toBeInTheDocument();
+    expect(screen.getByText("Export chat")).toBeInTheDocument();
   });
 
-  test('opens delete confirmation dialog when delete button is clicked', async () => {
+  test("opens delete confirmation dialog when delete button is clicked", async () => {
     renderWithProviders(<Chats />);
 
-    const deleteButton = screen.getByTestId('delete-all-chats-button');
+    const deleteButton = screen.getByTestId("delete-all-chats-button");
     fireEvent.click(deleteButton);
 
     await waitFor(() => {
-      expect(screen.getByTestId('dialog-description')).toBeInTheDocument();
+      expect(screen.getByTestId("dialog-description")).toBeInTheDocument();
     });
   });
 
-  test('calls export function when export button is clicked', () => {
+  test("calls export function when export button is clicked", () => {
     renderWithProviders(<Chats />);
 
-    const exportButton = screen.getByTestId('export-chat-button');
+    const exportButton = screen.getByTestId("export-chat-button");
     fireEvent.click(exportButton);
 
-    expect(mockExportChat).toHaveBeenCalledWith({ chatId: 'chat-1' });
+    expect(mockExportChat).toHaveBeenCalledWith({ chatId: "chat-1" });
   });
 
-  test('disables export button when chat has errors', () => {
+  test("disables export button when chat has errors", () => {
     const mockMessages = [
       {
-        id: 'msg-1',
-        role: 'assistant' as const,
-        content: 'Error response',
-        created_at: '2024-01-01T00:00:00Z',
+        id: "msg-1",
+        role: "assistant" as const,
+        content: "Error response",
+        created_at: "2024-01-01T00:00:00Z",
         components: [],
         in_progress: false,
-        error: 'Some error occurred',
+        error: "Some error occurred",
       },
     ];
 
@@ -213,18 +213,21 @@ describe('Chats Component', () => {
 
     renderWithProviders(<Chats />);
 
-    const exportButton = screen.getByTestId('export-chat-button');
+    const exportButton = screen.getByTestId("export-chat-button");
     expect(exportButton).toBeDisabled();
-    expect(exportButton).toHaveAttribute('title', 'Cannot export chat with errors');
+    expect(exportButton).toHaveAttribute(
+      "title",
+      "Cannot export chat with errors",
+    );
   });
 
-  test('disables export button when processing', () => {
+  test("disables export button when processing", () => {
     const mockMessages = [
       {
-        id: 'msg-1',
-        role: 'user' as const,
-        content: 'Hello',
-        created_at: '2024-01-01T00:00:00Z',
+        id: "msg-1",
+        role: "user" as const,
+        content: "Hello",
+        created_at: "2024-01-01T00:00:00Z",
         components: [],
         in_progress: true,
       },
@@ -238,34 +241,38 @@ describe('Chats Component', () => {
 
     renderWithProviders(<Chats />);
 
-    const exportButton = screen.getByTestId('export-chat-button');
+    const exportButton = screen.getByTestId("export-chat-button");
     expect(exportButton).toBeDisabled();
-    expect(exportButton).toHaveAttribute('title', 'Wait for agent to finish responding');
+    expect(exportButton).toHaveAttribute(
+      "title",
+      "Wait for agent to finish responding",
+    );
   });
 
-  test('renders system message (conversation summary) in chat', () => {
+  test("renders system message (conversation summary) in chat", () => {
     const mockMessages = [
       {
-        id: 'user-1',
-        role: 'user' as const,
-        content: 'What is the data about?',
+        id: "user-1",
+        role: "user" as const,
+        content: "What is the data about?",
         components: [],
-        created_at: '2024-01-01T00:00:00Z',
+        created_at: "2024-01-01T00:00:00Z",
       },
       {
-        id: 'system-1',
-        role: 'system' as const,
-        content: 'The user analyzed patient demographics focusing on readmission rates.',
+        id: "system-1",
+        role: "system" as const,
+        content:
+          "The user analyzed patient demographics focusing on readmission rates.",
         components: [],
-        created_at: '2024-01-01T00:01:00Z',
+        created_at: "2024-01-01T00:01:00Z",
         in_progress: false,
       },
       {
-        id: 'assistant-1',
-        role: 'assistant' as const,
-        content: 'Analysis shows key patterns.',
+        id: "assistant-1",
+        role: "assistant" as const,
+        content: "Analysis shows key patterns.",
         components: [],
-        created_at: '2024-01-01T00:02:00Z',
+        created_at: "2024-01-01T00:02:00Z",
       },
     ];
 
@@ -277,25 +284,25 @@ describe('Chats Component', () => {
 
     renderWithProviders(<Chats />);
 
-    const systemMessage = screen.getByTestId('system-message-system-1');
+    const systemMessage = screen.getByTestId("system-message-system-1");
     expect(systemMessage).toBeInTheDocument();
   });
 
-  test('renders system message with in_progress state', () => {
+  test("renders system message with in_progress state", () => {
     const mockMessages = [
       {
-        id: 'user-1',
-        role: 'user' as const,
-        content: 'Question',
+        id: "user-1",
+        role: "user" as const,
+        content: "Question",
         components: [],
-        created_at: '2024-01-01T00:00:00Z',
+        created_at: "2024-01-01T00:00:00Z",
       },
       {
-        id: 'system-1',
-        role: 'system' as const,
-        content: 'Summarizing conversation...',
+        id: "system-1",
+        role: "system" as const,
+        content: "Summarizing conversation...",
         components: [],
-        created_at: '2024-01-01T00:01:00Z',
+        created_at: "2024-01-01T00:01:00Z",
         in_progress: true,
       },
     ];
@@ -308,20 +315,20 @@ describe('Chats Component', () => {
 
     renderWithProviders(<Chats />);
 
-    const systemMessage = screen.getByTestId('system-message-system-1');
+    const systemMessage = screen.getByTestId("system-message-system-1");
     expect(systemMessage).toBeInTheDocument();
   });
 
-  test('displays error message when user message fails', () => {
-    const question = 'What is the weather?';
+  test("displays error message when user message fails", () => {
+    const question = "What is the weather?";
     const errorMessage =
-      'Failed to process your question: LLM validation failed: Invalid response format from model';
+      "Failed to process your question: LLM validation failed: Invalid response format from model";
     const mockMessages = [
       {
-        id: 'msg-1',
-        role: 'user' as const,
+        id: "msg-1",
+        role: "user" as const,
         content: question,
-        created_at: '2024-01-01T00:00:00Z',
+        created_at: "2024-01-01T00:00:00Z",
         components: [],
         in_progress: false,
         error: errorMessage,
@@ -338,6 +345,6 @@ describe('Chats Component', () => {
 
     expect(screen.getByText(question)).toBeInTheDocument();
     expect(screen.getByText(errorMessage)).toBeInTheDocument();
-    expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+    expect(screen.queryByTestId("loading-spinner")).not.toBeInTheDocument();
   });
 });

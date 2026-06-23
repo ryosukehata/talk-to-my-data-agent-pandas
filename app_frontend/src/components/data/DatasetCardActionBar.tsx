@@ -1,12 +1,10 @@
-import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { useTranslation } from '@/i18n';
-import { Button } from '@/components/ui/button';
-import { DATA_TABS } from '@/state/constants';
-import { SearchControl } from '@/components/ui-custom/search-control';
-import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import React from "react";
+import { useTranslation } from "@/i18n";
+import { Button } from "@/components/ui/button";
+import { DATA_TABS } from "@/state/constants";
+import { SearchControl } from "@/components/ui-custom/search-control";
+import { cn } from "@/lib/utils";
+import { Download, Loader2, Trash2 } from "lucide-react";
 
 interface DatasetCardActionBarProps {
   onSearch?: (searchText: string) => void;
@@ -31,10 +29,12 @@ export const DatasetCardActionBar: React.FC<DatasetCardActionBarProps> = ({
 }) => {
   const { t } = useTranslation();
   const isDisabled = disabled || isProcessing || isDownloading;
-  const searchLabel = viewMode === DATA_TABS.DESCRIPTION ? t('Search') : t('Search columns');
+  const searchLabel =
+    viewMode === DATA_TABS.DESCRIPTION ? t("Search") : t("Search columns");
+  const canDownload = Boolean(onDownload) && viewMode !== DATA_TABS.RAW;
 
   return (
-    <div className={cn('flex items-center gap-1', className)}>
+    <div className={cn("flex items-center gap-1", className)}>
       {/* Search Component */}
       {onSearch && (
         <SearchControl
@@ -46,17 +46,17 @@ export const DatasetCardActionBar: React.FC<DatasetCardActionBarProps> = ({
       )}
 
       {/* Download Button */}
-      {onDownload && (
+      {canDownload && (
         <Button
           variant="link"
           onClick={onDownload}
-          title={t('Download dictionary as CSV')}
+          title={t("Download dictionary as CSV")}
           disabled={isDisabled}
         >
           {isDownloading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin" />
           ) : (
-            <FontAwesomeIcon icon={faDownload} />
+            <Download />
           )}
         </Button>
       )}
@@ -66,10 +66,10 @@ export const DatasetCardActionBar: React.FC<DatasetCardActionBarProps> = ({
         <Button
           variant="link"
           onClick={onDelete}
-          title={t('Delete dictionary')}
+          title={t("Delete dictionary")}
           disabled={isDisabled}
         >
-          <FontAwesomeIcon icon={faTrash} />
+          <Trash2 />
         </Button>
       )}
     </div>

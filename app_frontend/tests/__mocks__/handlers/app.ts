@@ -1,13 +1,13 @@
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from "msw";
 
 export const appHandlers = [
-  http.get('api/v1/welcome', () => {
+  http.get("api/v1/welcome", () => {
     return HttpResponse.json({
-      message: 'Welcome Engineer!',
+      message: "Welcome Engineer!",
     });
   }),
 
-  http.get('/api/v1/config/feature-flags', () => {
+  http.get("/api/v1/config/feature-flags", () => {
     return HttpResponse.json({
       refinerEnabled: false,
       refinerAutoSend: false,
@@ -17,11 +17,11 @@ export const appHandlers = [
     });
   }),
 
-  http.get('/api/v1/templates', () => {
+  http.get("/api/v1/templates", () => {
     return HttpResponse.json([]);
   }),
 
-  http.get('/api/v1/templates/categories', () => {
+  http.get("/api/v1/templates/categories", () => {
     return HttpResponse.json([]);
   }),
 ];

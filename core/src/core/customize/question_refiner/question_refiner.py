@@ -7,6 +7,8 @@ Question Refiner Module - Facade
 
 from __future__ import annotations
 
+from datarobot_genai.core.utils.token_tracking import TokenUsageTracker
+
 from core.analyst_db import AnalystDB
 from core.customize.domain.question_refiner.domain import (
     QuestionRefinementRequest,
@@ -21,7 +23,6 @@ from core.customize.infrastructure.llm.llm import (
 from core.customize.usecase.question_refiner.refiner import (
     RefineQuestionUseCase,
 )
-from core.token_tracking import TokenUsageTracker
 
 
 class QuestionRefiner:

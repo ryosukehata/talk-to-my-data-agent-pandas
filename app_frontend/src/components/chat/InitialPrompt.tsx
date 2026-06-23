@@ -1,16 +1,16 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
-import { PromptInput } from '@/components/ui-custom/prompt-input';
-import chatMidnight from '@/assets/chat-midnight.svg';
-import chatLight from '@/assets/chat-light.svg';
-import { usePostMessage } from '@/api/chat-messages/hooks';
-import { useTranslation } from '@/i18n';
-import { useAppState } from '@/state/hooks';
-import { DATA_SOURCES } from '@/constants/dataSources';
-import { TemplateButton } from '@/components/template';
-import { RefinerButton } from '@/components/refiner';
-import type { IChat } from '@/api/chat-messages/types';
-import type { PromptTemplate } from '@/api/templates/types';
-import { useTheme } from '@/theme/theme-provider';
+import { useMemo, useState, useRef, useEffect } from "react";
+import { PromptInput } from "@/components/ui-custom/prompt-input";
+import chatMidnight from "@/assets/chat-midnight.svg";
+import chatLight from "@/assets/chat-light.svg";
+import { usePostMessage } from "@/api/chat-messages/hooks";
+import { useTranslation } from "@/i18n";
+import { useAppState } from "@/state/hooks";
+import { DATA_SOURCES } from "@/constants/dataSources";
+import { TemplateButton } from "@/components/template";
+import { RefinerButton } from "@/components/refiner";
+import type { IChat } from "@/api/chat-messages/types";
+import type { PromptTemplate } from "@/api/templates/types";
+import { useTheme } from "@/theme/theme-provider";
 
 export const InitialPrompt = ({
   chatId,
@@ -31,7 +31,7 @@ export const InitialPrompt = ({
     dataSource: globalDataSource,
   } = useAppState();
   const { mutate: sendMessage } = usePostMessage();
-  const [selectedTemplateText, setSelectedTemplateText] = useState<string>('');
+  const [selectedTemplateText, setSelectedTemplateText] = useState<string>("");
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
 
   const isDisabled = !allowedDataSources?.[0];
@@ -57,7 +57,7 @@ export const InitialPrompt = ({
       dataSource: chatDataSource,
     });
     // Clear template text after sending
-    setSelectedTemplateText('');
+    setSelectedTemplateText("");
   };
 
   const handleRefineComplete = (refinedMessage: string) => {
@@ -72,7 +72,7 @@ export const InitialPrompt = ({
     handleSend(message);
     // Clear the input field after auto-send
     if (promptInputRef.current) {
-      promptInputRef.current.value = '';
+      promptInputRef.current.value = "";
     }
   };
 
@@ -87,28 +87,28 @@ export const InitialPrompt = ({
   }, [selectedTemplateText]);
 
   return (
-    <div className="flex-1 flex flex-col p-4" data-testid={testId}>
-      <div className="flex flex-col flex-1 items-center justify-center">
-        <div className="w-[400px] flex flex-col flex-1 items-center justify-center">
-          <img src={theme === 'dark' ? chatMidnight : chatLight} alt="" />
-          <h4 className="mb-2 mt-4">
-            <strong className=" text-center font-semibold">
-              {t('Type a question about your dataset')}
+    <div className="flex flex-1 flex-col p-4" data-testid={testId}>
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="flex w-[400px] flex-1 flex-col items-center justify-center">
+          <img src={theme === "dark" ? chatMidnight : chatLight} alt="" />
+          <h4 className="mt-4 mb-2">
+            <strong className="text-center font-semibold">
+              {t("Type a question about your dataset")}
             </strong>
           </h4>
-          <p className="text-center mb-10">
+          <p className="mb-10 text-center">
             {t(
-              "Ask specific questions about your datasets to get insights, generate visualizations, and discover patterns. Include column names and the kind of analysis you're looking for to get more accurate results."
+              "Ask specific questions about your datasets to get insights, generate visualizations, and discover patterns. Include column names and the kind of analysis you're looking for to get more accurate results.",
             )}
           </p>
 
           {/* Template selection area */}
-          <div className="w-full flex justify-center items-center gap-2 mb-4">
+          <div className="mb-4 flex w-full items-center justify-center gap-2">
             <TemplateButton
               onSelectTemplate={handleTemplateSelect}
               onSendDirectly={handleSend}
               mode="send"
-              variant="outline"
+              variant="secondary"
               size="sm"
               disabled={isDisabled}
               testId="initial-template-button"
@@ -124,7 +124,7 @@ export const InitialPrompt = ({
           </div>
 
           <PromptInput
-            key={selectedTemplateText ? 'with-template' : 'empty'}
+            key={selectedTemplateText ? "with-template" : "empty"}
             ref={promptInputRef}
             chatId={chatId}
             sendButtonArrangement="append"
@@ -132,7 +132,7 @@ export const InitialPrompt = ({
             initialValue={selectedTemplateText}
             isDisabled={isDisabled}
             testId="initial-prompt-input"
-            placeholder={t('Ask another question about your datasets.')}
+            placeholder={t("Ask another question about your datasets.")}
             autoFocus
           />
         </div>

@@ -14,6 +14,7 @@
 
 import json
 import os
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,7 +23,7 @@ os.environ.setdefault("DATAROBOT_API_TOKEN", "test-token")
 os.environ.setdefault("DATAROBOT_ENDPOINT", "https://example.com")
 os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 
-from app import STATIC_FRONTEND_AVAILABLE, is_static_frontend_available
+from app import STATIC_FRONTEND_AVAILABLE, get_app_version, is_static_frontend_available
 from app.main import app
 
 client = TestClient(app)
@@ -93,3 +94,24 @@ def test_env_reports_actual_static_frontend_availability() -> None:
 
     payload = response.text.removeprefix("window.ENV = ").removesuffix(";")
     assert json.loads(payload)["IS_STATIC_FRONTEND"] is STATIC_FRONTEND_AVAILABLE
+
+
+def test_health_includes_app_version() -> None:
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
+    assert "version" in response.json()
+
+
+def test_get_app_version_reads_deploy_version_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    version_dir = tmp_path / "app"
+    version_dir.mkdir()
+    (version_dir / "VERSION").write_text("  v11.5.3-1-gabcdef0\n", encoding="utf-8")
+
+    monkeypatch.setattr("app.BASE_DIR", str(version_dir))
+
+    assert get_app_version() == "v11.5.3-1-gabcdef0"

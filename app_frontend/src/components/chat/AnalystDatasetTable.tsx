@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Table,
   TableBody,
@@ -6,19 +6,21 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 
 interface AnalystDatasetTableProps {
   records?: Record<string, unknown>[];
 }
 
-export const AnalystDatasetTable: React.FC<AnalystDatasetTableProps> = ({ records }) => {
+export const AnalystDatasetTable: React.FC<AnalystDatasetTableProps> = ({
+  records,
+}) => {
   const headerRow = records?.length ? Object.keys(records[0]) : [];
   return (
     <Table>
       <TableHeader className="bg-background">
         <TableRow>
-          {headerRow.map(h => (
+          {headerRow.map((h) => (
             <TableHead key={h}>{h}</TableHead>
           ))}
         </TableRow>
@@ -26,7 +28,7 @@ export const AnalystDatasetTable: React.FC<AnalystDatasetTableProps> = ({ record
       <TableBody>
         {records?.map((record, index) => (
           <TableRow key={index}>
-            {Object.keys(record).map(k => (
+            {Object.keys(record).map((k) => (
               <TableCell key={`${index}_${k}`}>{String(record[k])}</TableCell>
             ))}
           </TableRow>

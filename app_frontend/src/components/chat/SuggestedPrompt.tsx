@@ -1,12 +1,10 @@
-import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane } from '@fortawesome/free-solid-svg-icons/faPaperPlane';
-import { faHourglassHalf } from '@fortawesome/free-solid-svg-icons/faHourglassHalf';
-import { useGeneratedDictionaries } from '@/api/dictionaries/hooks';
-import { usePostMessage } from '@/api/chat-messages/hooks';
-import { useAppState } from '@/state/hooks';
-import { useTranslation } from '@/i18n';
-import { Button } from '@/components/ui/button';
+import React from "react";
+import { Hourglass, Send } from "lucide-react";
+import { useGeneratedDictionaries } from "@/api/dictionaries/hooks";
+import { usePostMessage } from "@/api/chat-messages/hooks";
+import { useAppState } from "@/state/hooks";
+import { useTranslation } from "@/i18n";
+import { Button } from "@/components/ui/button";
 
 interface SuggestedPromptProps {
   message: string;
@@ -20,20 +18,21 @@ export const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({
   hasInProgressMessages,
 }) => {
   const { t } = useTranslation();
-  const { enableChartGeneration, enableBusinessInsights, dataSource } = useAppState();
+  const { enableChartGeneration, enableBusinessInsights, dataSource } =
+    useAppState();
   const { data: dictionaries } = useGeneratedDictionaries();
   const { mutate: postMessage } = usePostMessage();
   const isActionShown = !!dictionaries?.[0];
   const actionTooltip = hasInProgressMessages
-    ? t('Wait for agent to finish responding')
-    : t('Send');
+    ? t("Wait for agent to finish responding")
+    : t("Send");
 
   return (
-    <div className="h-16 p-3 rounded border justify-start items-center gap-2 inline-flex">
-      <div className="grow shrink basis-0 body">{message}</div>
-      <div className="w-9 h-9 p-2 justify-center items-center flex">
-        <div className="w-5 h-5 flex-col justify-center items-center gap-2.5 inline-flex">
-          <div className="text-center text-sm leading-tight cursor-pointer">
+    <div className="inline-flex h-16 items-center justify-start gap-2 rounded border p-3">
+      <div className="shrink grow basis-0 body">{message}</div>
+      <div className="flex size-9 items-center justify-center p-2">
+        <div className="inline-flex size-5 flex-col items-center justify-center gap-2.5">
+          <div className="cursor-pointer text-center text-sm leading-tight">
             {isActionShown && (
               <Button
                 variant="ghost"
@@ -50,7 +49,7 @@ export const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({
                   });
                 }}
               >
-                <FontAwesomeIcon icon={hasInProgressMessages ? faHourglassHalf : faPaperPlane} />
+                {hasInProgressMessages ? <Hourglass /> : <Send />}
               </Button>
             )}
           </div>

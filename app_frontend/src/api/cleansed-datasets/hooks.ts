@@ -1,12 +1,12 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { cleansedDatasetKeys, datasetMetadataKeys } from './keys';
-import { getCleansedDataset, getDatasetMetadata } from './api-requests';
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { cleansedDatasetKeys, datasetMetadataKeys } from "./keys";
+import { getCleansedDataset, getDatasetMetadata } from "./api-requests";
 
 export const useInfiniteCleansedDataset = (
   name: string,
   limit = 100,
   search?: string,
-  enabled = true
+  enabled = true,
 ) => {
   return useInfiniteQuery({
     queryKey: cleansedDatasetKeys.detail(name, { search, limit }),

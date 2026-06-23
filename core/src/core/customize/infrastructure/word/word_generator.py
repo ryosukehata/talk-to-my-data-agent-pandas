@@ -12,10 +12,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from core.logging_helper import get_logger
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Inches, Pt, RGBColor
+
+from core.logging_helper import get_logger
 
 logger = get_logger("WordGenerator")
 

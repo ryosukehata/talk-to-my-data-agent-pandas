@@ -1,12 +1,5 @@
 from abc import ABC, abstractmethod
 
-from core.customize.domain.question_refiner.domain import (
-    QuestionRefinementRequest,
-)
-from core.customize.domain.report.domain import Report
-from core.customize.domain.report.service_interface import ReportSectionData
-from core.customize.prompts import REPORT_WORD_SUMMARY_SYSTEM_PROMPT
-from core.logging_helper import get_logger
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_system_message_param import (
     ChatCompletionSystemMessageParam,
@@ -14,6 +7,14 @@ from openai.types.chat.chat_completion_system_message_param import (
 from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
+
+from core.customize.domain.question_refiner.domain import (
+    QuestionRefinementRequest,
+)
+from core.customize.domain.report.domain import Report
+from core.customize.domain.report.service_interface import ReportSectionData
+from core.customize.prompts import REPORT_WORD_SUMMARY_SYSTEM_PROMPT
+from core.logging_helper import get_logger
 
 logger = get_logger(__name__)
 

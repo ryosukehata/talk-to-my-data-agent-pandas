@@ -1,2 +1,1 @@
 export const VITE_DEFAULT_PORT = 5173;
-export const VITE_STATIC_DEFAULT_PORT = 8080;

@@ -13,8 +13,9 @@ from core.logging_helper import get_logger
 from core.schema import AnalystChatMessage, ChatRequest
 
 if TYPE_CHECKING:
-    from core.analyst_db import AnalystDB
     from starlette.requests import Request
+
+    from core.analyst_db import AnalystDB
 
 logger = get_logger("ChatExecutor")
 
