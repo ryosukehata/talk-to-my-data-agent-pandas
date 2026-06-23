@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="{{ env_script_url }}" type="text/javascript"></script>
+    <link rel="icon" type="image/png" href="{{ favicon_url }}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Talk to My Data</title>
+    {% for css in css_files %}
+    <link rel="stylesheet" crossorigin href="{{ css }}" />
+    {% endfor %}
+    {% for preload in modulepreload_files %}
+    <link rel="modulepreload" crossorigin href="{{ preload }}" />
+    {% endfor %}
+    {% for js in js_files %}
+    <script type="module" crossorigin src="{{ js }}"></script>
+    {% endfor %}
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

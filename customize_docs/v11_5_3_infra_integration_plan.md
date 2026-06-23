@@ -31,4 +31,5 @@ upstream `v11.5.3` のうち、デプロイ・runtime parameter・起動資材�
 
 - `uv run pytest customize_docs/test_v11_5_3_infra_config.py -q`
 - `uv run pytest customize_docs/test_v11_5_3_infra_config.py customize_docs/test_llm_runtime_parameters.py customize_docs/test_application_source_file_manifest.py app_backend/tests/test_llm_configuration.py -q`
-
+- 2026-06-23 最新 `dev` 追従後、旧 `pulumi-up.yml` / `python-unit-tests.yml` 前提の仕様テストを新しい backend/core/frontend/infra 分割 workflow 前提へ更新。
+  - `uv run pytest customize_docs/test_v11_5_3_infra_config.py customize_docs/test_llm_runtime_parameters.py customize_docs/test_application_source_file_manifest.py customize_docs/test_pulumi_workflow_refresh.py customize_docs/test_taskfile_deployment_dx.py -q`: 13 passed

@@ -95,6 +95,17 @@ def test_core_config_reads_runtime_builder_token_toggle(
     assert CoreConfig().use_builder_api_token is True
 
 
+def test_core_config_ignores_empty_boolean_env_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("USE_DATAROBOT_LLM_GATEWAY", "")
+    monkeypatch.setenv("MLOPS_RUNTIME_PARAM_USE_DATAROBOT_LLM_GATEWAY", "")
+    monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.com/api/v2")
+    monkeypatch.setenv("DATAROBOT_API_TOKEN", "builder-token")
+
+    assert CoreConfig().use_datarobot_llm_gateway is False
+
+
 def test_builder_token_is_not_used_unless_allowed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

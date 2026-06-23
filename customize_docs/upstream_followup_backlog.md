@@ -24,6 +24,15 @@ v11.5.1 取り込みでは、既存の pandas 公開挙動、customize routes、
 - ただし、この fork では `app_backend/tests` だけでなく `customize_docs` tests が仕様回帰を守っているため、CI 実行範囲を狭めない。
 - pandas 維持方針と矛盾する依存更新、Polars 前提の lock 差分、DataRobot deploy workflow への影響は別PRで検証する。
 
+## v11.5.3 frontend マージ後に再評価した課題
+
+### React 静的配信方式の upstream 追従 (2026-06-23 対応済み)
+
+- `origin/dev` に frontend PR #102 が merge 済みになったため、upstream `v11.5.3` の `TemplateResponse` / Vite manifest ベースのReact配信方式を評価した。
+- 現行forkの `_dr_env.js` runtime env、`StaticFiles` mount、SPA deep reload fallbackは維持し、manifestからentry JS / CSS / modulepreloadだけをbackend templateで解決する。
+- `APP_VERSION` を含むruntime envは引き続き `/_dr_env.js` 経由で渡す。`TemplateResponse` contextは静的asset URLに限定し、frontendの `APP_BASE_URL` / `BASE_PATH` / `API_PORT` 契約を変えない。
+- 実装とテスト方針は `customize_docs/v11_5_3_static_frontend_manifest.md` に分離して記録した。
+
 ### pandas から Polars への境界再評価
 
 - 現時点では pandas 公開挙動を維持するが、将来 upstream 追従コストが大きくなった場合は、`AnalystDataset.to_df()`、generated code、dictionary、cleansing、frontend dataset表示への影響を見積もる。

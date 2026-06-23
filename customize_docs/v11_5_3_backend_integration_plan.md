@@ -44,6 +44,7 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
   - readable formatter が extra fields を失わないこと。
   - builder token fallback が許可時だけ使われること。
   - `core.config.Config` が `USE_BUILDER_API_TOKEN` / `MLOPS_RUNTIME_PARAM_USE_BUILDER_API_TOKEN` と `DATAROBOT_API_TOKEN` を公開すること。
+  - 空文字の boolean env (`USE_DATAROBOT_LLM_GATEWAY=` など) は未設定扱いになり、Config 初期化を壊さないこと。
   - local empty use case が `default_use_case=[]` として設定されること。
   - token 使用時も空 `DATAROBOT_DEFAULT_USE_CASE` が `default_use_case=[]` として DataRobot client に渡ること。
   - seat license 403 が `ApplicationUsageException` になること。
@@ -83,6 +84,8 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `app_frontend/vite.config.ts` に upstream と同じ coverage reporter (`json-summary` を含む) を追加し、coverage report action が参照する `coverage-summary.json` を生成する。
 - `core/Taskfile.yaml` と `frontend/Taskfile.yaml` は、Python tests が未配置の場合の pytest exit 5 を成功扱いにする。legacy `frontend` は coverage XML が生成されないため、`frontend-test.yml` の coverage upload は外す。
 - `core/src/core/resources.py` は `pydantic-settings` 2.12 で `parse_env_vars` の公開位置が変わったため、旧 `pydantic_settings.sources` と新 `pydantic_settings.sources.utils` の両方に対応する。
+- `core.config.Config` は `DataRobotAppFrameworkBaseSettings` の設定を継承しつつ `env_ignore_empty=True` にして、空の `.env` / runtime parameter を未設定扱いにする。
+- `core.customize.usecase.report` / `utils.customize.usecase.report` の互換 re-export は lazy import にし、Word生成など質問生成LLMを使わない経路で `datarobot_genai` import を強制しない。
 
 ## 検証
 
@@ -115,6 +118,11 @@ upstream `v11.5.3` の backend/runtime 差分を、現行 fork の pandas 前提
 - `npm run test:coverage` (`app_frontend`): 123 passed and coverage summary generated
 - `npm run build` (`app_frontend`): passed
 - GitHub workflow YAML parse via `python3` + PyYAML: passed
+- 2026-06-23 PR #103 最新dev追従後:
+  - `uv run --project app_backend pytest app_backend/tests/test_main.py app_backend/tests/test_llm_configuration.py app_backend/tests/test_v1151_fastapi_app_factory.py app_backend/tests/test_v1151_fastapi_integration.py app_backend/tests/test_v1153_backend_compat.py -q`: 41 passed
+  - `uv run --project app_backend pytest app_backend/tests -q`: 119 passed, 3 warnings
+  - `uv run pytest customize_docs -q`: 27 passed, 2 skipped
+  - `uv run --project app_backend ruff check app_backend/app/__init__.py app_backend/tests/test_main.py app_backend/tests/test_v1153_backend_compat.py core/src/core/config.py core/src/core/customize/usecase/report/__init__.py core/src/core/customize/usecase/report/init_report.py utils/customize/usecase/report/__init__.py customize_docs/test_pulumi_workflow_refresh.py customize_docs/test_taskfile_deployment_dx.py`: passed
 
 ## 既知事項
 

@@ -19,11 +19,12 @@ from core.customize.domain.report.domain import (
     ReportStatus,
 )
 from core.customize.domain.report.repository_interface import IReportRepository
-from core.customize.usecase.report.generate_questions import GenerateQuestionsUseCase
 from core.logging_helper import get_logger
 
 if TYPE_CHECKING:
-    pass
+    from core.customize.usecase.report.generate_questions import (
+        GenerateQuestionsUseCase,
+    )
 
 logger = get_logger("InitReportUseCase")
 

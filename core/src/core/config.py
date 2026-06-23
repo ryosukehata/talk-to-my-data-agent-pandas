@@ -18,6 +18,11 @@ from .schema import DatabaseConnectionType
 
 
 class Config(DataRobotAppFrameworkBaseSettings):
+    model_config = {
+        **DataRobotAppFrameworkBaseSettings.model_config,
+        "env_ignore_empty": True,
+    }
+
     datarobot_endpoint: str
     datarobot_api_token: str
 

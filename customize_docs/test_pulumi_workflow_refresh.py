@@ -4,110 +4,63 @@ from pathlib import Path
 
 import yaml
 
+WORKFLOWS_DIR = Path(__file__).parents[1] / ".github" / "workflows"
 
-def test_pulumi_up_workflow_refreshes_stack_before_update() -> None:
-    workflow_path = (
-        Path(__file__).parents[1] / ".github" / "workflows" / "pulumi-up.yml"
-    )
-    workflow = yaml.safe_load(workflow_path.read_text())
 
-    steps = workflow["jobs"]["update"]["steps"]
-    prepare_manifest_step = next(
-        (
-            step
-            for step in steps
-            if step.get("name")
-            == "Prepare application infra manifest for Pulumi refresh"
-        ),
-        None,
-    )
-    build_frontend_step = next(
-        (
-            step
-            for step in steps
-            if step.get("name") == "Build frontend assets for Pulumi refresh"
-        ),
-        None,
-    )
-    restore_files_step = next(
-        (
-            step
-            for step in steps
-            if step.get("name") == "Restore ApplicationSource files for Pulumi refresh"
-        ),
-        None,
-    )
-    remove_stale_components_step = next(
-        (
-            step
-            for step in steps
-            if step.get("name") == "Remove stale Pulumi state resources"
-        ),
-        None,
-    )
-    pulumi_steps = [step for step in steps if step.get("uses") == "pulumi/actions@v6"]
+def _load_workflow(name: str) -> dict:
+    return yaml.safe_load((WORKFLOWS_DIR / name).read_text())
 
-    assert prepare_manifest_step is not None
-    assert "app_backend/app_infra.json" in prepare_manifest_step["run"]
-    assert '"database":"no_database"' in prepare_manifest_step["run"]
-    assert build_frontend_step is not None
-    assert "cd app_frontend" in build_frontend_step["run"]
-    assert "npm install" in build_frontend_step["run"]
-    assert "npm run build" in build_frontend_step["run"]
-    assert steps.index(build_frontend_step) < steps.index(pulumi_steps[0])
-    assert restore_files_step is not None
-    assert "pulumi stack export" in restore_files_step["run"]
-    assert "prepare_pulumi_refresh_files.py" in restore_files_step["run"]
-    assert steps.index(restore_files_step) < steps.index(pulumi_steps[0])
-    assert remove_stale_components_step is not None
-    assert "prune_pulumi_state_resources.py" in remove_stale_components_step["run"]
-    assert (
-        "custom:resource:CustomJobPostActions" in (remove_stale_components_step["run"])
-    )
-    assert (
-        "custom:resource:CustomJobScheduleCleanup"
-        in (remove_stale_components_step["run"])
-    )
-    assert "command:local:Command" in remove_stale_components_step["run"]
-    assert "datarobot:index/customJob:CustomJob" in remove_stale_components_step["run"]
-    assert 'project_name="dev"' in remove_stale_components_step["run"]
-    assert 'project_name="ttmd-pandas-react"' in remove_stale_components_step["run"]
-    assert (
-        "Data Analyst App Source [$project_name]" in remove_stale_components_step["run"]
-    )
-    assert "Data Analyst Dashboard Source" in remove_stale_components_step["run"]
-    assert "Data Analyst Dashboard" in remove_stale_components_step["run"]
-    assert "Dataset Trace" in remove_stale_components_step["run"]
-    assert "Dataset Access Log" in remove_stale_components_step["run"]
-    assert "pulumi stack import" in remove_stale_components_step["run"]
-    assert "pulumi state delete" not in remove_stale_components_step["run"]
-    assert steps.index(remove_stale_components_step) < steps.index(pulumi_steps[0])
-    assert len(pulumi_steps) == 2
-    assert {
-        step["with"]["stack-name"]: step["with"].get("refresh") for step in pulumi_steps
-    } == {
-        "ryosukehata/dataanalyst/ttmd-pandas-react": True,
-        "ryosukehata/dataanalyst/dev": True,
+
+def _step_by_name(steps: list[dict], name: str) -> dict:
+    return next(step for step in steps if step.get("name") == name)
+
+
+def test_removed_legacy_python_workflows_stay_removed() -> None:
+    assert not (WORKFLOWS_DIR / "pulumi-up.yml").exists()
+    assert not (WORKFLOWS_DIR / "python-unit-tests.yml").exists()
+
+
+def test_infra_python_workflow_runs_split_infra_checks() -> None:
+    workflow = _load_workflow("infra-python.yml")
+    job = workflow["jobs"]["python-checks"]
+    steps = job["steps"]
+
+    assert job["defaults"]["run"]["working-directory"] == "infra"
+    assert _step_by_name(steps, "Setup uv")["with"]["working-directory"] == "infra"
+    assert _step_by_name(steps, "Install Dependencies") == {
+        "name": "Install Dependencies",
+        "working-directory": "infra",
+        "run": "task install",
     }
-    for step in pulumi_steps:
-        assert step["env"]["SKIP_PULUMI_FRONTEND_BUILD"] == "true"
-        assert step["env"]["SKIP_PULUMI_CUSTOM_JOBS"] == "true"
-        assert step["env"]["DISALLOW_MONITORING_RESOURCES"] == "true"
-        assert "VITE_ENABLE_REPORT_BUILDER" in step["env"]
-        assert "SCHEDULER_HOUR" not in step["env"]
+    assert _step_by_name(steps, "Run Static Checks") == {
+        "name": "Run Static Checks",
+        "working-directory": "infra",
+        "run": "task lint-check",
+    }
 
 
-def test_python_unit_workflow_runs_backend_and_customize_docs_tests() -> None:
-    workflow_path = (
-        Path(__file__).parents[1] / ".github" / "workflows" / "python-unit-tests.yml"
-    )
-    workflow = yaml.safe_load(workflow_path.read_text())
+def test_backend_workflow_builds_static_frontend_before_tests() -> None:
+    workflow = _load_workflow("app_backend-test.yml")
+    job = workflow["jobs"]["tests"]
+    steps = job["steps"]
+    build_frontend_step = _step_by_name(steps, "Build static Frontend files")
+    test_step = _step_by_name(steps, "Test")
 
-    steps = workflow["jobs"]["test"]["steps"]
-    run_tests_step = next(
-        (step for step in steps if step.get("name") == "Run tests"),
-        None,
-    )
-
-    assert run_tests_step is not None
-    assert "pytest app_backend/tests customize_docs -q" in run_tests_step["run"]
+    assert job["defaults"]["run"]["working-directory"] == "app_backend"
+    assert _step_by_name(steps, "Install Dependencies")["run"] == "task install"
+    assert _step_by_name(steps, "Install Frontend Dependencies") == {
+        "name": "Install Frontend Dependencies",
+        "working-directory": "app_frontend",
+        "run": "npm install",
+    }
+    assert build_frontend_step == {
+        "name": "Build static Frontend files",
+        "working-directory": "app_frontend",
+        "run": "npm run build",
+    }
+    assert test_step == {
+        "name": "Test",
+        "working-directory": "app_backend",
+        "run": "task test",
+    }
+    assert steps.index(build_frontend_step) < steps.index(test_step)
