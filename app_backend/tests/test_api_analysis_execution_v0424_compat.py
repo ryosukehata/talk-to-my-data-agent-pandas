@@ -7,6 +7,10 @@ from typing import Any
 
 import pandas as pd
 import pytest
+from datarobot_genai.core.utils.token_tracking import (
+    TiktokenCountingStrategy,
+    TokenUsageTracker,
+)
 
 os.environ.setdefault("DATAROBOT_API_TOKEN", "test-token")
 os.environ.setdefault("DATAROBOT_ENDPOINT", "https://example.com")
@@ -31,7 +35,6 @@ from utils.schema import (
     RunDatabaseAnalysisResult,
     RunDatabaseAnalysisResultMetadata,
 )
-from utils.token_tracking import TiktokenCountingStrategy, TokenUsageTracker
 
 
 def _dataset_metadata(name: str) -> DatasetMetadata:

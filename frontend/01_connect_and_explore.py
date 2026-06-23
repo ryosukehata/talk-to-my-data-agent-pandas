@@ -19,6 +19,8 @@ from typing import Any, Optional, cast
 import nest_asyncio
 import pandas as pd
 import streamlit as st
+from streamlit.runtime.uploaded_file_manager import UploadedFile
+
 from app_settings import (
     apply_custom_css,
     display_page_logo,
@@ -27,8 +29,6 @@ from app_settings import (
 )
 from datarobot_connect import DataRobotTokenManager
 from helpers import state_empty, state_init
-from streamlit.runtime.uploaded_file_manager import UploadedFile
-
 from utils.analyst_db import AnalystDB, DataSourceType, InternalDataSourceType
 from utils.api import (
     list_registry_datasets,

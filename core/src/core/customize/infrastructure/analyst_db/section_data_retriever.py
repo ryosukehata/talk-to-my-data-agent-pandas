@@ -10,6 +10,11 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
+from openai.types.chat.chat_completion_user_message_param import (
+    ChatCompletionUserMessageParam,
+)
+
 from core.customize.domain.report.domain import Report
 from core.customize.domain.report.service_interface import (
     IReportSectionDataRetriever,
@@ -17,10 +22,6 @@ from core.customize.domain.report.service_interface import (
 )
 from core.customize.usecase.prompt.builder import ISummarySectionDataFactory
 from core.logging_helper import get_logger
-from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-from openai.types.chat.chat_completion_user_message_param import (
-    ChatCompletionUserMessageParam,
-)
 
 if TYPE_CHECKING:
     from core.analyst_db import AnalystDB

@@ -28,6 +28,29 @@ def test_core_rest_api_exposes_app_factory(
     )
 
 
+def test_core_rest_api_mounts_upstream_split_routers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_required_import_env(monkeypatch)
+
+    from core import rest_api
+
+    routes_by_path = {
+        getattr(route, "path", ""): route for route in rest_api.create_app().routes
+    }
+
+    assert routes_by_path["/api/v1/datasets/upload"].endpoint.__module__ == (
+        "core.routers.datasets"
+    )
+    assert routes_by_path["/api/v1/database/select"].endpoint.__module__ == (
+        "core.routers.database"
+    )
+    assert routes_by_path["/api/v1/chats/{chat_id}/messages"].endpoint.__module__ == (
+        "core.routers.chats"
+    )
+    assert rest_api.upload_files is routes_by_path["/api/v1/datasets/upload"].endpoint
+
+
 def test_backend_main_starts_from_core_app_factory() -> None:
     tree = ast.parse(APP_MAIN_PATH.read_text(encoding="utf-8"))
 

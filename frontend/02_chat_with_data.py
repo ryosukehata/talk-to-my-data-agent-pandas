@@ -24,18 +24,18 @@ from typing import Any, Optional, cast
 import nest_asyncio
 import opentelemetry
 import streamlit as st
-from app_settings import (
-    apply_custom_css,
-    display_page_logo,
-)
-from datarobot_connect import DataRobotTokenManager
-from helpers import log_error_details, state_init
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
 from streamlit.delta_generator import DeltaGenerator
 
+from app_settings import (
+    apply_custom_css,
+    display_page_logo,
+)
+from datarobot_connect import DataRobotTokenManager
+from helpers import log_error_details, state_init
 from utils.analyst_db import AnalystDB, InternalDataSourceType
 from utils.api import (
     AnalysisGenerationError,
