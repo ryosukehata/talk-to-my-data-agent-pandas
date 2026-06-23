@@ -9,7 +9,7 @@ export type Dataset = {
   file_size?: number;
 };
 
-export type DatasetResponse = {
+type DatasetResponse = {
   dataset: {
     name: string;
     data_records: Record<string, unknown>[];

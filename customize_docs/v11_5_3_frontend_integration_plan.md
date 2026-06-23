@@ -48,13 +48,21 @@ upstream `v11.5.3` の frontend 挙動修正を、現行 fork の template / cus
 
 ## 検証
 
+- 2026-06-23 dev追従
+  - `origin/dev` (`c779f30`) を `codex/v1153-frontend` へmerge。
+  - `DatasetResponse` は `api-requests.ts` 内部でのみ使う型のため、`knip` の未使用export検出に合わせて非export化。
+  - CI workflow は `npm install` / `npm run lint` / `npm run test` / `npm run knip` のため、npmベースで再検証。
+  - `npm install --package-lock=false`: passed
+  - `npm run lint && npm run test && npm run knip`: passed。lintは既存warning 6件のみ、Vitestは 134 passed、knipはconfiguration hintsのみ。
+  - `npm run build`: passed。
+  - `DATAROBOT_API_TOKEN=token DATAROBOT_ENDPOINT=endpoint uv run --all-extras --dev pytest tests/test_main.py tests/test_v1153_backend_compat.py`: 18 passed, 3 skipped。
 - `./node_modules/.bin/vitest --run tests/components/AddDataModal.test.tsx tests/components/NewChatModal.test.tsx tests/components/RenameChatModal.test.tsx tests/components/SettingsModal.test.tsx tests/components/DatasetCardActionBar.test.tsx`: 16 passed
 - `./node_modules/.bin/tsc -b tsconfig.app.json`: passed
 - `./node_modules/.bin/eslint .`: passed with existing warnings only
 - `./node_modules/.bin/vitest --run`: 134 passed
-- `NODE_OPTIONS='--max-old-space-size=4096' ./node_modules/.bin/vite build`: failed after local dependency reinstall attempt, because the local dependency tree resolved `react@19.2.7` and Vite could not resolve `unenv/node/process`.
+- `NODE_OPTIONS='--max-old-space-size=4096' ./node_modules/.bin/vite build`: passed after npmベースで依存を入れ直し。
 
 ## 既知事項
 
-- `pnpm --dir app_frontend test -- ...` はこの環境で dependency status check が `pnpm install` を起動し、build script approval (`ERR_PNPM_IGNORED_BUILDS`) で停止する。検証は既存 `node_modules` の `vitest` / `tsc` / `eslint` binaries を直接実行した。
-- `npm ci` は既存の `app_frontend/package.json` と `app_frontend/package-lock.json` が不整合のため停止する。例: `i18next@25.4.2` in lock does not satisfy `i18next@25.10.10` in package.json.
+- `pnpm --dir app_frontend install --no-lockfile` は pnpm 11 のbuild script承認で `pnpm-workspace.yaml` を生成するため、CI同等確認には使わない。現在のCIは `npm install` を実行する。
+- `npm install` はローカルNode 24で `i18next-parser` のengine warningを出す。CI matrixのNode 20/22では該当せず、Node 24 jobもwarning扱いでinstallは成功する。
