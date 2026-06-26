@@ -107,7 +107,6 @@ def test_backend_package_exposes_app_factory(
 
     created_app = create_app()
 
-    assert created_app is create_app()
     assert any(
         getattr(route, "path", "") == "/api/v1/config/feature-flags"
         for route in created_app.routes
@@ -120,6 +119,10 @@ def test_backend_main_app_uses_core_factory(
 ) -> None:
     _set_required_import_env(monkeypatch)
 
-    from app import create_app, main
+    from app import main
 
-    assert main.app is create_app()
+    assert any(
+        getattr(route, "path", "") == "/api/v1/config/feature-flags"
+        for route in main.app.routes
+    )
+    assert any(getattr(route, "path", "") == "/health" for route in main.app.routes)

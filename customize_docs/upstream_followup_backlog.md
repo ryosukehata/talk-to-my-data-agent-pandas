@@ -26,11 +26,11 @@ v11.5.1 取り込みでは、既存の pandas 公開挙動、customize routes、
 
 ## v11.5.3 frontend マージ後に再評価した課題
 
-### React 静的配信方式の upstream 追従 (2026-06-23 対応済み)
+### React 静的配信方式の upstream 追従 (2026-06-27 対応済み)
 
 - `origin/dev` に frontend PR #102 が merge 済みになったため、upstream `v11.5.3` の `TemplateResponse` / Vite manifest ベースのReact配信方式を評価した。
-- 現行forkの `_dr_env.js` runtime env、`StaticFiles` mount、SPA deep reload fallbackは維持し、manifestからentry JS / CSS / modulepreloadだけをbackend templateで解決する。
-- `APP_VERSION` を含むruntime envは引き続き `/_dr_env.js` 経由で渡す。`TemplateResponse` contextは静的asset URLに限定し、frontendの `APP_BASE_URL` / `BASE_PATH` / `API_PORT` 契約を変えない。
+- 更新追従コストを下げるため、`app_backend/app/__init__.py`、`app_backend/templates/index.html`、`app_backend/tests/test_main.py` は upstream `v11.5.3` と一致させた。
+- fork側で必要な差分は、monorepo import 用の `app_backend/tests/conftest.py` 補助と、upstreamの非キャッシュ `create_app()` 挙動に合わせた既存追加テストの期待値更新だけに限定した。
 - 実装とテスト方針は `customize_docs/v11_5_3_static_frontend_manifest.md` に分離して記録した。
 
 ### pandas から Polars への境界再評価
