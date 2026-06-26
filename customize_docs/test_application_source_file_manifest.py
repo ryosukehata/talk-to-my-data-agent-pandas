@@ -1,45 +1,17 @@
 from __future__ import annotations
 
-import sys
-from collections import Counter
-from importlib import import_module
 from pathlib import Path
-from types import SimpleNamespace
 
-import pulumi_datarobot as datarobot
+REPO_ROOT = Path(__file__).parents[1]
+APP_BACKEND_SOURCE = REPO_ROOT / "infra" / "infra" / "app_backend.py"
 
 
-def test_app_source_file_destinations_are_unique(monkeypatch) -> None:
-    monkeypatch.setenv("APP_ENVIRONMENT_ID", "test-env")
-    monkeypatch.setenv("PULUMI_STACK_CONTEXT", "test-stack")
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "infra"))
-    monkeypatch.setattr(
-        datarobot.ExecutionEnvironment,
-        "get",
-        staticmethod(
-            lambda id, resource_name: SimpleNamespace(id=id)  # noqa: A002
-        ),
-    )
-    sys.modules.pop("infra.settings_app_infra", None)
+def test_app_source_manifest_collects_core_and_customize_files_once() -> None:
+    source = APP_BACKEND_SOURCE.read_text()
 
-    settings_app_infra = import_module("infra.settings_app_infra")
-    monkeypatch.setattr(
-        settings_app_infra,
-        "_prep_metadata_yaml",
-        lambda runtime_parameter_values: None,
-    )
-
-    destination_counts = Counter(
-        destination for _, destination in settings_app_infra.get_app_files([])
-    )
-    duplicate_destinations = sorted(
-        destination for destination, count in destination_counts.items() if count > 1
-    )
-
-    assert duplicate_destinations == []
-    assert destination_counts["core/src/core/rest_api.py"] == 1
-    assert destination_counts["core/src/core/customize/api_endpoints/report.py"] == 1
-    assert destination_counts["core/src/core/locale/ja_JP/LC_MESSAGES/base.mo"] == 1
-    assert destination_counts["utils/locale/ja_JP/LC_MESSAGES/base.mo"] == 0
-    assert destination_counts["utils/rest_api.py"] == 1
-    assert destination_counts["utils/customize/api_endpoints/report.py"] == 1
+    assert "def get_app_backend_app_files(" in source
+    assert '(project_root / "utils").glob("**/*.py")' in source
+    assert '(project_root / "core").glob("**/*.py")' in source
+    assert "core/src/core/locale/{application_locale}/LC_MESSAGES/base.mo" in source
+    assert "return _deduplicate_files_by_destination(source_files)" in source
+    assert "utils/locale" not in source

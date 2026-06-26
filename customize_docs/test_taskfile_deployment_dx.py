@@ -23,21 +23,33 @@ def test_root_taskfile_exposes_infra_deploy_entrypoints() -> None:
     assert taskfile["tasks"]["deploy-dev"]["cmds"] == [{"task": "infra:deploy-dev"}]
 
 
-def test_infra_taskfile_keeps_existing_root_pulumi_project() -> None:
+def test_infra_taskfile_uses_split_infra_project_entrypoints() -> None:
     taskfile = _load_yaml("infra/Taskfile.yaml")
+    pulumi_project = _load_yaml("infra/Pulumi.yaml")
+    tasks = taskfile["tasks"]
 
-    assert taskfile["tasks"]["deploy"]["dir"] == ".."
-    assert taskfile["tasks"]["deploy-dev"]["dir"] == ".."
-    assert taskfile["tasks"]["refresh"]["dir"] == ".."
-    assert taskfile["tasks"]["select"]["dir"] == ".."
+    assert pulumi_project["runtime"]["name"] == "python"
+    assert "main" not in pulumi_project
+    assert "deploy" in tasks["up"]["aliases"]
+    assert tasks["deploy-dev"]["aliases"] == ["up-dev"]
     assert any(
-        "uv run pulumi up" in command
-        for command in taskfile["tasks"]["deploy"]["cmds"]
+        "run pulumi up" in command
+        for command in tasks["up"]["cmds"]
         if isinstance(command, str)
     )
     assert any(
         "--target" in command
-        for command in taskfile["tasks"]["deploy-dev"]["cmds"]
+        for command in tasks["deploy-dev"]["cmds"]
+        if isinstance(command, str)
+    )
+    assert any(
+        "run pulumi refresh" in command
+        for command in tasks["refresh"]["cmds"]
+        if isinstance(command, str)
+    )
+    assert any(
+        "run pulumi stack select" in command
+        for command in tasks["select"]["cmds"]
         if isinstance(command, str)
     )
 
