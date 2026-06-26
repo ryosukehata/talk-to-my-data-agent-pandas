@@ -218,13 +218,12 @@ Your data privacy is important to us. Data handling is governed by the DataRobot
 
 ### Change the LLM
 
-1. Modify the `LLM` setting in `infra/settings_generative.py` by changing `LLM=LLMs.AZURE_OPENAI_GPT_4_O` to any other LLM from the `LLMs` object.
-   - Trial users: Please set `LLM=LLMs.AZURE_OPENAI_GPT_4_O_MINI` since GPT-4o is not supported in the trial. Use the `OPENAI_API_DEPLOYMENT_ID` in `.env` to override which model is used in your Azure organization. You'll still see GPT 4o-mini in the playground, but the deployed app will use the provided Azure deployment.
-2. To use an existing TextGen model or deployment:
-   - In `infra/settings_generative.py`: Set `LLM=LLMs.DEPLOYED_LLM`.
-   - In `.env`: Set either the `TEXTGEN_REGISTERED_MODEL_ID` or the `TEXTGEN_DEPLOYMENT_ID`
-   - In `.env`: Set `CHAT_MODEL_NAME` to the model name expected by the deployment (e.g. "claude-3-7-sonnet-20250219" for an anthropic deployment,"datarobot-deployed-llm" for NIM models )
-   - (Optional) In `utils/api.py`: `ALTERNATIVE_LLM_BIG` and `ALTERNATIVE_LLM_SMALL` can be used for fine-grained control over which LLM is used for different tasks.
+LLM infrastructure is selected through `infra/configurations/llm/*` and the active `infra/infra/llm.py` symlink.
+
+1. To change the default LLM Gateway model, set `LLM_DEFAULT_MODEL` in `.env`.
+2. To switch LLM infrastructure, set `INFRA_ENABLE_LLM` to one of the files in `infra/configurations/llm/`, for example `deployed_llm.py`, `registered_model.py`, `blueprint_with_llm_gateway.py`, or `blueprint_with_external_llm.py`.
+3. To use an existing TextGen deployment, set `INFRA_ENABLE_LLM=deployed_llm.py` and `TEXTGEN_DEPLOYMENT_ID` in `.env`.
+4. To use an existing registered TextGen model, set `INFRA_ENABLE_LLM=registered_model.py` and `TEXTGEN_REGISTERED_MODEL_ID` in `.env`.
 
 ### Use [DataRobot LLM Gateway](https://docs.datarobot.com/en/docs/gen-ai/genai-code/dr-llm-gateway.html)
 
@@ -242,27 +241,25 @@ The application follows this priority order for LLM selection:
 **Important**: Remove or comment out `OPENAI_*` environment variables to use DataRobot's LLM Gateway
 
 1. In `.env`: Set `USE_DATAROBOT_LLM_GATEWAY=true`
-2. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+2. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
 #### **When LLM Gateway is enabled:**
 
 - No hardcoded LLM credentials (OpenAI keys) are required in your `.env` file
 - The LLM Gateway provides a unified interface to multiple LLM providers through DataRobot in production
-- You can pick from the catalog and change the model `LLM` in `infra/settings_generative.py`
-- It will use a DataRobot Guarded RAG Deployment and LLM Blueprint for that selected model
+- You can pick from the catalog and change the model through `LLM_DEFAULT_MODEL`
+- The default `gateway_direct.py` configuration passes Gateway runtime parameters directly to the application
 
 **Note**: LLM Gateway mode requires consumption based pricing is enabled for your DataRobot account as is evidenced by the `ENABLE_LLM_GATEWAY` feature flag.
 Contact your administrator if this feature is not available.
 
 1. In `.env`: If not using an existing TextGen model or deployment, provide the required credentials dependent on your choice.
-2. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+2. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
 > **⚠️ Availability information:**
@@ -274,37 +271,34 @@ Contact your administrator if this feature is not available.
 
 To add Snowflake support:
 
-1. Modify the `DATABASE_CONNECTION_TYPE` setting in `infra/settings_database.py` by changing `DATABASE_CONNECTION_TYPE = "no_database"` to `DATABASE_CONNECTION_TYPE = "snowflake"`.
+1. Set `DATABASE_CONNECTION_TYPE=snowflake` in `.env`.
 2. Provide snowflake credentials in `.env` by either setting `SNOWFLAKE_USER` and `SNOWFLAKE_PASSWORD` or by setting `SNOWFLAKE_KEY_PATH` to a file containing the key. The key file should be a `*.p8` private key file. (see [Snowflake Documentation](https://docs.snowflake.com/en/user-guide/key-pair-auth))
 3. Fill out the remaining snowflake connection settings in `.env` (refer to `.env.template` for more details)
-4. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+4. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
 #### BigQuery
 
 The Talk to my Data Agent supports connecting to BigQuery.
 
-1. Modify the `DATABASE_CONNECTION_TYPE` setting in `infra/settings_database.py` by changing `DATABASE_CONNECTION_TYPE = "no_database"` to `DATABASE_CONNECTION_TYPE = "bigquery"`.
+1. Set `DATABASE_CONNECTION_TYPE=bigquery` in `.env`.
 2. Provide the required google credentials in `.env` dependent on your choice. Ensure that GOOGLE_DB_SCHEMA is also populated in `.env`.
-3. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+3. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
 #### SAP Datasphere
 
 The Talk to my Data Agent supports connecting to SAP Datasphere.
 
-1. Modify the `DATABASE_CONNECTION_TYPE` setting in `infra/settings_database.py` by changing `DATABASE_CONNECTION_TYPE = "no_database"` to `DATABASE_CONNECTION_TYPE = "sap"`.
+1. Set `DATABASE_CONNECTION_TYPE=sap` in `.env`.
 2. Provide the required SAP credentials in `.env`.
-3. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+3. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
 ### Change the Frontend

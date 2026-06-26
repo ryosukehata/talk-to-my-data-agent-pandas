@@ -25,8 +25,11 @@ def test_root_taskfile_exposes_infra_deploy_entrypoints() -> None:
 
 def test_infra_taskfile_uses_split_infra_project_entrypoints() -> None:
     taskfile = _load_yaml("infra/Taskfile.yaml")
+    pulumi_project = _load_yaml("infra/Pulumi.yaml")
     tasks = taskfile["tasks"]
 
+    assert pulumi_project["runtime"]["name"] == "python"
+    assert "main" not in pulumi_project
     assert "deploy" in tasks["up"]["aliases"]
     assert tasks["deploy-dev"]["aliases"] == ["up-dev"]
     assert any(

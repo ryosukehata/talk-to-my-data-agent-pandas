@@ -14,36 +14,26 @@
 
 import os
 import time
-from pathlib import Path
 
 import pulumi
-import pulumi_command as command
+import pulumi_command as command  # type: ignore[import-not-found]
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 
-project_dir = Path(__file__).parent.parent
+from . import project_dir
 
 
 def build_frontend() -> command.local.Command | None:
-    """
-    Build the frontend application before deploying infrastructure.
-    Split into two stages: install dependencies and build application.
-    """
     if os.environ.get("SKIP_PULUMI_FRONTEND_BUILD", "false").lower() == "true":
         return None
 
-    frontend_dir = project_dir / "app_frontend"
+    frontend_dir = project_dir.parent / "app_frontend"
 
-    build_react_app = command.local.Command(
+    return command.local.Command(
         f"Data Analyst Build Frontend [{PROJECT_NAME}]",
         create=f"cd {frontend_dir} && npm install && npm run build",
-        triggers=[str(time.time())],  # This will cause rebuild every time
-        opts=pulumi.ResourceOptions(
-            # This resource should be created first
-            depends_on=[]
-        ),
+        triggers=[str(time.time())],
+        opts=pulumi.ResourceOptions(depends_on=[]),
     )
-
-    return build_react_app
 
 
 app_frontend = build_frontend()

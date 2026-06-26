@@ -14,8 +14,13 @@ def _keyword_constant(call: ast.Call, name: str) -> str | None:
 
 
 def test_app_runtime_parameters_include_llm_default_model() -> None:
-    source = (REPO_ROOT / "infra" / "__main__.py").read_text()
-    tree = ast.parse(source)
+    app_backend_source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
+    assert "llm_app_runtime_parameters" in app_backend_source
+
+    gateway_source = (
+        REPO_ROOT / "infra" / "configurations" / "llm" / "gateway_direct.py"
+    ).read_text()
+    tree = ast.parse(gateway_source)
 
     runtime_parameter_keys = {
         key

@@ -4,7 +4,7 @@
 
 GitHub Actions の Pulumi CD で、DataRobot `ApplicationSource` 更新時に `filePath` の重複で 422 が返った。
 
-`infra/settings_app_infra.py` の `get_app_files()` は `utils/**/*.py` で `utils/customize/**/*.py` も収集していたが、その後に `utils/customize/**/*.py` を同じ配置先パスで再追加していた。
+旧 `infra/settings_app_infra.py` の `get_app_files()` は `utils/**/*.py` で `utils/customize/**/*.py` も収集していたが、その後に `utils/customize/**/*.py` を同じ配置先パスで再追加していた。PR #103 follow-up後は同じ責務を `infra/infra/app_backend.py` の `get_app_backend_app_files()` が持つ。
 
 ## 対応
 

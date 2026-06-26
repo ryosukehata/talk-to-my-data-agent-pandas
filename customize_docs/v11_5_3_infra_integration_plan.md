@@ -9,6 +9,7 @@ upstream `v11.5.3` のうち、デプロイ・runtime parameter・起動資材�
 - `.env.template` に `USE_BUILDER_API_TOKEN=false` を追加する。
 - DataRobotアプリケーションのruntime parameterに `USE_BUILDER_API_TOKEN` を渡す。
 - `infra/configurations/llm/*` を upstream `v11.5.3` と同じ Pulumi resource style に戻し、アプリruntime parameterに同じキーを渡す。
+- `infra/` を upstream `v11.5.3` と同じ `infra/Pulumi.yaml` / `infra/infra/*` package構成へ寄せる。
 - デプロイ資材にgit由来の `VERSION` ファイルを含める。
 - `app_backend/start-app.sh` を、`uv` がある環境とprebuilt Python環境の両方で起動できるようにする。
 
@@ -23,7 +24,8 @@ upstream `v11.5.3` のうち、デプロイ・runtime parameter・起動資材�
 - `customize_docs/test_v11_5_3_infra_config.py`
   - `.env.template` がbuilder token toggleを文書化していること。
   - 全LLM設定ファイルが upstream と同じ `ApplicationSourceRuntimeParameterValueArgs` / `CustomModelRuntimeParameterValueArgs` の構成を持ち、`USE_BUILDER_API_TOKEN` をアプリruntime parameterへ渡すこと。
-  - `infra/__main__.py` のPulumi ApplicationSource runtime parameterに同キーが含まれること。
+  - `infra/infra/app_backend.py` がLLM設定ファイルのruntime parameterをアプリruntime parameterへ取り込むこと。
+  - `infra/` が upstream 型の split package 構成になり、旧 `settings_*` 構成が残っていないこと。
   - `start-app.sh` が `uv` とprebuilt Python fallbackの両方を持つこと。
   - `VERSION` ファイル生成処理とgitignoreが揃っていること。
 
@@ -36,3 +38,4 @@ upstream `v11.5.3` のうち、デプロイ・runtime parameter・起動資材�
 - 2026-06-26 PR #103 follow-upで、`infra/configurations/llm/*` の import-safe helper を削除し、upstream `v11.5.3` と同じトップレベル Pulumi resource 構成へ戻した。外部DataRobot接続が必要な import 実行テストは行わず、ASTでruntime parameter契約を検証する。
   - `uv run --project app_backend pytest app_backend/tests/test_llm_configuration.py -q`: 4 passed
   - `uv run pytest customize_docs/test_v11_5_3_infra_config.py -q`: 5 passed
+- 2026-06-26 追加follow-upで、`infra/Pulumi.yaml` / `infra/infra/*` / `infra/feature_flags/*` を upstream 型へ移行した。旧 `infra/settings_*` と直下 `infra/components` は削除し、既存のApplicationSource manifest、optional custom jobs、monitoring、cleanup jobは `infra/infra/app_backend.py` に移した。

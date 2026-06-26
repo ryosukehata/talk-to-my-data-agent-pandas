@@ -61,18 +61,10 @@ def test_llm_configurations_pass_builder_token_to_application_runtime() -> None:
 
 
 def test_pulumi_app_runtime_parameters_include_builder_token_toggle() -> None:
-    source = (REPO_ROOT / "infra" / "__main__.py").read_text()
-    tree = ast.parse(source)
+    source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
 
-    runtime_parameter_keys = {
-        key
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        for key in [_keyword_constant(node, "key")]
-        if key is not None
-    }
-
-    assert "USE_BUILDER_API_TOKEN" in runtime_parameter_keys
+    assert "llm_app_runtime_parameters" in source
+    assert "*list(llm_app_runtime_parameters)" in source
 
 
 def test_start_script_supports_uv_and_prebuilt_python_environments() -> None:
@@ -85,9 +77,47 @@ def test_start_script_supports_uv_and_prebuilt_python_environments() -> None:
 
 
 def test_app_source_writes_version_file_for_deployed_runtime() -> None:
-    settings_source = (REPO_ROOT / "infra" / "settings_app_infra.py").read_text()
+    settings_source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
     gitignore = (REPO_ROOT / "app_backend" / ".gitignore").read_text()
 
     assert "def _write_version_file()" in settings_source
     assert "_write_version_file()" in settings_source
     assert "/VERSION" in gitignore.splitlines()
+
+
+def test_infra_directory_uses_upstream_split_layout() -> None:
+    expected_paths = [
+        "Pulumi.yaml",
+        "__main__.py",
+        "configurations/README.md",
+        "configurations/llm/gateway_direct.py",
+        "feature_flags/README.md",
+        "feature_flags/feature_flag_requirements.yaml",
+        "infra/__init__.py",
+        "infra/app_backend.py",
+        "infra/app_frontend.py",
+        "infra/components/dr_credential.py",
+        "infra/libllm.py",
+        "infra/llm.py",
+    ]
+    legacy_paths = [
+        "__init__.py",
+        "app_frontend.py",
+        "components/dr_credential.py",
+        "configurations/__init__.py",
+        "feature_flag_requirements.yaml",
+        "feature_flag_requirements_llm_gateway.yaml",
+        "feature_flag_requirements_on_prem.yaml",
+        "settings_app_infra.py",
+        "settings_database.py",
+        "settings_generative.py",
+        "settings_job_infra.py",
+        "settings_main.py",
+        "settings_proxy_llm.py",
+    ]
+
+    for path in expected_paths:
+        assert (REPO_ROOT / "infra" / path).exists(), path
+    for path in legacy_paths:
+        assert not (REPO_ROOT / "infra" / path).exists(), path
+    assert (REPO_ROOT / "infra" / "infra" / "llm.py").is_symlink()

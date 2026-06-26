@@ -12,11 +12,11 @@ v11.5.1 取り込みでは、既存の pandas 公開挙動、customize routes、
 - 移行時は `get_initialized_db`、`run_complete_analysis_task`、customize routes、backend monkeypatch tests、static frontend fallback、session middleware の互換を先にテストで固定する。
 - `utils.rest_api` / `core.rest_api` の互換 re-export をいつ削減できるかも併せて判断する。
 
-### Infra package の大移動
+### Infra package の大移動 (2026-06-26 対応済み)
 
-- upstream の `infra/Pulumi.yaml` / `infra/infra/*` 構成へ寄せるかを再評価する。
-- 現行の root `Pulumi.yaml`、`pulumi-up.yml`、`infra/settings_*`、custom job、cleanup job、monitoring、report builder feature flags、ApplicationSource file manifest への影響を小さい PR で切り分ける。
-- 移行する場合は `customize_docs/test_application_source_file_manifest.py`、`customize_docs/test_pulumi_workflow_refresh.py`、custom job / optional resource のテストを先に拡張する。
+- PR #103 follow-upで upstream の `infra/Pulumi.yaml` / `infra/infra/*` 構成へ移行した。
+- 旧 `infra/settings_*` と直下 `infra/components` は削除し、ApplicationSource file manifest、custom job、cleanup job、monitoring、report builder feature flags は `infra/infra/app_backend.py` に移した。
+- 回帰は `customize_docs/test_v11_5_3_infra_config.py`、`customize_docs/test_application_source_file_manifest.py`、`customize_docs/test_custom_job_schedule_resource.py` で固定する。
 
 ### Lock file / workflow 再編
 
