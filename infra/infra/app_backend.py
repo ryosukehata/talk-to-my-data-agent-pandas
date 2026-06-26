@@ -414,10 +414,10 @@ elif USE_JAPANESE_FONT_ENV:
 else:
     base_environment_id = RuntimeEnvironments.PYTHON_312_APPLICATION_BASE.value.id
 
-app_backend_app_source_args = ApplicationSourceArgs(
-    resource_name=f"Data Analyst App Source [{PROJECT_NAME}]",
-    base_environment_id=base_environment_id,
-).model_dump(mode="json", exclude_none=True)
+app_backend_app_source_args: dict[str, pulumi.Input[str]] = {
+    "resource_name": f"Data Analyst App Source [{PROJECT_NAME}]",
+    "base_environment_id": base_environment_id,
+}
 app_backend_app_resource_name: str = f"Data Analyst Application [{PROJECT_NAME}]"
 app_backend_app_runtime_parameters = [
     *list(llm_app_runtime_parameters),

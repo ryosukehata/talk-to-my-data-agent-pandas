@@ -67,6 +67,14 @@ def test_pulumi_app_runtime_parameters_include_builder_token_toggle() -> None:
     assert "*list(llm_app_runtime_parameters)" in source
 
 
+def test_app_source_accepts_existing_app_environment_pulumi_output() -> None:
+    source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
+
+    assert "base_environment_id: pulumi.Input[str]" in source
+    assert "app_backend_app_source_args: dict[str, pulumi.Input[str]]" in source
+    assert "app_backend_app_source_args = ApplicationSourceArgs" not in source
+
+
 def test_start_script_supports_uv_and_prebuilt_python_environments() -> None:
     start_script = (REPO_ROOT / "app_backend" / "start-app.sh").read_text()
 
