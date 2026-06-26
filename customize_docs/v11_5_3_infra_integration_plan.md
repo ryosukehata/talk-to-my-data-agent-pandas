@@ -40,3 +40,4 @@ upstream `v11.5.3` のうち、デプロイ・runtime parameter・起動資材�
   - `uv run pytest customize_docs/test_v11_5_3_infra_config.py -q`: 5 passed
 - 2026-06-26 追加follow-upで、`infra/Pulumi.yaml` / `infra/infra/*` / `infra/feature_flags/*` を upstream 型へ移行した。旧 `infra/settings_*` と直下 `infra/components` は削除し、既存のApplicationSource manifest、optional custom jobs、monitoring、cleanup jobは `infra/infra/app_backend.py` に移した。
 - 2026-06-27 追加follow-upで、実デプロイ済みTextGen deploymentを使う構成に合わせ、既定の `infra/infra/llm.py` symlink、`.datarobot/cli/llm.yml` のdefault、`.env.template`、READMEを `deployed_llm.py` 基準へ変更した。
+- 2026-06-27 CD復元PRで、upstreamの分割CI構成は維持しつつ、このリポジトリ固有の `.github/workflows/pulumi-up.yml` を再追加した。workflowは `main` / `dev` へのpushで `infra/` Pulumi projectから `pulumi up --refresh` を実行し、従来のOpenAI利用に合わせて `blueprint_with_external_llm.py` と `OPENAI_*` secrets を使う。
