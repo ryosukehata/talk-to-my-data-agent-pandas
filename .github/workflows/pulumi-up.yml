@@ -1,0 +1,136 @@
+---
+name: Pulumi Up
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pulumi-up-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Pulumi Update
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    environment: main
+    env:
+      PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
+      PULUMI_STACK_NAME: ${{ github.ref == 'refs/heads/main' && 'ryosukehata/dataanalyst/ttmd-pandas-react' || 'ryosukehata/dataanalyst/dev'
+        }}
+      DATAROBOT_API_TOKEN: ${{ secrets.DATAROBOT_API_TOKEN }}
+      DATAROBOT_ENDPOINT: ${{ secrets.DATAROBOT_ENDPOINT }}
+      DATAROBOT_DEFAULT_USE_CASE: ${{ secrets.DATAROBOT_DEFAULT_USE_CASE }}
+      APP_ENVIRONMENT_ID: ${{ secrets.APP_ENVIRONMENT_ID }}
+      INFRA_ENABLE_LLM: blueprint_with_external_llm.py
+      LLM_DEFAULT_MODEL: ${{ vars.LLM_DEFAULT_MODEL || secrets.LLM_DEFAULT_MODEL || 'azure/gpt-4o' }}
+      LLM_DEFAULT_LLM_ID: ${{ vars.LLM_DEFAULT_LLM_ID || secrets.LLM_DEFAULT_LLM_ID || 'azure-openai-gpt-4-o' }}
+      LLM_DEFAULT_LLM_NAME: ${{ vars.LLM_DEFAULT_LLM_NAME || secrets.LLM_DEFAULT_LLM_NAME || 'Azure OpenAI GPT-4o' }}
+      USE_BUILDER_API_TOKEN: ${{ vars.USE_BUILDER_API_TOKEN || 'false' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
+      OPENAI_API_VERSION: ${{ secrets.OPENAI_API_VERSION }}
+      OPENAI_API_DEPLOYMENT_ID: ${{ secrets.OPENAI_API_DEPLOYMENT_ID }}
+      FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE || 'react' }}
+      SKIP_PULUMI_FRONTEND_BUILD: "true"
+      SKIP_PULUMI_CUSTOM_JOBS: "true"
+      DISALLOW_MONITORING_RESOURCES: "true"
+      VITE_ENABLE_TEMPLATE_EDIT: ${{ secrets.VITE_ENABLE_TEMPLATE_EDIT }}
+      VITE_ENABLE_CUSTOM_PROMPTS: ${{ secrets.VITE_ENABLE_CUSTOM_PROMPTS }}
+      PROMPTS_TEMPLATE_PATH: ${{ secrets.PROMPTS_TEMPLATE_PATH }}
+      VITE_ENABLE_QUESTION_REFINER: ${{ secrets.VITE_ENABLE_QUESTION_REFINER }}
+      VITE_ENABLE_REFINER_AUTO_SEND: ${{ secrets.VITE_ENABLE_REFINER_AUTO_SEND }}
+      VITE_ENABLE_REPORT_BUILDER: ${{ secrets.VITE_ENABLE_REPORT_BUILDER }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          working-directory: infra
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install Taskfile
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install infra dependencies
+        working-directory: infra
+        run: task install
+
+      - name: Prepare application infra manifest for Pulumi refresh
+        run: |
+          cat > app_backend/app_infra.json <<'EOF'
+          {"llm":"llm","database":"no_database"}
+          EOF
+
+      - name: Build frontend assets for Pulumi refresh
+        working-directory: app_frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Restore ApplicationSource files for Pulumi refresh
+        working-directory: infra
+        run: |
+          uv run pulumi stack export --stack "$PULUMI_STACK_NAME" --file /tmp/pulumi-stack.json --non-interactive
+          uv run python ../.github/scripts/prepare_pulumi_refresh_files.py /tmp/pulumi-stack.json --workspace "$GITHUB_WORKSPACE"
+
+      - name: Remove stale Pulumi state resources
+        working-directory: infra
+        run: |
+          project_name="dev"
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            project_name="ttmd-pandas-react"
+          fi
+
+          uv run python ../.github/scripts/prune_pulumi_state_resources.py \
+            /tmp/pulumi-stack.json \
+            /tmp/pulumi-stack-pruned.json \
+            custom:resource:CustomJobPostActions \
+            custom:resource:CustomJobScheduleCleanup \
+            command:local:Command \
+            datarobot:index/customJob:CustomJob \
+            datarobot:index:CustomJob \
+            --resource-name "Data Analyst App Source [$project_name]" \
+            --resource-name "Data Analyst Dashboard Source [$project_name]" \
+            --resource-name "Data Analyst Dashboard [$project_name]" \
+            --resource-name "Dataset Trace [$project_name]" \
+            --resource-name "Dataset Access Log [$project_name]" \
+            > /tmp/pruned-urns.txt
+
+          stale_urns="$(cat /tmp/pruned-urns.txt)"
+          if [ -z "$stale_urns" ]; then
+            echo "No stale Pulumi state resources found"
+            exit 0
+          fi
+
+          while IFS= read -r urn; do
+            echo "Pruning stale Pulumi state resource: $urn"
+          done < /tmp/pruned-urns.txt
+
+          uv run pulumi stack import --stack "$PULUMI_STACK_NAME" --file /tmp/pulumi-stack-pruned.json --non-interactive
+
+      - name: Run Pulumi Up
+        uses: pulumi/actions@v6
+        with:
+          command: up
+          stack-name: ${{ env.PULUMI_STACK_NAME }}
+          work-dir: infra
+          refresh: true
