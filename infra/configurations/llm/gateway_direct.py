@@ -1,38 +1,109 @@
-from __future__ import annotations
+# Copyright 2025 DataRobot, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+Choose this option for direct DataRobot LLM Gateway integration.
+"""
 
-from collections.abc import Mapping
+import os
 
-from infra.configurations.llm import (
-    DEFAULT_GATEWAY_MODEL,
-    REQUIRED_GATEWAY_FEATURE_FLAGS,
-    LLMConfigurationDefinition,
-    configured_builder_api_token,
-    configured_model,
-    resolve_env,
-    runtime_parameter,
+import pulumi_datarobot as datarobot
+from datarobot_pulumi_utils.pulumi import export
+
+from .libllm import (
+    validate_feature_flags,
+    verify_llm,
+    verify_llm_gateway_model_availability,
 )
 
+__all__ = [
+    "app_runtime_parameters",
+    "custom_model_runtime_parameters",
+    "default_model",
+    "llm_application_name",
+]
 
-def get_configuration(
-    env: Mapping[str, str] | None = None,
-) -> LLMConfigurationDefinition:
-    resolved_env = resolve_env(env)
-    default_model = configured_model(resolved_env, DEFAULT_GATEWAY_MODEL)
-    runtime_parameters = (
-        runtime_parameter("USE_DATAROBOT_LLM_GATEWAY", "1"),
-        runtime_parameter("LLM_DEFAULT_MODEL", default_model),
-    )
-    app_runtime_parameters = (
-        *runtime_parameters,
-        runtime_parameter(
-            "USE_BUILDER_API_TOKEN", configured_builder_api_token(resolved_env)
-        ),
-    )
-    return LLMConfigurationDefinition(
-        name="LLM Gateway",
-        module_name="gateway_direct.py",
-        default_model=default_model,
-        app_runtime_parameters=app_runtime_parameters,
-        custom_model_runtime_parameters=runtime_parameters,
-        required_feature_flags=REQUIRED_GATEWAY_FEATURE_FLAGS,
-    )
+REQUIRED_FEATURE_FLAGS = {
+    "ENABLE_MLOPS": True,
+    "ENABLE_CUSTOM_INFERENCE_MODEL": True,
+    "ENABLE_PUBLIC_NETWORK_ACCESS_FOR_ALL_CUSTOM_MODELS": True,
+    "ENABLE_MLOPS_TEXT_GENERATION_TARGET_TYPE": True,
+    "ENABLE_MLOPS_RESOURCE_REQUEST_BUNDLES": True,
+}
+
+llm_application_name: str = "llm"
+
+# This is the model_id that the DataRobot LLM Gateway expects.
+# You can get a list of these models by running:
+"""
+import datarobot
+dr_client = datarobot.Client()
+response = dr_client.get("genai/llmgw/catalog/")
+data = response.json()
+print("\n.   - ".join(
+    [
+        model["model"]
+        for model in data["data"]
+        if model["isActive"]
+    ]
+))
+"""
+default_model: str = os.environ.get(
+    "LLM_DEFAULT_MODEL", "datarobot/bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0"
+)
+default_use_builder_api_token = os.environ.get("USE_BUILDER_API_TOKEN", "false")
+
+# Verify everything is configured properly for this configuration option.
+validate_feature_flags(REQUIRED_FEATURE_FLAGS)
+
+# This does a quick check that validates the selected model is available
+# by checking the LLM Gateway. If it isn't, it will raise an error
+# with the list of models that are available and active.
+verify_llm_gateway_model_availability(default_model)
+
+# LiteLLM support DataRobot as a provider, so this validates
+# everything is working and the default LLM you've chosen is available
+verify_llm(f"{default_model}")
+
+app_runtime_parameters = [
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="USE_DATAROBOT_LLM_GATEWAY",
+        type="string",
+        value="1",
+    ),
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="LLM_DEFAULT_MODEL",
+        type="string",
+        value=default_model,
+    ),
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="USE_BUILDER_API_TOKEN",
+        type="string",
+        value=default_use_builder_api_token,
+    ),
+]
+custom_model_runtime_parameters = [
+    datarobot.CustomModelRuntimeParameterValueArgs(
+        key="USE_DATAROBOT_LLM_GATEWAY",
+        type="string",
+        value="1",
+    ),
+    datarobot.CustomModelRuntimeParameterValueArgs(
+        key="LLM_DEFAULT_MODEL",
+        type="string",
+        value=default_model,
+    ),
+]
+export("USE_DATAROBOT_LLM_GATEWAY", "1")
+export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)
+export("LLM_DEFAULT_MODEL", default_model)

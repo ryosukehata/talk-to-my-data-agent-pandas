@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import ast
-import importlib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[1]
+LLM_CONFIG_DIR = REPO_ROOT / "infra" / "configurations" / "llm"
 LLM_MODULES = (
     "blueprint_with_external_llm",
     "blueprint_with_llm_gateway",
@@ -21,6 +21,19 @@ def _keyword_constant(call: ast.Call, name: str) -> str | None:
     return None
 
 
+def _runtime_parameter_calls(module_name: str, args_class_name: str) -> list[ast.Call]:
+    source = (LLM_CONFIG_DIR / f"{module_name}.py").read_text()
+    tree = ast.parse(source)
+
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == args_class_name
+    ]
+
+
 def test_env_template_documents_builder_token_toggle() -> None:
     env_template = (REPO_ROOT / ".env.template").read_text()
 
@@ -29,20 +42,21 @@ def test_env_template_documents_builder_token_toggle() -> None:
 
 
 def test_llm_configurations_pass_builder_token_to_application_runtime() -> None:
-    env = {"USE_BUILDER_API_TOKEN": "true"}
-
     for module_name in LLM_MODULES:
-        module = importlib.import_module(f"infra.configurations.llm.{module_name}")
-        definition = module.get_configuration(env)
         app_parameters = {
-            parameter.key: parameter.value
-            for parameter in definition.app_runtime_parameters
+            _keyword_constant(call, "key"): call
+            for call in _runtime_parameter_calls(
+                module_name, "ApplicationSourceRuntimeParameterValueArgs"
+            )
         }
         custom_model_keys = {
-            parameter.key for parameter in definition.custom_model_runtime_parameters
+            _keyword_constant(call, "key")
+            for call in _runtime_parameter_calls(
+                module_name, "CustomModelRuntimeParameterValueArgs"
+            )
         }
 
-        assert app_parameters["USE_BUILDER_API_TOKEN"] == "true"
+        assert "USE_BUILDER_API_TOKEN" in app_parameters
         assert "USE_BUILDER_API_TOKEN" not in custom_model_keys
 
 

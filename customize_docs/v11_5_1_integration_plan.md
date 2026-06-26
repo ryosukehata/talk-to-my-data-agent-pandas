@@ -305,6 +305,7 @@ PR2 の core package mechanical migration で、top-level 依存も切り替え�
 - 2026-06-15: LiteLLM 経路では generic model alias (`datarobot-deployed-llm`, `custom-model`) を `LLM_DEFAULT_MODEL` に解決し、既存の `max_tokens` -> `max_completion_tokens` 変換、明示 timeout の尊重、token tracking を維持する。
 - 2026-06-15: `infra/configurations/llm/*` は Pulumi resource を作らない import-safe 定義として追加した。実際の resource 統合は PR5 以降で行い、この PR では LLM Gateway / deployed LLM / registered model / external LLM の runtime parameter 定義を評価可能にする。
 - 2026-06-15: `instructor[litellm]` と `litellm>=1.72.1` を root / backend dependencies に追加した。`uv lock` は実行したが、このリポジトリの lock file には差分が出なかった。
+- 2026-06-26: PR #103 follow-upで、`infra/configurations/llm/*` は upstream `v11.5.3` と同じ Pulumi resource style へ戻した。import-safe helper は削除し、外部接続なしの確認は AST ベースの runtime parameter 契約テストへ置き換えた。
 
 ### PR5: Infra / Taskfile / deployment DX
 

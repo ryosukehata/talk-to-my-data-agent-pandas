@@ -41,7 +41,6 @@ from infra.components.dr_credential import (
     get_database_credentials,
     get_llm_credentials,
 )
-from infra.configurations.llm import DEFAULT_DEPLOYED_MODEL, configured_model
 from infra.settings_database import DATABASE_CONNECTION_TYPE
 from infra.settings_proxy_llm import CHAT_MODEL_NAME
 from utils.customize.csv_validator import (
@@ -59,7 +58,9 @@ from utils.schema import AppInfra
 
 TEXTGEN_DEPLOYMENT_ID = os.environ.get("TEXTGEN_DEPLOYMENT_ID")
 TEXTGEN_REGISTERED_MODEL_ID = os.environ.get("TEXTGEN_REGISTERED_MODEL_ID")
-LLM_DEFAULT_MODEL = configured_model(os.environ, DEFAULT_DEPLOYED_MODEL)
+LLM_DEFAULT_MODEL = os.environ.get(
+    "LLM_DEFAULT_MODEL", "datarobot/datarobot-deployed-llm"
+)
 USE_BUILDER_API_TOKEN = os.environ.get("USE_BUILDER_API_TOKEN", "false")
 USE_DATAROBOT_LLM_GATEWAY = (
     os.environ.get("USE_DATAROBOT_LLM_GATEWAY", "false").lower() == "true"
