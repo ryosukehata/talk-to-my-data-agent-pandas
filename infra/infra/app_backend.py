@@ -204,19 +204,23 @@ def get_app_backend_app_files(
 ) -> list[tuple[str, str]]:
     _prep_metadata_yaml(runtime_parameter_values)
     _write_version_file()
-    source_files = [
-        (f.as_posix(), f.relative_to(app_backend_application_path).as_posix())
-        for f in app_backend_application_path.glob("**/*")
-        if f.is_file() and ".yaml" not in f.name
-    ]
+    source_files: list[tuple[str, str]] = []
+    for dirpath, _, filenames in os.walk(
+        app_backend_application_path, followlinks=True
+    ):
+        for filename in filenames:
+            if ".yaml" in filename:
+                continue
+            file_path = Path(dirpath) / filename
+            source_files.append(
+                (
+                    file_path.resolve().as_posix(),
+                    file_path.relative_to(app_backend_application_path).as_posix(),
+                )
+            )
     source_files.extend(
         (f.as_posix(), f.relative_to(project_root).as_posix())
         for f in (project_root / "utils").glob("**/*.py")
-        if f.is_file()
-    )
-    source_files.extend(
-        (f.as_posix(), f.relative_to(project_root).as_posix())
-        for f in (project_root / "core").glob("**/*.py")
         if f.is_file()
     )
     source_files.append(
@@ -475,6 +479,8 @@ app_backend_app = datarobot.CustomApplication(
     use_case_ids=[use_case.id],
     allow_auto_stopping=True,
     resources=app_backend_app_source.resources,
+    required_key_scope_level=app_backend_app_source.required_key_scope_level,
+    opts=pulumi.ResourceOptions(depends_on=[app_backend_app_source]),
 )
 
 export(app_backend_app_env_name, app_backend_app.id)

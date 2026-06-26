@@ -75,6 +75,16 @@ def test_app_source_accepts_existing_app_environment_pulumi_output() -> None:
     assert "app_backend_app_source_args = ApplicationSourceArgs" not in source
 
 
+def test_custom_application_waits_for_application_source() -> None:
+    source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
+
+    assert (
+        "required_key_scope_level=app_backend_app_source.required_key_scope_level"
+        in source
+    )
+    assert "opts=pulumi.ResourceOptions(depends_on=[app_backend_app_source])" in source
+
+
 def test_start_script_supports_uv_and_prebuilt_python_environments() -> None:
     start_script = (REPO_ROOT / "app_backend" / "start-app.sh").read_text()
 
