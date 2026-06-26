@@ -2,13 +2,13 @@
 root:
   - env: INFRA_ENABLE_LLM
     type: string
-    default: "gateway_direct.py"
+    default: "deployed_llm.py"
     help: >
       Choose your LLM integration.
 
-      - For the simplest setup, select DataRobot's LLM Gateway.
       - If you already have a custom model deployed LLM and a deployment ID,
         select DataRobot Deployed LLM.
+      - For the simplest Gateway-only setup, select DataRobot's LLM Gateway.
       - If you want to use your LLM provider credentials instead of the LLM
         Gateway, select External LLM.
       - If you need full DataRobot governance and monitoring with LLM Blueprint

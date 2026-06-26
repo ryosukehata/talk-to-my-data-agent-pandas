@@ -3,11 +3,11 @@ import os
 from pathlib import Path
 
 
-def test_default_infra_llm_symlink_uses_gateway_direct_configuration() -> None:
+def test_default_infra_llm_symlink_uses_deployed_llm_configuration() -> None:
     llm_module_path = Path(__file__).parents[2] / "infra" / "infra" / "llm.py"
 
     assert llm_module_path.is_symlink()
-    assert os.readlink(llm_module_path) == "../configurations/llm/gateway_direct.py"
+    assert os.readlink(llm_module_path) == "../configurations/llm/deployed_llm.py"
 
 
 def test_default_gateway_configuration_does_not_force_max_completion_length() -> None:

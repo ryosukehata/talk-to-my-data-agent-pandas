@@ -1,1 +1,1 @@
-../configurations/llm/gateway_direct.py
+../configurations/llm/deployed_llm.py

@@ -17,10 +17,10 @@ def test_app_runtime_parameters_include_llm_default_model() -> None:
     app_backend_source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
     assert "llm_app_runtime_parameters" in app_backend_source
 
-    gateway_source = (
-        REPO_ROOT / "infra" / "configurations" / "llm" / "gateway_direct.py"
+    deployed_llm_source = (
+        REPO_ROOT / "infra" / "configurations" / "llm" / "deployed_llm.py"
     ).read_text()
-    tree = ast.parse(gateway_source)
+    tree = ast.parse(deployed_llm_source)
 
     runtime_parameter_keys = {
         key

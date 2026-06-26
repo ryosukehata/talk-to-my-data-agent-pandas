@@ -106,7 +106,7 @@ def test_datarobot_cli_llm_yaml_exposes_upstream_configuration_choices() -> None
     )
     option_values = {option["value"] for option in llm_selector["options"]}
 
-    assert llm_selector["default"] == "gateway_direct.py"
+    assert llm_selector["default"] == "deployed_llm.py"
     assert {
         "gateway_direct.py",
         "deployed_llm.py",

@@ -220,9 +220,9 @@ Your data privacy is important to us. Data handling is governed by the DataRobot
 
 LLM infrastructure is selected through `infra/configurations/llm/*` and the active `infra/infra/llm.py` symlink.
 
-1. To change the default LLM Gateway model, set `LLM_DEFAULT_MODEL` in `.env`.
-2. To switch LLM infrastructure, set `INFRA_ENABLE_LLM` to one of the files in `infra/configurations/llm/`, for example `deployed_llm.py`, `registered_model.py`, `blueprint_with_llm_gateway.py`, or `blueprint_with_external_llm.py`.
-3. To use an existing TextGen deployment, set `INFRA_ENABLE_LLM=deployed_llm.py` and `TEXTGEN_DEPLOYMENT_ID` in `.env`.
+1. By default, `infra/infra/llm.py` points to `deployed_llm.py` so the stack uses an existing TextGen deployment.
+2. To use an existing TextGen deployment, set `TEXTGEN_DEPLOYMENT_ID` and optionally `LLM_DEFAULT_MODEL` in `.env`.
+3. To switch LLM infrastructure, set `INFRA_ENABLE_LLM` to one of the files in `infra/configurations/llm/`, for example `gateway_direct.py`, `registered_model.py`, `blueprint_with_llm_gateway.py`, or `blueprint_with_external_llm.py`.
 4. To use an existing registered TextGen model, set `INFRA_ENABLE_LLM=registered_model.py` and `TEXTGEN_REGISTERED_MODEL_ID` in `.env`.
 
 ### Use [DataRobot LLM Gateway](https://docs.datarobot.com/en/docs/gen-ai/genai-code/dr-llm-gateway.html)
@@ -240,7 +240,7 @@ The application follows this priority order for LLM selection:
 
 **Important**: Remove or comment out `OPENAI_*` environment variables to use DataRobot's LLM Gateway
 
-1. In `.env`: Set `USE_DATAROBOT_LLM_GATEWAY=true`
+1. In `.env`: Set `INFRA_ENABLE_LLM=gateway_direct.py` and `USE_DATAROBOT_LLM_GATEWAY=true`
 2. Run `task deploy` to update your stack.
    ```bash
    task deploy
@@ -251,7 +251,7 @@ The application follows this priority order for LLM selection:
 - No hardcoded LLM credentials (OpenAI keys) are required in your `.env` file
 - The LLM Gateway provides a unified interface to multiple LLM providers through DataRobot in production
 - You can pick from the catalog and change the model through `LLM_DEFAULT_MODEL`
-- The default `gateway_direct.py` configuration passes Gateway runtime parameters directly to the application
+- The `gateway_direct.py` configuration passes Gateway runtime parameters directly to the application
 
 **Note**: LLM Gateway mode requires consumption based pricing is enabled for your DataRobot account as is evidenced by the `ENABLE_LLM_GATEWAY` feature flag.
 Contact your administrator if this feature is not available.

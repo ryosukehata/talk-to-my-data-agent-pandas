@@ -39,3 +39,4 @@ upstream `v11.5.3` のうち、デプロイ・runtime parameter・起動資材�
   - `uv run --project app_backend pytest app_backend/tests/test_llm_configuration.py -q`: 4 passed
   - `uv run pytest customize_docs/test_v11_5_3_infra_config.py -q`: 5 passed
 - 2026-06-26 追加follow-upで、`infra/Pulumi.yaml` / `infra/infra/*` / `infra/feature_flags/*` を upstream 型へ移行した。旧 `infra/settings_*` と直下 `infra/components` は削除し、既存のApplicationSource manifest、optional custom jobs、monitoring、cleanup jobは `infra/infra/app_backend.py` に移した。
+- 2026-06-27 追加follow-upで、実デプロイ済みTextGen deploymentを使う構成に合わせ、既定の `infra/infra/llm.py` symlink、`.datarobot/cli/llm.yml` のdefault、`.env.template`、READMEを `deployed_llm.py` 基準へ変更した。
