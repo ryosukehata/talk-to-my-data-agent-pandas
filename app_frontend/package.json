@@ -89,12 +89,15 @@
     "knip": "^5.63.0",
     "msw": "^2.7.4",
     "postcss": "^8.5.1",
-    "prettier": "^3.5.3",
+    "prettier": "3.6.2",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
     "vite": "^6.2.0",
     "vite-plugin-node-polyfills": "^0.23.0",
     "vitest": "^3.1.1"
+  },
+  "overrides": {
+    "axios": ">=1.13.5 <1.14.0"
   }
 }

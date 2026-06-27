@@ -144,6 +144,8 @@ export const usePostMessage = () => {
       if (!variables.chatId && context?.previousChats) {
         queryClient.setQueryData(messageKeys.chats, context.previousChats);
       }
+
+      toast.error(i18n.t("There was a problem sending your message."));
     },
     onSuccess: (data, variables) => {
       const messages = data?.messages;
@@ -218,6 +220,8 @@ export const useDeleteMessage = () => {
       if (context?.previousMessages && context?.messagesKey) {
         queryClient.setQueryData(context.messagesKey, context.previousMessages);
       }
+
+      toast.error(i18n.t("There was a problem deleting the message."));
     },
     onSuccess: (_, variables) => {
       if (variables.chatId) {
@@ -253,6 +257,9 @@ export const useCreateChat = () => {
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: messageKeys.chats });
     },
+    onError: () => {
+      toast.error(i18n.t("There was a problem creating the chat."));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: messageKeys.chats });
     },
@@ -274,6 +281,9 @@ export const useDeleteChat = ({ onSuccess }: { onSuccess?: () => void }) => {
     { previousChats: IChat[] }
   >({
     mutationFn: ({ chatId }) => deleteChat({ chatId }),
+    onError: () => {
+      toast.error(i18n.t("There was a problem deleting the chat."));
+    },
     onSuccess: async (_, variables) => {
       await queryClient.invalidateQueries({ queryKey: messageKeys.chats });
       // Invalidate the specific chat messages
@@ -321,6 +331,8 @@ export const useRenameChat = () => {
       if (context?.previousChats) {
         queryClient.setQueryData(messageKeys.chats, context.previousChats);
       }
+
+      toast.error(i18n.t("There was a problem renaming the chat."));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: messageKeys.chats });
@@ -369,6 +381,8 @@ export const useUpdateChatDataSource = () => {
       if (context?.previousChats) {
         queryClient.setQueryData(messageKeys.chats, context.previousChats);
       }
+
+      toast.error(i18n.t("There was a problem updating the data source."));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: messageKeys.chats });

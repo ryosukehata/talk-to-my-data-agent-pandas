@@ -46,13 +46,14 @@ DICTIONARY_PARALLEL_BATCH_SIZE = 2
 DICTIONARY_TIMEOUT = 45.0
 
 # Dataset Size Limits
-MAX_REGISTRY_DATASET_SIZE = 400e6  # aligns to 400MB set in streamlit config.toml
+MAX_REGISTRY_DATASET_SIZE = 400e6  # 400MB upload size limit
 REGISTRY_DATASET_SIZE_CUTOFF: Final[float] = (
     200e6  # at 200MB we move from downloading to analyzing remotely with dataset
 )
 DISK_CACHE_LIMIT_BYTES = 512e6
 
 # Token and Context Limits
+MAX_PROMPT_LENGTH = 4096  # max characters allowed in a single user prompt
 MAX_CSV_TOKENS = 50000  # limit for data analyst csv sended to llm
 MODEL_CONTEXT_WINDOW = 128000  # GPT-4o context window
 CONTEXT_WARNING_THRESHOLD = int(MODEL_CONTEXT_WINDOW * 0.8)

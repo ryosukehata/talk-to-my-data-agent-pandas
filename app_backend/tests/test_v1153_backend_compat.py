@@ -6,6 +6,7 @@ import datarobot
 import pytest
 from core.api_exceptions import ApplicationUsageException
 from core.config import Config as CoreConfig
+from core.telemetry import ReadableFormatter
 from datarobot_genai.core.utils.token_tracking import (
     ApiResponseCountingStrategy,
     HeuristicTokenCountingStrategy,
@@ -16,7 +17,6 @@ from utils.data_connections.datarobot.helpers import RecipeError, handle_datarob
 from utils.datarobot_client import get_visitors_token, use_user_token
 
 from app.config import Config
-from app.telemetry import ReadableFormatter
 
 
 def make_request(
