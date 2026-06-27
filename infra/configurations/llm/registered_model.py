@@ -23,12 +23,12 @@ import os
 import datarobot as dr
 import pulumi
 import pulumi_datarobot as datarobot
+from configurations.llm.guardrails import llm_guard_configurations
 from datarobot_pulumi_utils.pulumi import export
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
 
 from . import use_case
-from .guardrails import llm_guard_configurations
 from .libllm import (
     validate_feature_flags,
     verify_llm,

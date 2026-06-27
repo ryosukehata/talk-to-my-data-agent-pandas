@@ -33,7 +33,10 @@ def test_llm_custom_models_import_guardrails_from_fork_module() -> None:
     for module_name in LLM_CUSTOM_MODEL_MODULES:
         source = _module_source(module_name)
 
-        assert "from .guardrails import llm_guard_configurations" in source
+        assert (
+            "from configurations.llm.guardrails import llm_guard_configurations"
+            in source
+        )
         assert "guard_configurations=llm_guard_configurations" in source
 
 
