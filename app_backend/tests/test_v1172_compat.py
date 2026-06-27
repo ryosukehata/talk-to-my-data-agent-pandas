@@ -9,6 +9,8 @@ from core.schema import AnalystChatMessage, AnalystDataset, UserFeedbackUpdate
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 def test_user_feedback_update_accepts_only_binary_rating() -> None:
     assert UserFeedbackUpdate(user_rating=1).user_rating == 1
@@ -154,14 +156,14 @@ async def _assert_dictionaries_response_exposes_failed_dictionary_error() -> Non
 
 
 def test_build_app_skips_dependency_install_when_prebundled_marker_exists() -> None:
-    script = Path("app_backend/build-app.sh").read_text()
+    script = (REPO_ROOT / "app_backend" / "build-app.sh").read_text()
 
     assert "/.datarobot-pre-bundled" in script
     assert "uv sync" in script
 
 
 def test_infra_allows_custom_execution_environment_ids() -> None:
-    source = Path("infra/infra/app_backend.py").read_text()
+    source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
 
     assert "APPLICATION_EXECUTION_ENVIRONMENT_ID" in source
     assert "APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID" in source
@@ -169,7 +171,7 @@ def test_infra_allows_custom_execution_environment_ids() -> None:
 
 
 def test_llm_client_uses_genai_semantic_attributes() -> None:
-    source = Path("core/src/core/llm_client.py").read_text()
+    source = (REPO_ROOT / "core" / "src" / "core" / "llm_client.py").read_text()
 
     assert "gen_ai.request.model" in source
     assert "gen_ai.provider.name" in source

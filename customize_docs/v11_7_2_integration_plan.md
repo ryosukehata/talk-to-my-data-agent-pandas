@@ -92,6 +92,21 @@ GREEN確認:
 - `uv run --project infra ruff check`: passed
 - `task infra:unit`: skipped because `infra/tests/units/` does not exist
 
+## CI follow-up
+
+PR #107 初回CIで以下を確認した。
+
+- `React: app_frontend node: 24` は `npm run knip` で失敗。`IUpdateMessageFeedbackParams` が `api-requests.ts` からexportされているが外部利用されていなかったため、内部interfaceへ戻した。
+- `FastAPI: app_backend 3.13` は `task test` の作業ディレクトリが `app_backend/` になることで、`app_backend/tests/test_v1172_compat.py` の root 相対ファイル読み取りが失敗した。`Path(__file__)` から `REPO_ROOT` を解決する形に修正した。
+
+追加確認:
+
+- `npm --prefix app_frontend run knip`: passed
+- `uv run pytest app_backend/tests/test_v1172_compat.py -q`: 9 passed
+- `cd app_backend && uv run pytest tests/test_v1172_compat.py -q`: 9 passed
+- `cd app_backend && task test`: 121 passed, 1 warning
+- `npm --prefix app_frontend test -- tests/api/chat-messages/hooks.test.ts tests/components/MessageHeader.test.tsx`: 30 passed
+
 Infra pytest note:
 
 - `uv run --project infra pytest` still picks up the repository root `pytest.ini`, collects backend/custom tests with the infra venv, and fails on missing backend-only dependencies (`datarobot_asgi_middleware`). This is the same project-level collection issue recorded during v11.6.3.

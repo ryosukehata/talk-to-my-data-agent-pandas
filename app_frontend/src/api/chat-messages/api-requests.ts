@@ -113,7 +113,7 @@ export const deleteMessage = async ({
   return data;
 };
 
-export interface IUpdateMessageFeedbackParams {
+interface IUpdateMessageFeedbackParams {
   messageId: string;
   userRating: -1 | 1;
   userFeedback?: string;
