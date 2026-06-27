@@ -19,6 +19,7 @@ from typing import Any
 from core.database_helpers import (
     BigQueryOperator,
     DatabaseOperator,
+    JdbcPreviewOperator,
     NoDatabaseOperator,
     SAPDatasphereOperator,
     SnowflakeOperator,
@@ -46,6 +47,7 @@ def get_external_database(schema: str | None = None) -> DatabaseOperator[Any]:
 __all__ = [
     "BigQueryOperator",
     "DatabaseOperator",
+    "JdbcPreviewOperator",
     "NoDatabaseOperator",
     "SAPDatasphereOperator",
     "SnowflakeOperator",

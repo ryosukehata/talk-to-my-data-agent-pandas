@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import json
 import traceback
@@ -36,6 +37,7 @@ from core.analyst_db import AnalystDB, InternalDataSourceType
 from core.code_execution import InvalidGeneratedCode
 from core.credentials import (
     GoogleCredentialsBQ,
+    JDBCCredentials,
     NoDatabaseCredentials,
     SAPDatasphereCredentials,
     SnowflakeCredentials,
@@ -46,7 +48,10 @@ from core.customize.prompts import (
 from core.logging_helper import get_logger
 from core.prompts import (
     SYSTEM_PROMPT_BIGQUERY,
+    SYSTEM_PROMPT_MYSQL,
+    SYSTEM_PROMPT_POSTGRES,
     SYSTEM_PROMPT_SAP_DATASPHERE,
+    SYSTEM_PROMPT_SQLSERVER,
 )
 from core.schema import (
     AnalystDataset,
@@ -72,6 +77,11 @@ class BigQueryCredentialArgs:
 @dataclass
 class SAPDatasphereCredentialArgs:
     credentials: SAPDatasphereCredentials
+
+
+@dataclass
+class JDBCCredentialArgs:
+    credentials: JDBCCredentials
 
 
 @dataclass
@@ -827,6 +837,236 @@ class SAPDatasphereOperator(DatabaseOperator[SAPDatasphereCredentialArgs]):
         )
 
 
+_JDBC_TABLE_DISCOVERY_SQL: dict[str, str] = {
+    "postgresql": """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_type = 'BASE TABLE'
+    """,
+    "mysql": """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_type = 'BASE TABLE'
+    """,
+    "sqlserver": """
+        SELECT TABLE_NAME
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_TYPE = 'BASE TABLE'
+    """,
+}
+
+_JDBC_DIALECT_NAMES = {
+    "postgresql": "PostgreSQL",
+    "mysql": "MySQL",
+    "sqlserver": "SQL Server",
+}
+
+
+class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
+    def __init__(
+        self,
+        credentials: JDBCCredentials,
+        default_timeout: int = _DEFAULT_DB_QUERY_TIMEOUT,
+    ):
+        self._credentials = credentials
+        self.default_timeout = default_timeout
+
+    @property
+    def _dialect_key(self) -> str:
+        uri = self._credentials.jdbc_uri
+        if uri.startswith("jdbc:postgresql://"):
+            return "postgresql"
+        if uri.startswith("jdbc:mysql://"):
+            return "mysql"
+        if uri.startswith("jdbc:sqlserver://"):
+            return "sqlserver"
+        raise ValueError(f"Unsupported JDBC URI scheme: {uri.split(':')[1]!r}")
+
+    def _dialect_name(self) -> str:
+        return _JDBC_DIALECT_NAMES[self._dialect_key]
+
+    def _quote_identifier(self, name: str) -> str:
+        match self._dialect_key:
+            case "postgresql":
+                return f'"{name}"'
+            case "mysql":
+                return f"`{name}`"
+            case "sqlserver":
+                return f"[{name}]"
+            case _:
+                raise ValueError(f"Unsupported dialect: {self._dialect_key!r}")
+
+    @staticmethod
+    def _preview() -> Any:
+        from datarobot.models.jdbc_data_preview import JdbcPreview
+
+        return JdbcPreview
+
+    @staticmethod
+    def _result_schema(result: Any) -> list[Any]:
+        result_schema = getattr(result, "result_schema", None)
+        if not result_schema:
+            raise ValueError("JDBC preview response did not include a result schema")
+        return list(result_schema)
+
+    @staticmethod
+    def _schema_names(result_schema: list[Any]) -> list[str]:
+        names: list[str] = []
+        for entry in result_schema:
+            if isinstance(entry, dict):
+                names.append(str(entry["name"]))
+            else:
+                names.append(str(entry.name))
+        return names
+
+    @staticmethod
+    def _schema_data_type(entry: Any) -> str:
+        if isinstance(entry, dict):
+            return str(entry.get("data_type") or entry.get("dataType") or "")
+        return str(getattr(entry, "data_type", ""))
+
+    def _parameters(self) -> dict[str, Any]:
+        return self._credentials.jdbc_connection_parameters or {}
+
+    def validate_connection(self) -> None:
+        try:
+            self._preview().preview(
+                jdbc_url=self._credentials.jdbc_uri,
+                sql="SELECT 1",
+                max_rows=1,
+                parameters=self._parameters(),
+            )
+        except Exception as e:
+            raise ValueError(f"JDBC connection validation failed: {e}") from e
+
+    @contextmanager
+    def create_connection(self) -> Generator[None]:
+        yield None
+
+    async def execute_query(
+        self, query: str, timeout: int | None = None
+    ) -> list[tuple[Any, ...]] | list[dict[str, Any]]:
+        del timeout
+        loop = asyncio.get_running_loop()
+        try:
+            result = await loop.run_in_executor(
+                None,
+                lambda: self._preview().preview(
+                    jdbc_url=self._credentials.jdbc_uri,
+                    sql=query,
+                    max_rows=10_000,
+                    parameters=self._parameters(),
+                ),
+            )
+            columns = self._schema_names(self._result_schema(result))
+            return [
+                row if isinstance(row, dict) else dict(zip(columns, row))
+                for row in result.records
+            ]
+        except Exception as e:
+            raise InvalidGeneratedCode(
+                f"JDBC query execution failed: {str(e)}",
+                code=query,
+                exception=e,
+                traceback_str=traceback.format_exc(),
+            )
+
+    async def get_tables(self, timeout: int | None = None) -> list[str]:
+        del timeout
+        loop = asyncio.get_running_loop()
+        try:
+            result = await loop.run_in_executor(
+                None,
+                lambda: self._preview().preview(
+                    jdbc_url=self._credentials.jdbc_uri,
+                    sql=_JDBC_TABLE_DISCOVERY_SQL[self._dialect_key],
+                    max_rows=10_000,
+                    parameters=self._parameters(),
+                ),
+            )
+            tables = [
+                row[0] if not isinstance(row, dict) else next(iter(row.values()))
+                for row in result.records
+            ]
+            logger.info("JDBC (%s): found %d tables", self._dialect_name(), len(tables))
+            return [str(table) for table in tables]
+        except Exception:
+            logger.error("JDBC: failed to fetch tables", exc_info=True)
+            return []
+
+    def get_schemas(self, timeout: int | None = None) -> list[str]:
+        del timeout
+        return []
+
+    @functools.lru_cache(maxsize=8)
+    async def get_data(
+        self,
+        *table_names: str,
+        analyst_db: AnalystDB,
+        sample_size: int = 5000,
+        timeout: int | None = None,
+    ) -> list[str]:
+        del timeout
+        loop = asyncio.get_running_loop()
+        names: list[str] = []
+        for table in table_names:
+            try:
+                result = await loop.run_in_executor(
+                    None,
+                    lambda table=table: self._preview().preview(
+                        jdbc_url=self._credentials.jdbc_uri,
+                        sql=f"SELECT * FROM {self._quote_identifier(table)}",
+                        max_rows=min(sample_size, 10_000),
+                        parameters=self._parameters(),
+                    ),
+                )
+                result_schema = self._result_schema(result)
+                columns = self._schema_names(result_schema)
+                records = [
+                    row if isinstance(row, dict) else dict(zip(columns, row))
+                    for row in result.records
+                ]
+                column_types = dict(
+                    zip(
+                        columns,
+                        [self._schema_data_type(entry) for entry in result_schema],
+                    )
+                )
+                dataframe = pd.DataFrame(records, columns=columns, dtype=str)
+                dataset = AnalystDataset(name=table, data=dataframe)
+                reg_result = await analyst_db.register_dataset(
+                    dataset,
+                    InternalDataSourceType.DATABASE,
+                    original_column_types=column_types,
+                    clobber=True,
+                )
+                if not reg_result["success"]:
+                    logger.error(
+                        "Failed to register JDBC dataset %s: %s",
+                        table,
+                        reg_result["msg"],
+                    )
+                    continue
+                names.append(table)
+            except Exception:
+                logger.error("JDBC: error loading table %s", table, exc_info=True)
+                continue
+        return names
+
+    def query_friendly_name(self, dataset_name: str) -> str:
+        return self._quote_identifier(dataset_name)
+
+    def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
+        prompt = {
+            "postgresql": SYSTEM_PROMPT_POSTGRES,
+            "mysql": SYSTEM_PROMPT_MYSQL,
+            "sqlserver": SYSTEM_PROMPT_SQLSERVER,
+        }[self._dialect_key]
+        return ChatCompletionSystemMessageParam(role="system", content=prompt)
+
+
 def get_database_operator(
     app_infra: AppInfra, schema: str | None = None
 ) -> DatabaseOperator[Any]:
@@ -835,6 +1075,7 @@ def get_database_operator(
             GoogleCredentialsBQ
             | SnowflakeCredentials
             | SAPDatasphereCredentials
+            | JDBCCredentials
             | NoDatabaseCredentials
         )
         try:
@@ -870,6 +1111,16 @@ def get_database_operator(
         except (ValidationError, ValueError):
             logger.warning(
                 "SAP credentials not properly configured, falling back to no database"
+            )
+        return NoDatabaseOperator(NoDatabaseCredentials())
+    elif app_infra.database == "datarobot_jdbc":
+        try:
+            credentials = JDBCCredentials()
+            return JdbcPreviewOperator(credentials)
+        except (ValidationError, ValueError):
+            logger.warning(
+                "JDBC credentials not properly configured, falling back to no database",
+                exc_info=True,
             )
         return NoDatabaseOperator(NoDatabaseCredentials())
     else:

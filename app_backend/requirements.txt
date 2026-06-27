@@ -123,7 +123,7 @@ cymem==2.0.13
     #   preshed
     #   spacy
     #   thinc
-datarobot==3.11.1
+datarobot==3.13.0
     # via
     #   -r app_backend/requirements.in
     #   datarobot-drum
@@ -609,7 +609,7 @@ protobuf==5.29.6
     #   grpcio-status
     #   opentelemetry-proto
     #   proto-plus
-psutil==6.1.1
+psutil==7.2.1
     # via
     #   -r app_backend/requirements.in
     #   memory-profiler

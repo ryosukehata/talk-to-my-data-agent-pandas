@@ -46,7 +46,9 @@ class AsyncDataRobotClient:
     def __init__(self, token: str, endpoint: str):
         normalized_endpoint = (endpoint or "").rstrip("/") + "/"
         self._client = httpx.AsyncClient(
-            base_url=normalized_endpoint, headers={"Authorization": f"Bearer {token}"}
+            base_url=normalized_endpoint,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=httpx.Timeout(60.0, connect=30.0),
         )
 
     async def unpaginate(
@@ -58,7 +60,7 @@ class AsyncDataRobotClient:
             yield row
         while resp_data.get("next") is not None:
             next_url = resp_data["next"]
-            r = await self._client.get(next_url, params=initial_params)
+            r = await self._client.get(next_url)
             resp_data = r.json()
             for row in resp_data["data"]:
                 yield row

@@ -155,6 +155,7 @@ Your response shall only contain a Python function called analyze_data(dfs) that
 Your response shall be formatted as JSON with the following fields:
 1) code: A string of python code that will execute and return a single pandas dataframe wrapped in a dictionary with key "data".
 2) description: A brief description of how the code works, and how the results can be interpreted to answer the question.
+3) used_datasets: A list of the exact `dfs` keys that your code references. Include only datasets your code actually reads. Names must be exact, taken from the provided "Available dataset keys in dfs".
 
 For example:
 
@@ -776,6 +777,28 @@ REATTEMPT:
 It's possible that your query will fail due to a SQL error or return an empty result set.
 If this happens, you will be provided the failed query and the error message.
 Take this failed SQL code and error message into consideration when building your query so that the problem doesn't happen again.
+""".strip()
+
+SYSTEM_PROMPT_SQLSERVER = """
+Your job is to write a SQL Server (T-SQL) query that analyzes one or more tables.
+The query will be executed against these tables, performing the necessary calculations and aggregations required to answer the user's business question.
+Carefully inspect the information and metadata provided to ensure your query will execute and return data.
+Your response shall be a single executable T-SQL query formatted as JSON with:
+1) code: T-SQL code that will execute and return the data.
+2) description: A brief description of how the code works and how the results answer the question.
+
+NECESSARY CONSIDERATIONS:
+- Use standard T-SQL syntax and functions.
+- Use TOP N instead of LIMIT N for row limiting.
+- Do not use DELETE, UPDATE, TRUNCATE, DROP, ALTER TABLE, or any operation that could alter data.
+- The table name will be provided in fully quoted form using square brackets, for example [table_name].
+- Include comments to explain your code.
+
+LANGUAGE:
+Any natural-language text in your response must be in the same language as the user's question. SQL remains SQL.
+
+REATTEMPT:
+If a previous query failed, use the failed SQL code and error message to avoid repeating the same issue.
 """.strip()
 
 SYSTEM_PROMPT_MYSQL = """

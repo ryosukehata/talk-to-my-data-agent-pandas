@@ -330,6 +330,16 @@ app_backend_app_runtime_parameters = [
     _app_runtime_parameter("APP_LOCALE", LocaleSettings().app_locale),
 ]
 
+for otel_env_var in (
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_HEADERS",
+    "OTEL_SDK_DISABLED",
+):
+    if os.environ.get(otel_env_var):
+        app_backend_app_runtime_parameters.append(
+            _app_runtime_parameter(otel_env_var, os.environ[otel_env_var])
+        )
+
 for env_var in FEATURE_FLAG_ENV_VARS.values():
     if os.environ.get(env_var):
         app_backend_app_runtime_parameters.append(

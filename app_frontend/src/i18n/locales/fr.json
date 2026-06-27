@@ -33,6 +33,8 @@
   "Downloading...": "Téléchargement en cours…",
   "Download dataset as CSV": "Télécharger le dataset au format CSV",
   "Analysis Dataset": "Dataset d’analyse",
+  "Dataset generated for analysis": "Jeu de données généré pour l’analyse",
+  "Datasets used:": "Jeux de données utilisés :",
   "Download dataset": "Téléchargement du jeu de données",
   "Code": "Code",
   "Copy snippet to clipboard": "Copier l’extrait dans le presse-papiers",

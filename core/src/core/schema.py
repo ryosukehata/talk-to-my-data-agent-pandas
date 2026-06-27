@@ -473,6 +473,7 @@ class RunAnalysisResult(BaseModel):
     )  # Excluded from JSON serialization
     dataset_id: str | None = None
     code: str | None = None
+    used_datasets: list[str] = Field(default_factory=list)
 
 
 class RunAnalysisResultMetadata(BaseModel):
@@ -651,12 +652,22 @@ class EnhancedQuestionGeneration(SanitizedJsonModel):
 class CodeGeneration(SanitizedJsonModel):
     code: str
     description: str
+    used_datasets: list[str] = Field(default_factory=list)
+
+    @field_validator("used_datasets", mode="before")
+    @classmethod
+    def _coerce_used_datasets(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item) for item in value if isinstance(item, str)]
 
 
 RuntimeCredentialType = Literal["llm", "db"]
 
 
-DatabaseConnectionType = Literal["snowflake", "bigquery", "sap", "no_database"]
+DatabaseConnectionType = Literal[
+    "snowflake", "bigquery", "sap", "no_database", "datarobot_jdbc"
+]
 
 
 class AppInfra(BaseModel):
