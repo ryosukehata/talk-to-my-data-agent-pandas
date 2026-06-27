@@ -1,8 +1,7 @@
 import pytest
-from pydantic import ValidationError
-
 from core.constants import MAX_PROMPT_LENGTH
 from core.schema import ChatMessagePayload
+from pydantic import ValidationError
 
 
 def test_chat_message_payload_allows_max_prompt_length() -> None:

@@ -113,6 +113,11 @@
 - External Data Store は `ExternalDataStoreNameDataSourceType` で `.value` を持たないため、telemetryの `data_source` には `.name` を使う。Internal sourceは従来どおり `.value` を使う。
 - 2026-06-08: `run_database_analysis()` の内側も確認し、`_run_database_analysis()` から `_generate_database_analysis_code()` への呼び出しで `database` が余分に1つ渡されていた問題を修正する。`run_database_analysis` / `_run_database_analysis` / `_generate_database_analysis_code` の全呼び出しに `telemetry_json` keyword があることをASTテストで固定する。
 
+## v11.6.3 CI対応メモ
+
+- 2026-06-27: PR #106 の初回CIで `app_backend` の `task lint-check` が Ruff import sort により失敗したため、対象ファイルのimport orderを修正した。
+- 2026-06-27: `app_frontend` の Node 24 CIでは `package-lock.json` なしの `npm install` により Prettier が浮動解決され、ローカルと異なる整形結果になった。CI再現用の一時worktreeで確認し、`app_frontend/package.json` の `prettier` を `3.6.2` に exact pin して lint 結果を固定した。
+
 ## v0.5.x 以降の更新計画
 
 ### 確認日
