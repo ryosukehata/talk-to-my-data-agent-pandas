@@ -187,5 +187,12 @@
   "Delete chat": "채팅 삭제",
   "Are you sure you want to delete this chat?": "이 채팅을 정말 삭제하시겠습니까?",
   "Data": "데이터",
-  "View": "보기"
+  "View": "보기",
+  "There was a problem sending your message.": "메시지를 보내는 중 문제가 발생했습니다.",
+  "There was a problem deleting the message.": "메시지를 삭제하는 중 문제가 발생했습니다.",
+  "There was a problem creating the chat.": "채팅을 생성하는 중 문제가 발생했습니다.",
+  "There was a problem deleting the chat.": "채팅을 삭제하는 중 문제가 발생했습니다.",
+  "There was a problem renaming the chat.": "채팅 이름을 변경하는 중 문제가 발생했습니다.",
+  "There was a problem updating the data source.": "데이터 소스를 업데이트하는 중 문제가 발생했습니다.",
+  "Message limit reached ({{max}} characters)": "메시지 한도에 도달했습니다 ({{max}}자)"
 }

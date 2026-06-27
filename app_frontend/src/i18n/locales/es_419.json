@@ -187,5 +187,12 @@
   "Delete chat": "Eliminar chat",
   "Are you sure you want to delete this chat?": "¿Estás seguro de que quieres eliminar este chat?",
   "Data": "Datos",
-  "View": "Ver"
+  "View": "Ver",
+  "There was a problem sending your message.": "Hubo un problema al enviar tu mensaje.",
+  "There was a problem deleting the message.": "Hubo un problema al eliminar el mensaje.",
+  "There was a problem creating the chat.": "Hubo un problema al crear el chat.",
+  "There was a problem deleting the chat.": "Hubo un problema al eliminar el chat.",
+  "There was a problem renaming the chat.": "Hubo un problema al renombrar el chat.",
+  "There was a problem updating the data source.": "Hubo un problema al actualizar la fuente de datos.",
+  "Message limit reached ({{max}} characters)": "Límite de mensaje alcanzado ({{max}} caracteres)"
 }

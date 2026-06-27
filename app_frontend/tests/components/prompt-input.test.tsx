@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi } from "vitest";
 import { PromptInput } from "@/components/ui-custom/prompt-input";
+import { MAX_PROMPT_LENGTH } from "@/constants/chat";
 
 describe("PromptInput", () => {
   it("renders correctly", () => {
@@ -161,6 +162,37 @@ describe("PromptInput", () => {
 
     fireEvent.click(screen.getByTestId("send-message-button"));
     expect(handleSend).not.toHaveBeenCalled();
+  });
+
+  it("disables send and shows an error at the message length limit", () => {
+    const handleSend = vi.fn();
+    render(
+      <PromptInput
+        onSend={handleSend}
+        initialValue={"a".repeat(MAX_PROMPT_LENGTH)}
+      />,
+    );
+
+    expect(screen.getByTestId("send-message-button")).toBeDisabled();
+    expect(screen.getByTestId("char-counter")).toHaveTextContent(
+      `Message limit reached (${MAX_PROMPT_LENGTH} characters)`,
+    );
+
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      code: "Enter",
+    });
+    expect(handleSend).not.toHaveBeenCalled();
+  });
+
+  it("shows a character counter near the message length limit", () => {
+    const messageLength = Math.floor(MAX_PROMPT_LENGTH * 0.81);
+
+    render(<PromptInput initialValue={"a".repeat(messageLength)} />);
+
+    expect(screen.getByTestId("char-counter")).toHaveTextContent(
+      `${messageLength}/${MAX_PROMPT_LENGTH}`,
+    );
   });
 });
 

@@ -211,5 +211,12 @@
   "Refining...": "洗練中...",
   "Question": "質問",
   "Reasoning": "理由",
-  "Relevant Columns": "関連カラム"
+  "Relevant Columns": "関連カラム",
+  "There was a problem sending your message.": "メッセージの送信中に問題が発生しました。",
+  "There was a problem deleting the message.": "メッセージの削除中に問題が発生しました。",
+  "There was a problem creating the chat.": "チャットの作成中に問題が発生しました。",
+  "There was a problem deleting the chat.": "チャットの削除中に問題が発生しました。",
+  "There was a problem renaming the chat.": "チャット名の変更中に問題が発生しました。",
+  "There was a problem updating the data source.": "データソースの更新中に問題が発生しました。",
+  "Message limit reached ({{max}} characters)": "メッセージの上限に達しました（{{max}}文字）"
 }

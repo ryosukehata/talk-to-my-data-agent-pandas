@@ -62,10 +62,7 @@ SKIP_PULUMI_CUSTOM_JOBS = (
     os.environ.get("SKIP_PULUMI_CUSTOM_JOBS", "false").lower() == "true"
 )
 
-APP_BACKEND_APP_PATHS = {
-    "react": Path("app_backend"),
-    "streamlit": Path("frontend"),
-}
+APP_BACKEND_APP_PATH = Path("app_backend")
 EXCLUDE_PATTERNS = [
     re.compile(pattern)
     for pattern in [
@@ -101,8 +98,7 @@ __all__ = [
 
 
 def get_app_backend_app_path() -> Path:
-    frontend_type = os.environ.get("FRONTEND_TYPE", "react")
-    return APP_BACKEND_APP_PATHS[frontend_type]
+    return APP_BACKEND_APP_PATH
 
 
 def _deduplicate_files_by_destination(

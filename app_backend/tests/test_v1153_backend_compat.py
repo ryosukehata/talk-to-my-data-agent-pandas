@@ -16,7 +16,7 @@ from utils.data_connections.datarobot.helpers import RecipeError, handle_datarob
 from utils.datarobot_client import get_visitors_token, use_user_token
 
 from app.config import Config
-from app.telemetry import ReadableFormatter
+from core.telemetry import ReadableFormatter
 
 
 def make_request(

@@ -89,6 +89,26 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
     return null;
   }, [selectedDataStoreId, availableDataStores]);
 
+  const hasSelections = useMemo(() => {
+    if (dataSource === DATA_SOURCES.DATABASE) {
+      return selectedTables.length > 0;
+    }
+    if (dataSource === NEW_DATA_STORE) {
+      return (
+        selectedAvailableDataStore !== null &&
+        selectedExternalDataSources.length > 0
+      );
+    }
+    return files.length > 0 || selectedDatasets.length > 0;
+  }, [
+    dataSource,
+    files.length,
+    selectedAvailableDataStore,
+    selectedDatasets.length,
+    selectedExternalDataSources.length,
+    selectedTables.length,
+  ]);
+
   // Reset selections when modal is opened/closed.
   useEffect(() => {
     setSelectedDatasets([]);
@@ -451,9 +471,10 @@ export const AddDataModal = ({ highlight }: { highlight?: boolean }) => {
             <Button
               type="submit"
               variant="secondary"
-              disabled={isPending}
+              disabled={isPending || !hasSelections}
               testId="add-data-modal-save-button"
               onClick={() => {
+                if (!hasSelections) return;
                 setError(null);
                 setIsPending(true);
                 if (dataSource === DATA_SOURCES.DATABASE) {

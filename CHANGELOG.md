@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.6.2] - 2026-03-26
+
+### Fixed
+
+- Revert from using dr file system. (APP-5650)
+
+## [11.6.0] - 2026-03-16
+
+### Removed
+
+- Removed deprecated Streamlit frontend (`frontend/` directory, CI workflow, e2e tests, `FRONTEND_TYPE` config)
+- Removed Streamlit dependencies (`streamlit`, `st-theme`, `streamlit-javascript`, `nest-asyncio`)
+
+## [11.5.5] - 2026-03-16
+
+### Added
+
+- Support Data Connector Integration with Apache Impala (APP-5077)
+- Support Data Connector Integration with MySQL (APP-5385)
+- Updated README with Codespace links for different regions (APP-5592)
+
+### Fixed
+
+- Fix Add Data modal stuck loading on empty selections (APP-4858)
+
+## [11.5.4] - 2026-03-03
+
+### Added
+
+- Add error toasts to chat mutation hooks
+- Set a limit for input prompt length
+
+### Fixed
+
+- Handle 401 response for external users
+- Fix circular symlink between app_backend and core by moving telemetry into core
+
 ## [11.5.3] - 2026-02-26
 
 ### Added

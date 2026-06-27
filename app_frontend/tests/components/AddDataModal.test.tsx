@@ -104,6 +104,20 @@ describe("AddDataModal", () => {
     ).toHaveAttribute("href", "https://www.datarobot.com/privacy/");
   });
 
+  test("keeps save disabled until data is selected", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AddDataModal />);
+
+    await user.click(screen.getByRole("button", { name: /add data/i }));
+
+    expect(
+      screen.getByRole("button", { name: /save selections/i }),
+    ).toBeDisabled();
+    expect(mockUploadMutate).not.toHaveBeenCalled();
+    expect(mockLoadFromDatabase).not.toHaveBeenCalled();
+    expect(mockSelectDataSources).not.toHaveBeenCalled();
+  });
+
   test("keeps database schema and table selection available", async () => {
     const user = userEvent.setup();
     renderWithProviders(<AddDataModal />);

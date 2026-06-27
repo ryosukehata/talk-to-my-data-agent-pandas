@@ -190,8 +190,7 @@ App templates contain three families of complementary logic:
   ```
 - **App Logic**: Necessary for user consumption; whether via a hosted front-end or integrating into an external consumption layer.
   ```
-  app_frontend/  # React frontend (recommended, default) with the api located in app_backend
-  frontend/  # Streamlit frontend (deprecated, will be removed March 20th, 2026)
+  app_frontend/  # React frontend with the api located in app_backend
   utils/  # App business logic & runtime helpers
   ```
 - **Operational Logic**: Necessary to activate DataRobot assets.
@@ -301,26 +300,9 @@ The Talk to my Data Agent supports connecting to SAP Datasphere.
    task deploy
    ```
 
-### Change the Frontend
+### Frontend
 
-> [!WARNING]
-> **The Streamlit frontend is deprecated and will be removed March 20th, 2026.** We strongly recommend using the React frontend.
-
-The Talk to My Data agent supports two frontend options:
-
-- **React** (default, recommended): A modern JavaScript-based frontend with enhanced UI features which uses [FastAPI Backend](app_backend/README.md). See the [React Frontend Development Guide](app_frontend/README.md)
-- **Streamlit** (deprecated): A Python-based frontend with a simple interface. **Will be removed March 20th, 2026.** See the [Streamlit Frontend Development Guide](frontend/README.md)
-
-#### Using the Streamlit Frontend (Not Recommended)
-
-If you need to temporarily use the deprecated Streamlit frontend:
-
-1. In `.env`: Set `FRONTEND_TYPE="streamlit"` to use the Streamlit frontend instead of the default React.
-2. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
-   ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
-   ```
+The Talk to My Data agent uses the React frontend in `app_frontend/` with the FastAPI backend in `app_backend/`. See the [React Frontend Development Guide](app_frontend/README.md) for local UI development.
 
 ## Tools
 
