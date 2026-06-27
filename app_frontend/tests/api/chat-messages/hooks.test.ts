@@ -15,6 +15,7 @@ import {
   useDeleteChat,
   useRenameChat,
   useUpdateChatDataSource,
+  useUpdateMessageFeedback,
 } from "@/api/chat-messages/hooks";
 
 vi.mock("sonner", () => ({
@@ -256,6 +257,78 @@ describe("useDeleteMessage", () => {
     expect(cached).toEqual(messageFixtures);
     expect(toast.error).toHaveBeenCalledWith(
       "There was a problem deleting the message.",
+    );
+  });
+});
+
+describe("useUpdateMessageFeedback", () => {
+  test("updates cached feedback fields for a message", async () => {
+    server.use(
+      http.post(
+        "*/v1/chats/messages/:messageId/feedback",
+        async ({ request }) => {
+          const body = (await request.json()) as {
+            user_rating: number;
+            user_feedback?: string;
+          };
+          return HttpResponse.json({
+            ...messageFixtures[1],
+            user_rating: body.user_rating,
+            user_feedback: body.user_feedback,
+          });
+        },
+      ),
+    );
+
+    const { queryClient, wrapper } = createTestEnv();
+    queryClient.setQueryData(messageKeys.messages("chat-1"), messageFixtures);
+
+    const { result } = renderHook(() => useUpdateMessageFeedback(), {
+      wrapper,
+    });
+
+    act(() => {
+      result.current.mutate({
+        messageId: "msg-2",
+        chatId: "chat-1",
+        userRating: -1,
+        userFeedback: "missed details",
+      });
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const cached = queryClient.getQueryData<IChatMessage[]>(
+      messageKeys.messages("chat-1"),
+    );
+    expect(cached?.[1].user_rating).toBe(-1);
+    expect(cached?.[1].user_feedback).toBe("missed details");
+  });
+
+  test("shows toast when feedback save fails", async () => {
+    server.use(
+      http.post("*/v1/chats/messages/:messageId/feedback", () =>
+        HttpResponse.json(null, { status: 500 }),
+      ),
+    );
+
+    const { wrapper } = createTestEnv();
+    const { result } = renderHook(() => useUpdateMessageFeedback(), {
+      wrapper,
+    });
+
+    act(() => {
+      result.current.mutate({
+        messageId: "msg-2",
+        chatId: "chat-1",
+        userRating: 1,
+      });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "There was a problem saving your feedback.",
     );
   });
 });

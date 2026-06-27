@@ -194,5 +194,11 @@
   "There was a problem deleting the chat.": "Houve um problema ao excluir o chat.",
   "There was a problem renaming the chat.": "Houve um problema ao renomear o chat.",
   "There was a problem updating the data source.": "Houve um problema ao atualizar a fonte de dados.",
+  "There was a problem saving your feedback.": "Houve um problema ao salvar seu feedback.",
+  "What could have been better?": "O que poderia ter sido melhor?",
+  "Describe the issue (optional)": "Descreva o problema (opcional)",
+  "Submit": "Enviar",
+  "Leave positive feedback": "Deixar feedback positivo",
+  "Leave negative feedback": "Deixar feedback negativo",
   "Message limit reached ({{max}} characters)": "Limite de mensagem atingido ({{max}} caracteres)"
 }

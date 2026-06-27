@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from collections.abc import Mapping
@@ -36,6 +37,7 @@ from openai import (
     NotFoundError,
     RateLimitError,
 )
+from opentelemetry import trace
 
 from core.constants import get_llm_model
 
@@ -54,8 +56,10 @@ _MODEL_ALIASES_FOR_CONFIG_DEFAULT = {
 }
 _DEFAULT_REQUEST_TIMEOUT_SECONDS = 180.0
 _DEFAULT_MAX_RETRIES = 2
+_CAPTURE_CONTENT_ENV = "LLM_CAPTURE_CONTENT"
 
 log = logging.getLogger(__name__)
+_tracer = trace.get_tracer(__name__)
 
 
 def _env_bool(env: Mapping[str, str], name: str, default: bool = False) -> bool:
@@ -189,6 +193,73 @@ def _normalize_completion_token_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]
     return normalized_kwargs
 
 
+def _usage_value(response: Any, *names: str) -> int | None:
+    usage = getattr(response, "usage", None)
+    if usage is None and isinstance(response, Mapping):
+        usage = response.get("usage")
+    if usage is None:
+        return None
+
+    for name in names:
+        value = (
+            usage.get(name)
+            if isinstance(usage, Mapping)
+            else getattr(usage, name, None)
+        )
+        if value is not None:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def _provider_name(
+    model: str,
+    llm_config: LLMClientConfig | None,
+    api_base: str | None,
+) -> str:
+    if api_base or llm_config and llm_config.deployment_api_base:
+        return "datarobot"
+    if model.startswith("datarobot/"):
+        return "datarobot"
+    if "/" in model:
+        return model.split("/", 1)[0]
+    return "openai"
+
+
+def _set_llm_span_attributes(
+    *,
+    span: trace.Span,
+    model: str,
+    messages: Any,
+    llm_config: LLMClientConfig | None,
+    api_base: str | None,
+    response: Any | None = None,
+) -> None:
+    provider = _provider_name(model, llm_config, api_base)
+    span.set_attribute("gen_ai.operation.name", "chat")
+    span.set_attribute("gen_ai.request.model", model)
+    span.set_attribute("gen_ai.provider.name", provider)
+    span.set_attribute("gen_ai.system", provider)
+
+    if response is not None:
+        input_tokens = _usage_value(response, "prompt_tokens", "input_tokens")
+        output_tokens = _usage_value(response, "completion_tokens", "output_tokens")
+        if input_tokens is not None:
+            span.set_attribute("gen_ai.usage.input_tokens", input_tokens)
+        if output_tokens is not None:
+            span.set_attribute("gen_ai.usage.output_tokens", output_tokens)
+
+    if _env_bool(os.environ, _CAPTURE_CONTENT_ENV):
+        span.set_attribute(
+            "gen_ai.input.messages",
+            json.dumps(messages, default=str, ensure_ascii=False),
+        )
+        if response is not None:
+            span.set_attribute("gen_ai.output.messages", str(response))
+
+
 class CompletionTokenCompatibilityProxy:
     """Proxy that normalizes deprecated completion token parameters."""
 
@@ -317,8 +388,24 @@ class CompletionsProxy:
         )
 
         try:
-            # Call underlying implementation
-            result = await self._completions.create(*args, **kwargs)
+            with _tracer.start_as_current_span(f"gen_ai.chat {model}") as span:
+                _set_llm_span_attributes(
+                    span=span,
+                    model=str(model),
+                    messages=messages,
+                    llm_config=self._llm_config,
+                    api_base=self._api_base,
+                )
+                # Call underlying implementation
+                result = await self._completions.create(*args, **kwargs)
+                _set_llm_span_attributes(
+                    span=span,
+                    model=str(model),
+                    messages=messages,
+                    llm_config=self._llm_config,
+                    api_base=self._api_base,
+                    response=result,
+                )
 
             # Track tokens if tracker is available
             if self._tracker:
@@ -343,10 +430,26 @@ class CompletionsProxy:
         )
 
         try:
-            # Call underlying implementation
-            result, org = await self._completions.create_with_completion(
-                *args, **kwargs
-            )
+            with _tracer.start_as_current_span(f"gen_ai.chat {model}") as span:
+                _set_llm_span_attributes(
+                    span=span,
+                    model=str(model),
+                    messages=messages,
+                    llm_config=self._llm_config,
+                    api_base=self._api_base,
+                )
+                # Call underlying implementation
+                result, org = await self._completions.create_with_completion(
+                    *args, **kwargs
+                )
+                _set_llm_span_attributes(
+                    span=span,
+                    model=str(model),
+                    messages=messages,
+                    llm_config=self._llm_config,
+                    api_base=self._api_base,
+                    response=org,
+                )
 
             # Track tokens if tracker is available
             if self._tracker:

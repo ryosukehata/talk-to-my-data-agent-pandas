@@ -43,3 +43,8 @@ tasks:
         if [ "$pytest_status" -ne 0 ] && [ "$pytest_status" -ne 5 ]; then
           exit "$pytest_status"
         fi
+
+  transfer-database:
+    desc: "🗄️ Transfer persistent storage between stopped DataRobot apps (dry-run by default)"
+    cmds:
+      - uv run python -m core.scripts.transfer_database {{.CLI_ARGS}}

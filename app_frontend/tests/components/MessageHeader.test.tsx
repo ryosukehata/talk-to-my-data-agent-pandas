@@ -10,12 +10,14 @@ vi.mock("@/api/chat-messages/hooks", () => ({
   useDeleteMessage: vi.fn(),
   usePostMessage: vi.fn(),
   useExport: vi.fn(),
+  useUpdateMessageFeedback: vi.fn(),
 }));
 
 import {
   useFetchAllMessages,
   useDeleteMessage,
   useExport,
+  useUpdateMessageFeedback,
 } from "@/api/chat-messages/hooks";
 
 describe("MessageHeader Component", () => {
@@ -45,6 +47,7 @@ describe("MessageHeader Component", () => {
     useFetchAllMessages: { data: [mockMessage, mockResponseMessage] } as any,
     useDeleteMessage: { mutate: vi.fn(), isPending: false } as any,
     useExport: { exportChat: vi.fn(), isLoading: false },
+    useUpdateMessageFeedback: { mutate: vi.fn(), isPending: false } as any,
     ...overrides,
   });
 
@@ -55,6 +58,9 @@ describe("MessageHeader Component", () => {
     );
     vi.mocked(useDeleteMessage).mockReturnValue(mockHooks.useDeleteMessage);
     vi.mocked(useExport).mockReturnValue(mockHooks.useExport);
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue(
+      mockHooks.useUpdateMessageFeedback,
+    );
   });
 
   test("renders basic header information for user message", () => {
@@ -265,7 +271,7 @@ describe("MessageHeader Component", () => {
     );
   });
 
-  test("does not render action buttons for assistant message", () => {
+  test("renders feedback actions for assistant message without user actions", () => {
     const assistantMessage = { ...mockMessage, role: "assistant" as const };
     const mockHooksWithAssistantMessage = createMockHooks({
       useFetchAllMessages: { data: [assistantMessage] } as any,
@@ -285,5 +291,117 @@ describe("MessageHeader Component", () => {
     expect(
       screen.queryByRole("button", { name: /export chat/i }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId("message-feedback-thumbs-up"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("message-feedback-thumbs-down"),
+    ).toBeInTheDocument();
+  });
+
+  test("shows thumbs up as selected when assistant message has positive feedback", () => {
+    const assistantMessage = {
+      ...mockResponseMessage,
+      user_rating: 1,
+    } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />,
+    );
+
+    expect(screen.getByTestId("message-feedback-thumbs-up")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  test("sends positive feedback and clears previous text", async () => {
+    const user = userEvent.setup();
+    const updateFeedback = vi.fn();
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue({
+      mutate: updateFeedback,
+      isPending: false,
+    } as any);
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />,
+    );
+
+    await user.click(screen.getByTestId("message-feedback-thumbs-up"));
+
+    expect(updateFeedback).toHaveBeenCalledWith({
+      messageId: assistantMessage.id,
+      chatId: "chat-1",
+      userRating: 1,
+      userFeedback: "",
+    });
+  });
+
+  test("opens negative feedback dialog and submits feedback text", async () => {
+    const user = userEvent.setup();
+    const updateFeedback = vi.fn();
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue({
+      mutate: updateFeedback,
+      isPending: false,
+    } as any);
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />,
+    );
+
+    await user.click(screen.getByTestId("message-feedback-thumbs-down"));
+    await user.type(
+      screen.getByTestId("message-feedback-textarea"),
+      "Needs more detail",
+    );
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(updateFeedback).toHaveBeenCalledWith({
+      messageId: assistantMessage.id,
+      chatId: "chat-1",
+      userRating: -1,
+      userFeedback: "Needs more detail",
+    });
+  });
+
+  test("closing negative feedback dialog sends rating without text", async () => {
+    const user = userEvent.setup();
+    const updateFeedback = vi.fn();
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue({
+      mutate: updateFeedback,
+      isPending: false,
+    } as any);
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />,
+    );
+
+    await user.click(screen.getByTestId("message-feedback-thumbs-down"));
+    await user.keyboard("{Escape}");
+
+    expect(updateFeedback).toHaveBeenCalledWith({
+      messageId: assistantMessage.id,
+      chatId: "chat-1",
+      userRating: -1,
+    });
   });
 });

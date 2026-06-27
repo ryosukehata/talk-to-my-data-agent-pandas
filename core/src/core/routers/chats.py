@@ -29,7 +29,7 @@ from datarobot_genai.core.utils.token_tracking import (
     TokenUsageTracker,
     count_messages_tokens,
 )
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_user_message_param import (
@@ -66,6 +66,7 @@ from core.schema import (
     RunAnalysisResult,
     RunChartsResult,
     RunDatabaseAnalysisResult,
+    UserFeedbackUpdate,
 )
 
 logger = get_logger()
@@ -255,6 +256,34 @@ async def delete_chat_message(
         logger.error(f"Error deleting message: {str(e)}")
 
         return cast(list[AnalystChatMessage], [])
+
+
+@router.post("/messages/{message_id}/feedback")
+async def update_message_feedback(
+    message_id: str,
+    feedback: UserFeedbackUpdate,
+    analyst_db: AnalystDB = Depends(get_initialized_db),
+) -> AnalystChatMessage:
+    """Update feedback for an assistant chat message."""
+    updated = await analyst_db.update_message_feedback(
+        message_id=message_id,
+        user_rating=feedback.user_rating,
+        user_feedback=feedback.user_feedback,
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Message with ID {message_id} not found",
+        )
+
+    message = await analyst_db.get_chat_message(message_id=message_id)
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Message with ID {message_id} not found",
+        )
+
+    return message
 
 
 @router.get("/{chat_id}/messages/{message_id}")

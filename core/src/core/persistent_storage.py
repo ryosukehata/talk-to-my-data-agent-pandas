@@ -189,7 +189,10 @@ class AsyncDataRobotClient:
 
 
 class PersistentStorage:
-    def __init__(self, user_id: Optional[str]):
+    def __init__(self, user_id: Optional[str], global_user: bool = False):
+        if user_id is not None and global_user:
+            raise ValueError("user_id cannot be set when global_user is True.")
+
         self.app_id: str = os.environ.get("APPLICATION_ID")  # type: ignore[assignment]
         if not self.app_id:
             raise ValueError("APPLICATION_ID env variable is not set.")
@@ -202,7 +205,7 @@ class PersistentStorage:
             )
         self._async_client = AsyncDataRobotClient(endpoint=endpoint, token=token)
 
-        self.name_prefix = f"{user_id}_"
+        self.name_prefix = "" if global_user else f"{user_id}_"
 
     @telemetry.meter_and_trace
     async def files(self) -> List[str]:
