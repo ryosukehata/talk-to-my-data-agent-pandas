@@ -28,6 +28,7 @@ from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
 
 from . import use_case
+from .guardrails import llm_guard_configurations
 from .libllm import (
     validate_feature_flags,
     verify_llm,
@@ -117,6 +118,7 @@ llm_custom_model = datarobot.CustomModel(
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
     runtime_parameter_values=[],
+    guard_configurations=llm_guard_configurations,
 )
 
 # Register the custom model from the LLM Blueprint

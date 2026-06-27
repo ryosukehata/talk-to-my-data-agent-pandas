@@ -28,6 +28,7 @@ from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
 
 from . import use_case
+from .guardrails import llm_guard_configurations
 from .libllm import (
     validate_feature_flags,
     verify_llm,
@@ -116,6 +117,7 @@ llm_custom_model = datarobot.CustomModel(
     base_environment_id=RuntimeEnvironments.PYTHON_312_MODERATIONS.value.id,
     use_case_ids=[use_case.id],
     source_llm_blueprint_id=llm_blueprint.id,
+    guard_configurations=llm_guard_configurations,
 )
 
 prediction_environment = datarobot.PredictionEnvironment(

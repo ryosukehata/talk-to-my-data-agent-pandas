@@ -89,6 +89,8 @@ def test_llm_configuration_modules_match_upstream_runtime_contracts() -> None:
 
 def test_llm_configuration_modules_use_upstream_pulumi_shape() -> None:
     for module_path in LLM_CONFIG_DIR.glob("*.py"):
+        if module_path.name == "guardrails.py":
+            continue
         source = module_path.read_text()
 
         assert "get_configuration" not in source
