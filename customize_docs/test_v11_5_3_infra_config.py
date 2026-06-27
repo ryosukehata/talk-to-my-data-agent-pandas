@@ -108,6 +108,7 @@ def test_infra_directory_uses_upstream_split_layout() -> None:
         "Pulumi.yaml",
         "__main__.py",
         "configurations/README.md",
+        "configurations/jobs/custom_jobs.py",
         "configurations/llm/gateway_direct.py",
         "feature_flags/README.md",
         "feature_flags/feature_flag_requirements.yaml",
