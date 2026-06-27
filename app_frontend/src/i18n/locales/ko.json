@@ -194,5 +194,11 @@
   "There was a problem deleting the chat.": "채팅을 삭제하는 중 문제가 발생했습니다.",
   "There was a problem renaming the chat.": "채팅 이름을 변경하는 중 문제가 발생했습니다.",
   "There was a problem updating the data source.": "데이터 소스를 업데이트하는 중 문제가 발생했습니다.",
+  "There was a problem saving your feedback.": "피드백을 저장하는 중 문제가 발생했습니다.",
+  "What could have been better?": "어떤 점을 개선할 수 있었나요?",
+  "Describe the issue (optional)": "문제를 설명하세요(선택 사항)",
+  "Submit": "제출",
+  "Leave positive feedback": "긍정 피드백 남기기",
+  "Leave negative feedback": "부정 피드백 남기기",
   "Message limit reached ({{max}} characters)": "메시지 한도에 도달했습니다 ({{max}}자)"
 }

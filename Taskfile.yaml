@@ -9,6 +9,9 @@ includes:
   app_frontend:
     taskfile: ./app_frontend/Taskfile.yaml
     dir: ./app_frontend
+  core:
+    taskfile: ./core/Taskfile.yaml
+    dir: ./core
   infra:
     taskfile: ./infra/Taskfile.yaml
     dir: ./infra

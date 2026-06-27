@@ -393,6 +393,7 @@ class DataDictionary(BaseModel):
 
 class DataDictionaryResponse(DataDictionary):
     in_progress: bool = False
+    error: Optional[str] = None
 
 
 class DictionaryGeneration(SanitizedJsonModel):
@@ -729,6 +730,8 @@ class AnalystChatMessage(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     chat_id: str | None = None
     error: str | None = None
+    user_rating: Literal[-1, 1] | None = None
+    user_feedback: str | None = None
 
     @field_serializer("created_at")
     def serialize_created_at(self, value: datetime) -> str:
@@ -859,6 +862,11 @@ class ChatMessagePayload(BaseModel):
     enable_business_insights: bool = True
     data_source: str = "file"
     chatName: Optional[str] = "New Chat"
+
+
+class UserFeedbackUpdate(BaseModel):
+    user_rating: Literal[-1, 1]
+    user_feedback: str | None = None
 
 
 class DownloadedRegistryDataset(BaseModel):

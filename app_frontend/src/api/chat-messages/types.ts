@@ -84,6 +84,8 @@ export interface IChatMessage {
   chat_id?: string; // ID of the chat this message belongs to
   id?: string; // Unique identifier for the message
   error?: string;
+  user_rating?: -1 | 1;
+  user_feedback?: string;
 }
 
 export interface IUserMessage {

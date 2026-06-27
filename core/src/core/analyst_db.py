@@ -436,7 +436,7 @@ class DatasetHandler(BaseDuckDBHandler):
     async def _initialize_child(self) -> None:
         all_tables_exists = await async_all(
             self._table_exists(table)
-            for table in ["dataset_metadata", "cleansing_reports"]
+            for table in ["dataset_metadata", "cleansing_reports", "dictionary_errors"]
         )
 
         if not all_tables_exists:
@@ -466,6 +466,17 @@ class DatasetHandler(BaseDuckDBHandler):
                         dataset_name VARCHAR,
                         report JSON,
                         PRIMARY KEY (dataset_name)
+                    )
+                    """,
+                )
+
+                await self.execute_query(
+                    conn,
+                    """
+                    CREATE TABLE IF NOT EXISTS dictionary_errors (
+                        dataset_name VARCHAR PRIMARY KEY,
+                        error VARCHAR NOT NULL,
+                        updated_at TIMESTAMP NOT NULL
                     )
                     """,
                 )
@@ -851,6 +862,10 @@ class DatasetHandler(BaseDuckDBHandler):
                 conn, "DELETE FROM cleansing_reports WHERE dataset_name = ?", [name]
             )
 
+            await self.execute_query(
+                conn, "DELETE FROM dictionary_errors WHERE dataset_name = ?", [name]
+            )
+
         logger.info(f"Deleted dataset {name}")
 
     async def delete_related_datasets(self, name: str) -> None:
@@ -901,6 +916,40 @@ class DatasetHandler(BaseDuckDBHandler):
 
         logger.info("Deleted all empty datasets")
 
+    async def mark_dictionary_failed(self, dataset_name: str, error: str) -> None:
+        async with self._write_connection() as conn:
+            await self.execute_query(
+                conn,
+                """
+                INSERT OR REPLACE INTO dictionary_errors
+                    (dataset_name, error, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                [dataset_name, error, datetime.now(timezone.utc)],
+            )
+
+    async def clear_dictionary_error(self, dataset_name: str) -> None:
+        async with self._write_connection() as conn:
+            await self.execute_query(
+                conn,
+                "DELETE FROM dictionary_errors WHERE dataset_name = ?",
+                [dataset_name],
+            )
+
+    async def get_dictionary_error(self, dataset_name: str) -> str | None:
+        async with self._read_connection() as conn:
+            result = await self.execute_query(
+                conn,
+                "SELECT error FROM dictionary_errors WHERE dataset_name = ?",
+                [dataset_name],
+            )
+            row = await asyncio.get_running_loop().run_in_executor(
+                None, result.fetchone
+            )
+            if row:
+                return cast(str, row[0])
+            return None
+
 
 class ChatHandler(BaseDuckDBHandler):
     """Async handler for chat-related operations."""
@@ -911,7 +960,8 @@ class ChatHandler(BaseDuckDBHandler):
 
     async def _initialize_child(self) -> None:
         all_tables_exist = await async_all(
-            self._table_exists(table) for table in ["chat_history", "chat_messages"]
+            self._table_exists(table)
+            for table in ["chat_history", "chat_messages", "message_feedback"]
         )
 
         if not all_tables_exist:
@@ -938,6 +988,18 @@ class ChatHandler(BaseDuckDBHandler):
                         chat_id VARCHAR NOT NULL,
                         message JSON NOT NULL,
                         created_at TIMESTAMP,
+                    )
+                    """,
+                )
+
+                await self.execute_query(
+                    conn,
+                    """
+                    CREATE TABLE IF NOT EXISTS message_feedback (
+                        message_id VARCHAR PRIMARY KEY REFERENCES chat_messages(id),
+                        chat_id VARCHAR REFERENCES chat_history(id),
+                        user_rating INTEGER,
+                        user_feedback VARCHAR
                     )
                     """,
                 )
@@ -1033,10 +1095,18 @@ class ChatHandler(BaseDuckDBHandler):
             result = await self.execute_query(
                 conn,
                 """
-                SELECT id, message, chat_id, created_at
-                FROM chat_messages
-                WHERE chat_id = ?
-                ORDER BY created_at
+                SELECT
+                    m.id,
+                    m.message,
+                    m.chat_id,
+                    m.created_at,
+                    mf.user_rating,
+                    mf.user_feedback
+                FROM chat_messages m
+                LEFT JOIN message_feedback mf
+                    ON mf.message_id = m.id
+                WHERE m.chat_id = ?
+                ORDER BY m.created_at
                 """,
                 [chat_id],
             )
@@ -1052,6 +1122,8 @@ class ChatHandler(BaseDuckDBHandler):
                     # Ensure the message has the correct id and chat_id
                     message.id = row[0]
                     message.chat_id = row[2]
+                    message.user_rating = row[4]
+                    message.user_feedback = row[5]
                     messages.append(message)
                 return messages
             return []
@@ -1285,6 +1357,13 @@ class ChatHandler(BaseDuckDBHandler):
 
             chat_id = row[0]
 
+            # Delete related feedback first since DuckDB does not cascade deletes.
+            await self.execute_query(
+                conn,
+                "DELETE FROM message_feedback WHERE message_id = ?",
+                [message_id],
+            )
+
             # Delete the message
             await self.execute_query(
                 conn,
@@ -1329,9 +1408,17 @@ class ChatHandler(BaseDuckDBHandler):
             result = await self.execute_query(
                 conn,
                 """
-                SELECT id, message, chat_id, created_at
-                FROM chat_messages
-                WHERE id = ?
+                SELECT
+                    m.id,
+                    m.message,
+                    m.chat_id,
+                    m.created_at,
+                    mf.user_rating,
+                    mf.user_feedback
+                FROM chat_messages m
+                LEFT JOIN message_feedback mf
+                    ON mf.message_id = m.id
+                WHERE m.id = ?
                 """,
                 [message_id],
             )
@@ -1348,6 +1435,8 @@ class ChatHandler(BaseDuckDBHandler):
             # Ensure the message has the correct id and chat_id
             message.id = row[0]
             message.chat_id = row[2]
+            message.user_rating = row[4]
+            message.user_feedback = row[5]
             return message
 
     async def update_chat_message(
@@ -1409,6 +1498,63 @@ class ChatHandler(BaseDuckDBHandler):
             )
 
             # Update the chat's updated_at timestamp
+            await self.execute_query(
+                conn,
+                """
+                UPDATE chat_history SET
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                [datetime.now(timezone.utc), chat_id],
+            )
+
+            return True
+
+    async def update_message_feedback(
+        self,
+        message_id: str,
+        user_rating: int,
+        user_feedback: str | None,
+    ) -> bool:
+        """
+        Update a message's user feedback without modifying the stored message payload.
+        """
+        if not message_id:
+            logger.warning(
+                "No message_id provided for update_message_feedback operation"
+            )
+            return False
+
+        logger.info(f"Updating feedback for message with ID {message_id}")
+
+        async with self._write_connection() as conn:
+            result = await self.execute_query(
+                conn, "SELECT chat_id FROM chat_messages WHERE id = ?", [message_id]
+            )
+            row = await asyncio.get_running_loop().run_in_executor(
+                None, lambda: result.fetchone()
+            )
+
+            if not row:
+                logger.warning(f"Chat message with ID {message_id} does not exist")
+                return False
+
+            chat_id = row[0]
+            await self.execute_query(
+                conn,
+                """
+                INSERT INTO message_feedback
+                    (message_id, chat_id, user_rating, user_feedback)
+                VALUES
+                    (?, ?, ?, ?)
+                ON CONFLICT (message_id) DO UPDATE SET
+                    chat_id = EXCLUDED.chat_id,
+                    user_rating = EXCLUDED.user_rating,
+                    user_feedback = EXCLUDED.user_feedback
+                """,
+                [message_id, chat_id, user_rating, user_feedback],
+            )
+
             await self.execute_query(
                 conn,
                 """
@@ -1492,6 +1638,11 @@ class ChatHandler(BaseDuckDBHandler):
                 # First, delete all existing messages
                 await self.execute_query(
                     conn,
+                    "DELETE FROM message_feedback WHERE chat_id = ?",
+                    [chat_id],
+                )
+                await self.execute_query(
+                    conn,
                     "DELETE FROM chat_messages WHERE chat_id = ?",
                     [chat_id],
                 )
@@ -1534,6 +1685,10 @@ class ChatHandler(BaseDuckDBHandler):
             logger.info(f"Deleting chat with ID {chat_id}")
 
             async with self._write_connection() as conn:
+                await self.execute_query(
+                    conn, "DELETE FROM message_feedback WHERE chat_id = ?", [chat_id]
+                )
+
                 # First delete all associated messages
                 await self.execute_query(
                     conn, "DELETE FROM chat_messages WHERE chat_id = ?", [chat_id]
@@ -1563,6 +1718,12 @@ class ChatHandler(BaseDuckDBHandler):
 
                 if row:
                     chat_id = row[0]
+                    await self.execute_query(
+                        conn,
+                        "DELETE FROM message_feedback WHERE chat_id = ?",
+                        [chat_id],
+                    )
+
                     # Delete all associated messages
                     await self.execute_query(
                         conn, "DELETE FROM chat_messages WHERE chat_id = ?", [chat_id]
@@ -1599,6 +1760,9 @@ class ChatHandler(BaseDuckDBHandler):
             )
 
             for (chat_id,) in chat_ids:
+                await self.execute_query(
+                    conn, "DELETE FROM message_feedback WHERE chat_id = ?", [chat_id]
+                )
                 await self.execute_query(
                     conn, "DELETE FROM chat_messages WHERE chat_id = ?", [chat_id]
                 )
@@ -2138,6 +2302,15 @@ class AnalystDB:
             logger.error(f"Failed to get data dictionary {name}", exc_info=True)
         return None
 
+    async def mark_dictionary_failed(self, name: str, error: str) -> None:
+        await self.dataset_handler.mark_dictionary_failed(name, error)
+
+    async def clear_dictionary_error(self, name: str) -> None:
+        await self.dataset_handler.clear_dictionary_error(name)
+
+    async def get_dictionary_error(self, name: str) -> str | None:
+        return await self.dataset_handler.get_dictionary_error(name)
+
     async def get_cleansing_report(
         self, dataset_name: str
     ) -> list[CleansedColumnReport] | None:
@@ -2250,6 +2423,19 @@ class AnalystDB:
         """
         return await self.chat_handler.update_chat_message(
             message_id=message_id, message=message
+        )
+
+    async def update_message_feedback(
+        self,
+        message_id: str,
+        user_rating: int,
+        user_feedback: str | None,
+    ) -> bool:
+        """Update message feedback directly by message ID."""
+        return await self.chat_handler.update_message_feedback(
+            message_id=message_id,
+            user_rating=user_rating,
+            user_feedback=user_feedback,
         )
 
     async def delete_chat_message(

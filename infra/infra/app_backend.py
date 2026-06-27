@@ -289,7 +289,12 @@ USE_JAPANESE_FONT_ENV = (
     if use_japanese_font_env_raw is not None
     else False
 )
-app_environment_id = os.environ.get("APP_ENVIRONMENT_ID")
+app_environment_id = os.environ.get(
+    "APPLICATION_EXECUTION_ENVIRONMENT_ID"
+) or os.environ.get("APP_ENVIRONMENT_ID")
+app_environment_version_id = os.environ.get(
+    "APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID"
+)
 if app_environment_id:
     pulumi.info(f"Using existing app environment '{app_environment_id}'")
     app_environment = datarobot.ExecutionEnvironment.get(
@@ -314,6 +319,11 @@ app_backend_app_source_args: dict[str, pulumi.Input[str]] = {
     "resource_name": f"Data Analyst App Source [{PROJECT_NAME}]",
     "base_environment_id": base_environment_id,
 }
+if app_environment_version_id:
+    app_backend_app_source_args["base_environment_version_id"] = (
+        app_environment_version_id
+    )
+
 app_backend_app_resource_name: str = f"Data Analyst Application [{PROJECT_NAME}]"
 app_backend_app_runtime_parameters = [
     *list(llm_app_runtime_parameters),

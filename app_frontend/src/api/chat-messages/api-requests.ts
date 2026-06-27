@@ -113,6 +113,34 @@ export const deleteMessage = async ({
   return data;
 };
 
+export interface IUpdateMessageFeedbackParams {
+  messageId: string;
+  userRating: -1 | 1;
+  userFeedback?: string;
+  signal?: AbortSignal;
+}
+
+export const updateMessageFeedback = async ({
+  messageId,
+  userRating,
+  userFeedback,
+  signal,
+}: IUpdateMessageFeedbackParams): Promise<IChatMessage> => {
+  const payload: { user_rating: -1 | 1; user_feedback?: string } = {
+    user_rating: userRating,
+  };
+  if (userFeedback !== undefined) {
+    payload.user_feedback = userFeedback;
+  }
+
+  const { data } = await apiClient.post<IChatMessage>(
+    `/v1/chats/messages/${messageId}/feedback`,
+    payload,
+    { signal },
+  );
+  return data;
+};
+
 interface IDeleteChatParams {
   chatId: string;
   signal?: AbortSignal;
