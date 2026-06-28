@@ -92,10 +92,14 @@ def test_app_backend_uv_lock_is_packaged_for_runtime_sync() -> None:
 def test_app_backend_uses_upstream_uv_runtime_bundle() -> None:
     app_backend = REPO_ROOT / "app_backend"
     start_script = (app_backend / "start-app.sh").read_text()
+    pyproject = (app_backend / "pyproject.toml").read_text()
 
     assert not (app_backend / "build-app.sh").exists()
     assert not (app_backend / "requirements.txt").exists()
     assert not (app_backend / "requirements.in").exists()
+    assert "[tool.uv]\npackage = false" in pyproject
+    assert "[build-system]" not in pyproject
+    assert "[tool.hatch.build.targets.wheel]" not in pyproject
     assert 'export UV_CACHE_DIR="${WORKING_DIR}/.uv"' in start_script
     assert "exec uv run python -m uvicorn" in start_script
     assert "--port 8080" in start_script

@@ -87,16 +87,11 @@ dev = [
     "types-pyyaml>=6.0.12.20241230,<7.0",
 ]
 
+[tool.uv]
+package = false
+
 [tool.uv.sources]
 core = { path = "core", editable = true }
-
-[build-system]
-requires = ["hatchling>=1.18.0"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["app"]
-include = ["static", "templates"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
