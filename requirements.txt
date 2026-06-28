@@ -78,12 +78,12 @@ tenacity>=8.0.0
 
 # backend
 aiologic>=0.16,<1.0
-datarobot[auth-authlib,core]>=3.10.0,<4.0
+datarobot[auth-authlib,core]>=3.13.0,<4.0
 datarobot-asgi-middleware>=0.2.0
 fastapi>=0.115.11,<0.130
 python-multipart>=0.0.20,<1.0
 uvicorn==0.34.0,<1
-psutil>=6.1.1,<7.0
+psutil>=7.2.1,<8.0
 pydantic>=2.11.4,<3.0
 pydantic-settings>=2.4.0,<3.0
 joblib>=1.4.2,<2.0

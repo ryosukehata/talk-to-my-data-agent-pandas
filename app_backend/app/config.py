@@ -14,8 +14,17 @@
 
 from core.telemetry import FormatType, LogLevel
 from datarobot.core.config import DataRobotAppFrameworkBaseSettings
+from pydantic import field_validator
 
 
 class Config(DataRobotAppFrameworkBaseSettings):
     log_level: LogLevel = LogLevel.INFO
     log_format: FormatType = "readable"
+    otel_exporter_otlp_endpoint: str = ""
+    otel_exporter_otlp_headers: str = ""
+    otel_sdk_disabled: bool = False
+
+    @field_validator("otel_sdk_disabled", mode="before")
+    @classmethod
+    def _coerce_empty_otel_sdk_disabled(cls, value: object) -> object:
+        return False if value == "" else value

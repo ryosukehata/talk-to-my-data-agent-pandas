@@ -1026,7 +1026,7 @@ async def _generate_run_analysis_python_code(
     attempt: int = 0,
     token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
-) -> str:
+) -> CodeGeneration:
     """
     Generate Python analysis code based on JSON data and question.
 
@@ -1094,6 +1094,14 @@ async def _generate_run_analysis_python_code(
         ),
         ChatCompletionUserMessageParam(
             role="user", content=f"Business Question: {request.question}"
+        ),
+        ChatCompletionUserMessageParam(
+            role="user",
+            content=(
+                f"Available dataset keys in dfs: {json.dumps(request.dataset_names)}\n"
+                "IMPORTANT: Only use these exact strings as keys when accessing dfs. "
+                "Do not derive key names from the business question or any other source."
+            ),
         ),
         ChatCompletionUserMessageParam(
             role="user", content=f"Data Shapes:\n{shape_info}"
@@ -1173,7 +1181,7 @@ async def _generate_run_analysis_python_code(
             )
         )
     logger.info("Code Gen complete")
-    return completion.code
+    return completion
 
 
 @telemetry.meter_and_trace
@@ -1625,7 +1633,7 @@ async def _run_analysis(
         analysis_context.assistant_message.step_reattempt = len(exception_history)
         analysis_context.stage_message_update()
 
-    code = await _generate_run_analysis_python_code(
+    completion = await _generate_run_analysis_python_code(
         request,
         analyst_db,
         next(iter(exception_history[::-1]), None),
@@ -1633,6 +1641,7 @@ async def _run_analysis(
         token_tracker=token_tracker,
         telemetry_json=telemetry_json,
     )
+    code = completion.code
     logger.info("Code generated, preparing execution")
 
     if (
@@ -1706,6 +1715,7 @@ async def _run_analysis(
                 len(df.columns) for df in dataframes.values() if not df.empty
             ),
         ),
+        used_datasets=completion.used_datasets,
     )
 
 

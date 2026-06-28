@@ -33,6 +33,8 @@
   "Downloading...": "다운로드 중…",
   "Download dataset as CSV": "데이터세트를 CSV로 다운로드",
   "Analysis Dataset": "분석 데이터세트",
+  "Dataset generated for analysis": "분석용으로 생성된 데이터셋",
+  "Datasets used:": "사용된 데이터셋:",
   "Download dataset": "데이터셋 다운로드",
   "Code": "코드",
   "Copy snippet to clipboard": "스니펫을 클립보드에 복사",

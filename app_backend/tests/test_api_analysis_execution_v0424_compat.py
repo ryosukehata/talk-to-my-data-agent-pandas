@@ -29,6 +29,7 @@ from utils.schema import (
     AnalystChatMessage,
     AnalystDataset,
     ChatRequest,
+    CodeGeneration,
     RunAnalysisRequest,
     RunAnalysisResult,
     RunAnalysisResultMetadata,
@@ -150,8 +151,12 @@ async def _assert_run_analysis_updates_steps_and_preserves_pandas(monkeypatch) -
                 data=pd.DataFrame({"amount": [100, 200]}),
             )
 
-    async def fake_generate_run_analysis_python_code(*args, **kwargs) -> str:
-        return "def analyze_data(datasets): ..."
+    async def fake_generate_run_analysis_python_code(*args, **kwargs) -> CodeGeneration:
+        return CodeGeneration(
+            code="def analyze_data(datasets): ...",
+            description="analysis",
+            used_datasets=["sales"],
+        )
 
     def fake_execute_python(**kwargs) -> AnalystDataset:
         assert "pl" not in kwargs["modules"]

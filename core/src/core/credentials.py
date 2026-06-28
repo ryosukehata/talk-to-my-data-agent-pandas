@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from pydantic import AliasChoices, AliasPath, Field
+from pydantic import AliasChoices, AliasPath, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -291,3 +291,32 @@ class SAPDatasphereCredentials(DRCredentials):
 
 class NoDatabaseCredentials(DRCredentials):
     pass
+
+
+_VALID_JDBC_PREFIXES = ("jdbc:postgresql://", "jdbc:mysql://", "jdbc:sqlserver://")
+
+
+class JDBCCredentials(DRCredentials):
+    jdbc_uri: str = Field(
+        validation_alias=AliasChoices(
+            "JDBC_URI",
+            AliasPath("MLOPS_RUNTIME_PARAM_JDBC_URI", "payload", "apiToken"),
+        )
+    )
+    jdbc_connection_parameters: Dict[str, Any] | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "JDBC_CONNECTION_PARAMETERS",
+            AliasPath(
+                "MLOPS_RUNTIME_PARAM_JDBC_CONNECTION_PARAMETERS", "payload", "apiToken"
+            ),
+        ),
+    )
+
+    @field_validator("jdbc_uri")
+    @classmethod
+    def _validate_jdbc_uri(cls, value: str) -> str:
+        if not value.startswith(_VALID_JDBC_PREFIXES):
+            supported = ", ".join(_VALID_JDBC_PREFIXES)
+            raise ValueError(f"Unsupported JDBC URI. Supported prefixes: {supported}")
+        return value

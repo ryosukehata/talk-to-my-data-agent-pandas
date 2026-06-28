@@ -18,11 +18,13 @@ import { useTheme } from "@/theme/theme-provider";
 interface CodeTabContentProps {
   code?: string | null;
   datasetId?: string | null;
+  usedDatasets?: string[] | null;
 }
 
 export const CodeTabContent: React.FC<CodeTabContentProps> = ({
   code,
   datasetId,
+  usedDatasets,
 }) => {
   const { t } = useTranslation();
   const { mutate: downloadDataset, isPending: isDownloadingDataset } =
@@ -36,8 +38,14 @@ export const CodeTabContent: React.FC<CodeTabContentProps> = ({
 
   return (
     <div className="flex min-w-0 flex-col gap-2.5">
+      {!!usedDatasets && usedDatasets.length > 0 && (
+        <div data-testid="provenance-strip" className="text-sm">
+          {t("Datasets used:")}{" "}
+          <span className="font-medium">{usedDatasets.join(", ")}</span>
+        </div>
+      )}
       {datasetId && (
-        <CollapsiblePanel header={t("Analysis Dataset")}>
+        <CollapsiblePanel header={t("Dataset generated for analysis")}>
           <div className="flex flex-col gap-2">
             <div className="flex justify-end">
               <Button

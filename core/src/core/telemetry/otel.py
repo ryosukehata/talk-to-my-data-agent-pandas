@@ -176,12 +176,37 @@ class OTel:
         # We keep this even if telemetry is disabled, just in case something tries to force it
         self._install_otlp_error_filter()
 
-        # Setup auto-instrumentation on first init
-        if not self._auto_instrumentation_setup:
+        # Setup auto-instrumentation on first init. Skip when telemetry is disabled:
+        # the httpx instrumentor wraps every AsyncClient process-wide and can hang
+        # CLI scripts that explicitly opt out of telemetry.
+        if self.telemetry_enabled and not self._auto_instrumentation_setup:
             self._setup_auto_instrumentation()
             self._auto_instrumentation_setup = True
 
         self._initialized = True
+
+    def configure(self, config: Any) -> None:
+        """Apply app-level OTel settings from DataRobot runtime parameters."""
+        otel_sdk_disabled = bool(getattr(config, "otel_sdk_disabled", False))
+        self.telemetry_enabled = not otel_sdk_disabled
+
+        endpoint = str(getattr(config, "otel_exporter_otlp_endpoint", "") or "")
+        headers = str(getattr(config, "otel_exporter_otlp_headers", "") or "")
+        if endpoint:
+            os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = endpoint
+        if headers:
+            os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = headers
+
+        if self.telemetry_enabled and not endpoint:
+            if not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT_INTERNAL"):
+                self.telemetry_enabled = False
+                logging.getLogger(__name__).warning(
+                    "OTEL_EXPORTER_OTLP_ENDPOINT not set. Disabling telemetry to prevent connection errors."
+                )
+
+        if self.telemetry_enabled and not self._auto_instrumentation_setup:
+            self._setup_auto_instrumentation()
+            self._auto_instrumentation_setup = True
 
     def _install_otlp_error_filter(self) -> None:
         """Install logging filter to suppress OTLP connection errors."""

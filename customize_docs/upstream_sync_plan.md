@@ -8,11 +8,11 @@
 ## 現在地
 
 - 取り込み元: `upstream/main`
-- fetch確認日: 2026-06-08
-- upstream次候補: `v0.5.2`
+- fetch確認日: 2026-06-27
+- upstream次候補: `v11.8.2`
 - upstream 0系最新: `v0.5.3`
-- upstream最新タグ: `v11.8.1`
-- `origin/dev` 最新: `b424579` (`v0.5.1` 取り込みPR #74 merge済み)
+- upstream最新タグ: `v11.8.2`
+- `origin/dev` 最新: `aee3e4d` (`v11.7.2` 取り込みPR #107 merge済み)
 - `origin/dev` は内容上 `v0.5.1` 済みだが、履歴上は `v0.5.1` タグを祖先に持たない。
 - 退避ブランチ: `backup/dev-before-upstream-sync-20260604`, `backup/dev-before-v0.4.24-sync-20260604`
 
@@ -66,6 +66,7 @@
 | `v11.5.2` | `codex/upstream-sync-v11.5.2` | 取り込む | CLI dotenv の `DATABASE_CONNECTION_TYPE` default 修正 | `None` 表示の選択肢は残しつつ、書き出し値を infra 標準の `no_database` にする。backend/frontend 挙動変更なし。 | 詳細は `customize_docs/v11_5_2_integration_plan.md` |
 | `v11.6.3` | `codex/upstream-sync-v11.6.3` | 一部取り込む | legacy Streamlit削除、chat mutation error toast、prompt 4096文字制限、Add Data空選択loading修正、DataRobot auth-required 401 header、telemetry core集約、DataRobot datastore helper拡張、persistent_fs/rw_lock追加、infra dependency更新 | `v11.5.3` は `ours` baseline mergeで履歴上の処理済みにした。`v11.6.3` 通常mergeでは app web layer の `app_backend/app/routers` 移動、root project削除、lockfile追加、Polars前提差分が再衝突したため、既存 `core.rest_api` / `core.routers` / root pytest設定 / pandas公開挙動は維持し、必要な上流挙動だけ移植した。Streamlit `frontend/` と `FRONTEND_TYPE` 分岐は upstream に合わせて削除。root/app_backend/core の `uv.lock` は `.gitignore` 対象のため、管理対象の `infra/uv.lock` のみ更新した。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 114 passed, 2 skipped。`uv run --project core pytest` は repo root の `pytest.ini` が優先され backend tests を core venv で収集して失敗するため、`uv run --project core pytest core/tests`: 1 passed で core 対象を確認。`npm --prefix app_frontend test`: 25 files / 153 tests passed。`npm --prefix app_frontend run lint`: passed with existing warnings。`uv run --project infra pytest` も同じ root 収集問題で失敗するため、infra project 内実行で 0 tests collected を確認。`task --list --sort none`: passed。 |
 | `v11.7.2` | `codex/upstream-sync-v11.7.2` | 一部取り込む | assistant feedback API/UI、`message_feedback`、dictionary failure persistence、`core:transfer-database`、pre-built execution environment、LLM GenAI semantic attributes、feedback i18n | pandas公開挙動、`core/src/core/customize`、custom prompts、question refiner、report builder、template selectorを維持。FastAPI request body validationはPydantic modelに寄せ、LLM telemetry本文は `LLM_CAPTURE_CONTENT=true` のときだけ扱う。PR3対象のv11.8 transfer hang修正、Polars前提差分、不要なtheme/docs churnは見送り。 | 詳細は `customize_docs/v11_7_2_integration_plan.md` |
+| `v11.8.2` | `codex/upstream-sync-v11.8.2` | 一部取り込む | transfer database hang修正、`datarobot>=3.13.0`、`used_datasets` schema/frontend表示、`datarobot_jdbc`、OTel env config、locale修正 | `git merge v11.8.2` は legacy upstream churn とPolars前提差分の再衝突が大きいため、必要差分を手動移植した。pandas公開挙動、`core/src/core/customize`、custom prompts、question refiner、report builder、template selectorを維持。LLM prompt/completion本文は引き続き `LLM_CAPTURE_CONTENT=true` のときだけ扱う。 | 詳細は `customize_docs/v11_8_2_integration_plan.md` |
 
 ## `v0.4.24` の次アクション
 
