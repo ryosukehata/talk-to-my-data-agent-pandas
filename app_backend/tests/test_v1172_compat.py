@@ -155,18 +155,6 @@ async def _assert_dictionaries_response_exposes_failed_dictionary_error() -> Non
     assert response[0].error == "LLM service unavailable"
 
 
-def test_build_app_installs_dependencies_when_prebundled_marker_exists() -> None:
-    script = (REPO_ROOT / "app_backend" / "build-app.sh").read_text()
-    prebundled_block = script.split(
-        'if [ -f "/.datarobot-pre-bundled" ]; then', maxsplit=1
-    )[1].split("fi", maxsplit=1)[0]
-
-    assert "/.datarobot-pre-bundled" in script
-    assert "python3 -m pip install -r requirements.txt" in prebundled_block
-    assert "skipping dependency install" not in prebundled_block
-    assert '[ -f "uv.lock" ]' in script
-
-
 def test_infra_allows_custom_execution_environment_ids() -> None:
     source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
 

@@ -28,7 +28,7 @@
 - upstream のPolars前提差分
 - broad theme/docs/logo churn
 - sidebar keyboard shortcut削除など、今回のPR3受け入れに必須ではないUI churn
-- requirements削除。forkでは既存deploy経路互換のため `requirements.txt` / `app_backend/requirements.txt` を維持する
+- app source の `requirements.txt` / `app_backend/requirements.txt` 依存経路。`Pulumi Up` 失敗調査後、upstream `v11.8.2` と同じ `uv.lock` + runtime `uv sync` に寄せるため削除へ変更した。
 
 ## Implementation decisions
 
@@ -94,3 +94,4 @@ GREEN確認:
 - 2026-06-28 follow-upの `Pulumi Up` でも ready 判定が失敗した。最新ApplicationSourceは `healthEndpointPath=/health` になっていたため、次の原因として `build-app.sh` が pre-bundled marker 検出時に依存installを完全にスキップする点を修正した。既存 `APP_ENVIRONMENT_ID` は v11.8.2 の `datarobot==3.13.0` などを内包している保証がないため、pre-bundled環境でも `requirements.txt` を明示installする。
 - 2026-06-28 upstream差分確認で、fork側 `start-app.sh` から upstream の pre-bundled bootstrap server が消えていることを確認した。`uv sync` と実サーバ起動までの間も port 8080 を開けておくため、upstream と同じく `python3 -m http.server` を一時起動し、sync後にuvicornへ切り替える。
 - 2026-06-28 追加調査で、upstream `v11.8.2` は `app_backend/uv.lock` をApplicationSourceに含める一方、fork側はroot `.gitignore` の `uv.lock` により `app_backend/uv.lock` が未追跡になっていた。pre-bundled runtimeでも `start-app.sh` が `uv sync` を実行するため、lockfileを配布対象に戻して DataRobot 上での依存解決を upstream と同じ deterministic sync に寄せる。
+- 2026-06-28 lockfile追加後も `Pulumi Up` は同じ ready 判定で失敗した。DataRobot のlatest sourceには `uv.lock` が含まれることを確認済み。残る upstream との差分として source root に `build-app.sh` / `requirements.in` / `requirements.txt` が残り、`start-app.sh` も `$PORT` / `DEV_MODE` 分岐を持っていたため、upstream `v11.8.2` と同じ `uv.lock` + runtime `uv sync` 構成へ戻す。

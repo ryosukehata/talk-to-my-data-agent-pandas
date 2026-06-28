@@ -71,10 +71,11 @@ def test_app_source_uses_root_health_probe_for_prebundled_bootstrap() -> None:
 def test_start_script_keeps_port_open_while_prebundled_env_syncs() -> None:
     start_script = (REPO_ROOT / "app_backend" / "start-app.sh").read_text()
     prebundled_block = start_script.split(
-        'if [ -f "$PRE_BUNDLED_MARKER" ]; then', maxsplit=1
+        'if [ -f "/.datarobot-pre-bundled" ]; then', maxsplit=1
     )[1].split("if command -v uv", maxsplit=1)[0]
 
     assert "python3 -m http.server" in prebundled_block
+    assert "python3 -m http.server 8080" in prebundled_block
     assert "TEMP_SERVER_PID" in prebundled_block
     assert "uv sync" in prebundled_block
 
@@ -86,3 +87,16 @@ def test_app_backend_uv_lock_is_packaged_for_runtime_sync() -> None:
     assert lockfile.is_file()
     assert lockfile.read_text().startswith("version = 1\n")
     assert "!app_backend/uv.lock" in gitignore
+
+
+def test_app_backend_uses_upstream_uv_runtime_bundle() -> None:
+    app_backend = REPO_ROOT / "app_backend"
+    start_script = (app_backend / "start-app.sh").read_text()
+
+    assert not (app_backend / "build-app.sh").exists()
+    assert not (app_backend / "requirements.txt").exists()
+    assert not (app_backend / "requirements.in").exists()
+    assert 'export UV_CACHE_DIR="${WORKING_DIR}/.uv"' in start_script
+    assert "exec uv run python -m uvicorn" in start_script
+    assert "--port 8080" in start_script
+    assert "PORT=" not in start_script

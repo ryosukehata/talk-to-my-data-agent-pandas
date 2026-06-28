@@ -1,60 +1,51 @@
 #!/usr/bin/env bash
 
-export UV_CACHE_DIR=.uv
-export PORT=${PORT:-"8080"}
-DEV_MODE=${DEV_MODE:-false}
-LOG_LEVEL="info"
-EXTRA_OPTS=(--proxy-headers)
+WORKING_DIR=$(pwd)
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(dirname "$0")"
 cd "$SCRIPT_DIR" || exit
-PRE_BUNDLED_MARKER="/.datarobot-pre-bundled"
 
-if [ "$(echo "$DEV_MODE" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
-  EXTRA_OPTS+=("--reload")
-  # Disable telemetry in dev mode to avoid OTLP connection errors
-  export DISABLE_TELEMETRY=true
-fi
+export UV_CACHE_DIR="${WORKING_DIR}/.uv"
 
-if [ -f "$PRE_BUNDLED_MARKER" ]; then
-  echo "Building prebundled env ${SCRIPT_DIR} ${UV_CACHE_DIR}"
+export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
 
-  PREBUNDLED_ROOT=/home/notebooks/talk-to-my-data-agent
-  PREBUNDLED_UV_CACHE="$PREBUNDLED_ROOT/.cache/uv"
-  PREBUNDLED_VENV="$PREBUNDLED_ROOT/app_backend/.venv"
+if [ -f "/.datarobot-pre-bundled" ]; then
+    echo "Building prebundled env ${WORKING_DIR} ${UV_CACHE_DIR}"
 
-  # Keep port 8080 alive to pass health checks while dependencies sync.
-  python3 -m http.server "$PORT" >/tmp/prebundled-bootstrap-http.log 2>&1 &
-  TEMP_SERVER_PID=$!
+    PREBUNDLED_ROOT=/home/notebooks/talk-to-my-data-agent
+    PREBUNDLED_UV_CACHE="$PREBUNDLED_ROOT/.cache/uv"
+    PREBUNDLED_VENV="$PREBUNDLED_ROOT/app_backend/.venv"
 
-  mkdir -p "$UV_CACHE_DIR"
-  if [ -d "$PREBUNDLED_UV_CACHE" ]; then
-    echo "Copying UV cache"
-    cp -r "$PREBUNDLED_UV_CACHE"/. "$UV_CACHE_DIR"/
-  fi
+    # Keep port 8080 alive to pass health checks while dependencies are being synchronized.
+    python3 -m http.server 8080 >/tmp/prebundled-bootstrap-http.log 2>&1 &
+    TEMP_SERVER_PID=$!
 
-  if [ -d "$PREBUNDLED_VENV" ]; then
-    echo "Copying prebundled .venv"
-    rm -rf ".venv"
-    cp -r "$PREBUNDLED_VENV" ".venv"
-  fi
+    mkdir -p "$UV_CACHE_DIR"
+    if [ -d "$PREBUNDLED_UV_CACHE" ]; then
+        echo "Copying UV cache"
+        cp -r "$PREBUNDLED_UV_CACHE"/. "$UV_CACHE_DIR"/
+    fi
 
-  echo "Running uv sync"
-  uv sync
+    echo "Syncing .venv"
 
-  echo "Starting real server"
-  kill "$TEMP_SERVER_PID"
-  wait "$TEMP_SERVER_PID"
+    if [ -d "$PREBUNDLED_VENV" ]; then
+        rm -rf ".venv"
+        cp -r "$PREBUNDLED_VENV" ".venv"
+    fi
 
-  exec uv run python -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --log-level "$LOG_LEVEL" "${EXTRA_OPTS[@]}" --timeout-keep-alive 300
-fi
+    echo "Running uv sync"
 
-if command -v uv >/dev/null 2>&1; then
-  if [ ! -d ".venv" ]; then
     uv sync
-  fi
-  exec uv run uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --log-level "$LOG_LEVEL" "${EXTRA_OPTS[@]}"
+
+    echo "Starting real server"
+
+    kill "$TEMP_SERVER_PID"
+    wait "$TEMP_SERVER_PID"
+
+    exec uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --proxy-headers --timeout-keep-alive 300
 else
-  export PYTHONPATH="${SCRIPT_DIR}/core/src:${SCRIPT_DIR}:${PYTHONPATH:-}"
-  exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --log-level "$LOG_LEVEL" "${EXTRA_OPTS[@]}"
+    # pyproject.toml build path: deps installed system-wide by the DR platform.
+    # core/ is a symlink, so include core/src on PYTHONPATH for the src layout.
+    export PYTHONPATH="${SCRIPT_DIR}/core/src:${SCRIPT_DIR}:${PYTHONPATH:-}"
+    exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --proxy-headers --timeout-keep-alive 300
 fi
