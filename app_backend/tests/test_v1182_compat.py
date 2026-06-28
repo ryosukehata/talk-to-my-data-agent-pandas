@@ -61,7 +61,19 @@ def test_infra_maps_jdbc_credentials_and_otel_runtime_parameters() -> None:
     assert "JDBC_CONNECTION_PARAMETERS" in credential_source
 
 
-def test_app_source_uses_dedicated_health_endpoint_for_readiness() -> None:
+def test_app_source_uses_root_health_probe_for_prebundled_bootstrap() -> None:
     app_backend_source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
 
-    assert 'health_endpoint_path="/health"' in app_backend_source
+    assert "health_endpoint_path=" not in app_backend_source
+    assert "service_web_requests_on_root_path=True" in app_backend_source
+
+
+def test_start_script_keeps_port_open_while_prebundled_env_syncs() -> None:
+    start_script = (REPO_ROOT / "app_backend" / "start-app.sh").read_text()
+    prebundled_block = start_script.split(
+        'if [ -f "$PRE_BUNDLED_MARKER" ]; then', maxsplit=1
+    )[1].split("if command -v uv", maxsplit=1)[0]
+
+    assert "python3 -m http.server" in prebundled_block
+    assert "TEMP_SERVER_PID" in prebundled_block
+    assert "uv sync" in prebundled_block
