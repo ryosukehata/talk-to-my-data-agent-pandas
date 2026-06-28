@@ -289,9 +289,7 @@ USE_JAPANESE_FONT_ENV = (
     if use_japanese_font_env_raw is not None
     else False
 )
-app_environment_id = os.environ.get(
-    "APPLICATION_EXECUTION_ENVIRONMENT_ID"
-) or os.environ.get("APP_ENVIRONMENT_ID")
+app_environment_id = os.environ.get("APPLICATION_EXECUTION_ENVIRONMENT_ID")
 app_environment_version_id = os.environ.get(
     "APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID"
 )

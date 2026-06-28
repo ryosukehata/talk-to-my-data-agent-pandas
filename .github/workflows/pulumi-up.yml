@@ -28,7 +28,6 @@ jobs:
       DATAROBOT_API_TOKEN: ${{ secrets.DATAROBOT_API_TOKEN }}
       DATAROBOT_ENDPOINT: ${{ secrets.DATAROBOT_ENDPOINT }}
       DATAROBOT_DEFAULT_USE_CASE: ${{ secrets.DATAROBOT_DEFAULT_USE_CASE }}
-      APP_ENVIRONMENT_ID: ${{ secrets.APP_ENVIRONMENT_ID }}
       INFRA_ENABLE_LLM: blueprint_with_external_llm.py
       LLM_DEFAULT_MODEL: ${{ vars.LLM_DEFAULT_MODEL || secrets.LLM_DEFAULT_MODEL || 'azure/gpt-4o' }}
       LLM_DEFAULT_LLM_ID: ${{ vars.LLM_DEFAULT_LLM_ID || secrets.LLM_DEFAULT_LLM_ID || 'azure-openai-gpt-4-o' }}
