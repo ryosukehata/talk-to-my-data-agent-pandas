@@ -89,3 +89,34 @@ def test_prepare_refresh_files_remaps_absolute_runner_paths(
 
     assert created_files == [expected_asset]
     assert expected_asset.read_text() == "current css"
+
+
+def test_prepare_refresh_files_does_not_restore_deleted_source_files(
+    tmp_path: Path,
+) -> None:
+    missing_build_script = tmp_path / "app_backend/build-app.sh"
+    missing_requirements = tmp_path / "app_backend/requirements.txt"
+    stack_state = {
+        "deployment": {
+            "resources": [
+                {
+                    "type": "datarobot:index/applicationSource:ApplicationSource",
+                    "outputs": {
+                        "files": [
+                            [str(missing_build_script), "build-app.sh"],
+                            [str(missing_requirements), "requirements.txt"],
+                        ]
+                    },
+                }
+            ]
+        }
+    }
+
+    created_files = prepare_pulumi_refresh_files.prepare_refresh_files(
+        stack_state=stack_state,
+        workspace=tmp_path,
+    )
+
+    assert created_files == []
+    assert not missing_build_script.exists()
+    assert not missing_requirements.exists()
