@@ -23,7 +23,6 @@ import tempfile
 from typing import Any, List, Union, cast
 
 import pandas as pd
-import polars.dataframe.frame
 from datarobot_genai.core.utils.token_tracking import (
     HeuristicTokenCountingStrategy,
     TokenUsageTracker,
@@ -707,12 +706,7 @@ async def save_chat_messages(
                 data_sheet = analysis_workbook.create_sheet(data_sheet_name)
 
                 try:
-                    dataset: polars.dataframe.frame.DataFrame = (
-                        dataset_to_export.data.df
-                    )
-
-                    # Convert to pandas with error handling for large datasets
-                    pandas_df = dataset.to_pandas()
+                    pandas_df = dataset_to_export.to_df()
 
                     # Add size check to prevent memory issues and Excel limits
                     original_rows = pandas_df.shape[0]

@@ -26,7 +26,7 @@ import inspect
 import logging
 import os
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -583,9 +583,21 @@ class OTel:
 
             @functools.wraps(func)
             async def inner_asyncgen(*args, **kwargs):
-                with tracer.start_as_current_span(span_name):
-                    async for x in func(*args, **kwargs):
+                span = tracer.start_span(span_name)
+                async_generator = func(*args, **kwargs)
+                try:
+                    while True:
+                        try:
+                            with trace.use_span(span, end_on_exit=False):
+                                x = await async_generator.__anext__()
+                        except StopAsyncIteration:
+                            break
                         yield x
+                finally:
+                    with suppress(Exception):
+                        with trace.use_span(span, end_on_exit=False):
+                            await async_generator.aclose()
+                    span.end()
 
             return inner_asyncgen
         elif inspect.isgeneratorfunction(func):

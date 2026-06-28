@@ -320,7 +320,7 @@ async def download_dataset(
         )
 
         csv_content = io.StringIO()
-        df.write_csv(csv_content)
+        df.to_csv(csv_content, index=False)
 
         csv_text = csv_content.getvalue()
         if bom:

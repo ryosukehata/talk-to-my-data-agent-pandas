@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 
+import numpy as np
 import pandas as pd
 
 os.environ.setdefault("DATAROBOT_API_TOKEN", "test-token")
@@ -17,7 +18,13 @@ from utils.analyst_db import (
     InternalDataSourceType,
     get_data_source_type,
 )
-from utils.schema import AnalystDataset
+from utils.chat_dataset_helper import extract_and_store_datasets
+from utils.schema import (
+    AnalystChatMessage,
+    AnalystDataset,
+    RunAnalysisResult,
+    RunAnalysisResultMetadata,
+)
 
 
 def test_get_data_source_type_accepts_internal_string_values() -> None:
@@ -54,6 +61,61 @@ def test_register_dataset_normalizes_tuple_columns_for_metadata(tmp_path) -> Non
     asyncio.run(
         _assert_register_dataset_normalizes_tuple_columns_for_metadata(tmp_path)
     )
+
+
+def test_extract_and_store_datasets_handles_numpy_bool_mixed_object_column(
+    tmp_path,
+) -> None:
+    asyncio.run(
+        _assert_extract_and_store_datasets_handles_numpy_bool_mixed_object_column(
+            tmp_path
+        )
+    )
+
+
+async def _assert_extract_and_store_datasets_handles_numpy_bool_mixed_object_column(
+    tmp_path,
+) -> None:
+    analyst_db = await AnalystDB.create(user_id="user-1", db_path=tmp_path)
+    source_df = pd.DataFrame(
+        {
+            "項目": ["A", "B", "C"],
+            "最小値": [1.0, np.False_, 3.2],
+            "有効": [True, False, True],
+            "件数": [10, 20, 30],
+        }
+    )
+    message = AnalystChatMessage(
+        role="assistant",
+        content="analysis",
+        components=[
+            RunAnalysisResult(
+                status="success",
+                dataset=AnalystDataset(name="analysis_result", data=source_df),
+                metadata=RunAnalysisResultMetadata(
+                    duration=0,
+                    attempts=1,
+                    datasets_analyzed=1,
+                ),
+            )
+        ],
+        in_progress=True,
+    )
+
+    stored_message = await extract_and_store_datasets(analyst_db, message)
+    stored_component = stored_message.components[0]
+    assert isinstance(stored_component, RunAnalysisResult)
+    assert stored_component.dataset_id is not None
+
+    restored = await analyst_db.dataset_handler.get_dataframe(
+        stored_component.dataset_id,
+        expected_type=DatasetType.ANALYST_RESULT_DATASET,
+        max_rows=None,
+    )
+
+    assert restored["最小値"].tolist() == ["1.0", "False", "3.2"]
+    assert restored["有効"].tolist() == [True, False, True]
+    assert restored["件数"].tolist() == [10, 20, 30]
 
 
 async def _assert_register_dataset_normalizes_tuple_columns_for_metadata(
