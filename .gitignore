@@ -183,6 +183,7 @@ e2e/downloads/
 !.env.template
 node_modules/
 uv.lock
+!app_backend/uv.lock
 .python-version
 
 # Logs

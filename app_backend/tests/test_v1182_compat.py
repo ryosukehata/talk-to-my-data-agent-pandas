@@ -77,3 +77,12 @@ def test_start_script_keeps_port_open_while_prebundled_env_syncs() -> None:
     assert "python3 -m http.server" in prebundled_block
     assert "TEMP_SERVER_PID" in prebundled_block
     assert "uv sync" in prebundled_block
+
+
+def test_app_backend_uv_lock_is_packaged_for_runtime_sync() -> None:
+    lockfile = REPO_ROOT / "app_backend" / "uv.lock"
+    gitignore = (REPO_ROOT / ".gitignore").read_text()
+
+    assert lockfile.is_file()
+    assert lockfile.read_text().startswith("version = 1\n")
+    assert "!app_backend/uv.lock" in gitignore
