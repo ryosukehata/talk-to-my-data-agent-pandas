@@ -59,3 +59,9 @@ def test_infra_maps_jdbc_credentials_and_otel_runtime_parameters() -> None:
     assert "JDBCCredentials" in credential_source
     assert "JDBC_URI" in credential_source
     assert "JDBC_CONNECTION_PARAMETERS" in credential_source
+
+
+def test_app_source_uses_dedicated_health_endpoint_for_readiness() -> None:
+    app_backend_source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
+
+    assert 'health_endpoint_path="/health"' in app_backend_source

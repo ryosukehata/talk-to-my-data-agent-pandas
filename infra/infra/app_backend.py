@@ -376,6 +376,7 @@ app_backend_app_source = datarobot.ApplicationSource(
     files=app_source_files,
     runtime_parameter_values=app_backend_app_runtime_parameters,
     resources=datarobot.ApplicationSourceResourcesArgs(
+        health_endpoint_path="/health",
         resource_label=CustomAppResourceBundles.CPU_7XL.value.id,
         replicas=1,
         session_affinity=True,

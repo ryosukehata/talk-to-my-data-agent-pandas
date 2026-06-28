@@ -90,3 +90,4 @@ GREEN確認:
 - `uv run --project infra pytest` はrepository rootの `pytest.ini` を拾い、infra venvで `app_backend/tests` まで収集して `datarobot_asgi_middleware` 不足で失敗する。これはv11.6.3/v11.7.2で記録済みのproject-level collection問題と同じで、infra Taskfileの対応経路は `task infra:unit`。
 - `pnpm --dir app_frontend test` は `ERR_PNPM_IGNORED_BUILDS` で `pnpm install` の段階で止まった。CIは `.github/workflows/app_frontend-vitest.yml` と `app_frontend/Taskfile.yaml` の両方でnpmを使うため、npmコマンドで最終確認した。
 - 一度pnpmを実行した副作用で `node_modules` がpnpmレイアウトになり、`npm run build` が `unenv/node/process` import解決で失敗した。`rm -rf app_frontend/node_modules && npm --prefix app_frontend install` でCI相当のnpmレイアウトへ戻し、build/test/lint/knipを再実行して通過確認した。
+- 2026-06-28 dev merge後の `Pulumi Up` は ApplicationSource build 成功後、CustomApplication の ready 判定で失敗した。DataRobot APIで対象ApplicationSource versionを確認すると `healthEndpointPath` が `null` で、アプリ側は `/health` を公開しているため、`ApplicationSourceResourcesArgs.health_endpoint_path="/health"` を明示して readiness probe をアプリ実装に合わせた。
