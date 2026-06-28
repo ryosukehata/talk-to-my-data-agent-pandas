@@ -63,9 +63,13 @@ def test_infra_maps_jdbc_credentials_and_otel_runtime_parameters() -> None:
 
 def test_infra_uses_upstream_execution_environment_selector() -> None:
     app_backend_source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
-    pulumi_workflow = (REPO_ROOT / ".github" / "workflows" / "pulumi-up.yml").read_text()
+    pulumi_workflow = (
+        REPO_ROOT / ".github" / "workflows" / "pulumi-up.yml"
+    ).read_text()
 
-    assert 'os.environ.get("APPLICATION_EXECUTION_ENVIRONMENT_ID")' in app_backend_source
+    assert (
+        'os.environ.get("APPLICATION_EXECUTION_ENVIRONMENT_ID")' in app_backend_source
+    )
     assert 'os.environ.get("APP_ENVIRONMENT_ID")' not in app_backend_source
     assert "APP_ENVIRONMENT_ID" not in pulumi_workflow
 
