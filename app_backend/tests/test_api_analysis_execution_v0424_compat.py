@@ -3,6 +3,7 @@ import asyncio
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
@@ -86,6 +87,25 @@ def _analysis_context(analyst_db: Any) -> api.RunCompleteAnalysisRequestContext:
         in_progress=True,
     )
     return context
+
+
+def test_datarobot_association_id_prefers_prediction_association_id() -> None:
+    completion_response = SimpleNamespace(
+        datarobot_association_id="prediction-association-id",
+        datarobot_moderations={"association_id": "moderation-association-id"},
+    )
+
+    assert (
+        api._get_datarobot_association_id(completion_response)
+        == "prediction-association-id"
+    )
+
+
+def test_datarobot_association_id_requires_prediction_association_id() -> None:
+    completion_response = SimpleNamespace(datarobot_moderations={"association_id": "x"})
+
+    with pytest.raises(ValueError, match="datarobot_association_id"):
+        api._get_datarobot_association_id(completion_response)
 
 
 def test_chat_router_task_passes_telemetry_json_to_run_complete_analysis(
