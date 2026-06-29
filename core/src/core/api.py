@@ -161,6 +161,15 @@ def log_memory() -> None:
     logger.info(f"Memory usage: {memory:.2f} MB")
 
 
+def _get_datarobot_association_id(completion_response: Any) -> str:
+    association_id = getattr(completion_response, "datarobot_association_id", None)
+    if association_id is None and isinstance(completion_response, dict):
+        association_id = completion_response.get("datarobot_association_id")
+    if not association_id:
+        raise ValueError("DataRobot response did not include datarobot_association_id.")
+    return str(association_id)
+
+
 @functools.cache
 def initialize_deployment() -> tuple[RESTClientObject, str]:
     """Initialize either LLM Gateway or DataRobot-hosted LLM deployment based on environment settings and credential priority."""
@@ -648,7 +657,7 @@ async def _get_dictionary_batch(
 
         # Convert to dictionary format
         descriptions = completion.to_dict()
-        association_id = completion_org.datarobot_moderations["association_id"]
+        association_id = _get_datarobot_association_id(completion_org)
         logger.info(f"Association ID: {association_id}")
 
         if telemetry_send is not None:
@@ -1006,7 +1015,7 @@ async def _generate_run_charts_python_code(
                 messages=messages,
                 timeout=900,
             )
-    association_id = response_org.datarobot_moderations["association_id"]
+    association_id = _get_datarobot_association_id(response_org)
     logger.info(f"Association ID: {association_id}")
     if telemetry_send is not None:
         # add query type to telemetry
@@ -1171,7 +1180,7 @@ async def _generate_run_analysis_python_code(
                 max_retries=10,
                 timeout=900,
             )
-    association_id = completion_org.datarobot_moderations["association_id"]
+    association_id = _get_datarobot_association_id(completion_org)
     logger.info(f"Association ID: {association_id}")
 
     if telemetry_send is not None:
@@ -1353,7 +1362,7 @@ async def rephrase_message(
                 timeout=900,
             )
 
-    association_id = completion_org.datarobot_moderations["association_id"]
+    association_id = _get_datarobot_association_id(completion_org)
     logger.info(f"Association ID: {association_id}")
 
     if telemetry_send is not None:
@@ -1537,7 +1546,7 @@ async def get_business_analysis(
                     messages=messages,
                     timeout=900,
                 )
-        association_id = completion_org.datarobot_moderations["association_id"]
+        association_id = _get_datarobot_association_id(completion_org)
         logger.info(f"Association ID: {association_id}")
 
         if telemetry_send is not None:
@@ -1894,7 +1903,7 @@ async def _generate_database_analysis_code(
                     "This could be due to data quality issues, complex dataset structure, or the question being too complex. "
                     "Try simplifying your question or checking your data."
                 ) from e
-    association_id = completion_org.datarobot_moderations["association_id"]
+    association_id = _get_datarobot_association_id(completion_org)
     logger.info(f"Association ID: {association_id}")
 
     if telemetry_send is not None:
