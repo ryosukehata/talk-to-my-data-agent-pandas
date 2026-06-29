@@ -23,6 +23,10 @@
 - actuals submit の HTTP レスポンスを追跡できるように、POST 先 URL、association ID、
   status code、Location ヘッダー、レスポンス本文の先頭をログに出すようにした。
   actualValue の中身はログに出さない。
+- prediction export 上の row timestamp より actuals POST が早く実行され、actual_value が
+  紐づかないケースが確認されたため、actuals POST は association ID 取得から 60 秒後に実行する。
+  待機中に共有された `telemetry_json` が後続処理で書き換わらないよう、関数入口で payload 用に
+  コピーする。
 
 ## 実APIでの整合性確認
 
@@ -49,3 +53,5 @@ prediction export CSV では、`datarobot_association_id` と同じ
   フォールバックしないことを単体テストで固定する。
 - actuals logging: HTTP クライアントを fake にして、成功時は status code と Location、
   失敗時は status code と response body がログに出ることを単体テストで固定する。
+- actuals delay: HTTP クライアントと sleep を fake にして、POST 前に 60 秒待つこと、
+  および待機中に元の `telemetry_json` が変わっても送信 payload が変わらないことを固定する。

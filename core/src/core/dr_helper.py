@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import datetime
 from typing import Any
@@ -11,6 +12,7 @@ from core.logging_helper import get_logger
 from core.resources import LLMDeployment
 
 logger = get_logger()
+_ACTUALS_POST_DELAY_SECONDS = 60
 _ACTUALS_RESPONSE_BODY_LOG_LIMIT = 1000
 
 
@@ -34,16 +36,23 @@ def initialize_deployment() -> tuple[RESTClientObject, str]:
 async def async_submit_actuals_to_datarobot(
     association_id: str, telemetry_json: dict[str, Any] | None = None
 ) -> None:
+    telemetry_payload = dict(telemetry_json or {})
+    logger.info(
+        "Delaying actuals post to DataRobot: "
+        f"delay_seconds={_ACTUALS_POST_DELAY_SECONDS} "
+        f"association_id={association_id} "
+        f"query_type={telemetry_payload.get('query_type')}"
+    )
+    await asyncio.sleep(_ACTUALS_POST_DELAY_SECONDS)
+
     dr_client, deployment_chat_base_url = initialize_deployment()
     deployment_chat_actuals_url = deployment_chat_base_url + "actuals/fromJSON/"
-    if telemetry_json is None:
-        telemetry_json = {}
-    telemetry_json["endTimestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    telemetry_payload["endTimestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = {
         "data": [
             {
                 "associationId": association_id,
-                "actualValue": json.dumps(telemetry_json, ensure_ascii=False),
+                "actualValue": json.dumps(telemetry_payload, ensure_ascii=False),
             }
         ]
     }
@@ -54,7 +63,7 @@ async def async_submit_actuals_to_datarobot(
                 "Posting actuals to DataRobot: "
                 f"url={deployment_chat_actuals_url} "
                 f"association_id={association_id} "
-                f"query_type={telemetry_json.get('query_type')}"
+                f"query_type={telemetry_payload.get('query_type')}"
             )
             response = await client.post(
                 deployment_chat_actuals_url, json=payload, headers=headers, timeout=5

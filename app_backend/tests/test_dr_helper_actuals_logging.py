@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from types import SimpleNamespace
 from typing import Any
@@ -11,6 +12,7 @@ from core import dr_helper
 class _FakeAsyncClient:
     response: Any = None
     requests: list[dict[str, Any]] = []
+    events: list[tuple[str, Any]] = []
 
     async def __aenter__(self) -> "_FakeAsyncClient":
         return self
@@ -25,6 +27,7 @@ class _FakeAsyncClient:
         headers: dict[str, str],
         timeout: int,
     ) -> Any:
+        self.events.append(("post", url))
         self.requests.append(
             {
                 "url": url,
@@ -39,6 +42,11 @@ class _FakeAsyncClient:
 def _setup_actuals_post(monkeypatch: pytest.MonkeyPatch, response: Any) -> None:
     _FakeAsyncClient.response = response
     _FakeAsyncClient.requests = []
+    _FakeAsyncClient.events = []
+
+    async def fake_sleep(seconds: float) -> None:
+        _FakeAsyncClient.events.append(("sleep", seconds))
+
     monkeypatch.setattr(
         dr_helper,
         "initialize_deployment",
@@ -47,7 +55,72 @@ def _setup_actuals_post(monkeypatch: pytest.MonkeyPatch, response: Any) -> None:
             "https://app.example/api/v2/deployments/deployment-123/",
         ),
     )
+    monkeypatch.setattr(
+        dr_helper, "asyncio", SimpleNamespace(sleep=fake_sleep), raising=False
+    )
     monkeypatch.setattr(dr_helper.httpx, "AsyncClient", _FakeAsyncClient)
+
+
+def test_actuals_post_waits_before_submitting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _setup_actuals_post(
+        monkeypatch,
+        SimpleNamespace(
+            status_code=202,
+            headers={},
+            text="",
+        ),
+    )
+
+    asyncio.run(
+        dr_helper.async_submit_actuals_to_datarobot(
+            association_id="association-123",
+            telemetry_json={"query_type": "03_generate_code_file"},
+        )
+    )
+
+    assert _FakeAsyncClient.events == [
+        ("sleep", dr_helper._ACTUALS_POST_DELAY_SECONDS),
+        (
+            "post",
+            "https://app.example/api/v2/deployments/deployment-123/actuals/fromJSON/",
+        ),
+    ]
+
+
+def test_actuals_post_snapshots_telemetry_before_delay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    telemetry_json = {"query_type": "03_generate_code_file"}
+    _setup_actuals_post(
+        monkeypatch,
+        SimpleNamespace(
+            status_code=202,
+            headers={},
+            text="",
+        ),
+    )
+
+    async def mutate_during_sleep(seconds: float) -> None:
+        _FakeAsyncClient.events.append(("sleep", seconds))
+        telemetry_json["query_type"] = "mutated"
+
+    monkeypatch.setattr(
+        dr_helper, "asyncio", SimpleNamespace(sleep=mutate_during_sleep)
+    )
+
+    asyncio.run(
+        dr_helper.async_submit_actuals_to_datarobot(
+            association_id="association-123",
+            telemetry_json=telemetry_json,
+        )
+    )
+
+    actual_value = json.loads(
+        _FakeAsyncClient.requests[0]["json"]["data"][0]["actualValue"]
+    )
+    assert actual_value["query_type"] == "03_generate_code_file"
 
 
 def test_actuals_post_logs_status_location_and_association_id(
