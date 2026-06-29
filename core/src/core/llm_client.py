@@ -30,7 +30,6 @@ from openai import (
     APIError,
     APIStatusError,
     APITimeoutError,
-    AsyncOpenAI,
     AuthenticationError,
     BadRequestError,
     InternalServerError,
@@ -152,15 +151,6 @@ class LLMClientConfig:
                 "LLM_MAX_RETRIES",
                 _DEFAULT_MAX_RETRIES,
             ),
-        )
-
-    @property
-    def should_use_litellm(self) -> bool:
-        """Return whether this config should use the LiteLLM adapter."""
-        return bool(
-            self.use_datarobot_llm_gateway
-            or self.llm_deployment_id
-            or self.default_model
         )
 
     @property
@@ -292,23 +282,6 @@ def _set_llm_span_attributes(
         )
         if response is not None:
             span.set_attribute("gen_ai.output.messages", str(response))
-
-
-class CompletionTokenCompatibilityProxy:
-    """Proxy that normalizes deprecated completion token parameters."""
-
-    def __init__(self, completions: Any):
-        self._completions = completions
-
-    async def create(self, *args: Any, **kwargs: Any) -> Any:
-        return await self._completions.create(
-            *args,
-            **_normalize_completion_token_kwargs(kwargs),
-        )
-
-    def __getattr__(self, name: str) -> Any:
-        """Delegate other attributes to underlying completions object."""
-        return getattr(self._completions, name)
 
 
 class TokenTrackingProxy:
@@ -613,49 +586,19 @@ class AsyncLLMClient:
 
         Args:
             token_tracker: Optional token usage tracker
-            dr_client: Optional DataRobot client (will be initialized if not provided)
-            deployment_base_url: Optional deployment URL (will be initialized if not provided)
+            dr_client: Optional DataRobot client used to fill the LiteLLM API token
+            deployment_base_url: Deprecated compatibility argument; LiteLLM routing
+                uses LLMClientConfig instead.
         """
         self.token_tracker = token_tracker
         self._dr_client = dr_client
-        self._deployment_base_url = deployment_base_url
+        del deployment_base_url
         self._llm_config = llm_config or LLMClientConfig.from_env()
-        self._openai_client: AsyncOpenAI | None = None
         self._instructor_client: instructor.AsyncInstructor | None = None
 
     async def __aenter__(self) -> TokenTrackingProxy:
         """Initialize clients on context entry."""
-        if self._llm_config.should_use_litellm:
-            return self._create_litellm_client()
-
-        # Import here to avoid circular imports
-        from core.api import initialize_deployment
-
-        # Initialize deployment if not provided
-        if self._dr_client is None or self._deployment_base_url is None:
-            dr_client, deployment_base_url = initialize_deployment()
-            self._dr_client = dr_client
-            self._deployment_base_url = deployment_base_url
-
-        # Create OpenAI client
-        self._openai_client = AsyncOpenAI(
-            api_key=self._dr_client.token,
-            base_url=self._deployment_base_url,
-            timeout=self._llm_config.timeout,
-            max_retries=2,
-        )
-        setattr(
-            self._openai_client.chat,
-            "completions",
-            CompletionTokenCompatibilityProxy(self._openai_client.chat.completions),
-        )
-
-        # Create instructor client
-        self._instructor_client = instructor.from_openai(
-            self._openai_client, mode=instructor.Mode.MD_JSON
-        )
-        # Return proxy that tracks tokens
-        return TokenTrackingProxy(self._instructor_client, self.token_tracker)
+        return self._create_litellm_client()
 
     def _create_litellm_client(self) -> TokenTrackingProxy:
         if litellm is None:
@@ -684,5 +627,4 @@ class AsyncLLMClient:
         exc_tb: TracebackType | None,
     ) -> None:
         """Clean up clients on context exit."""
-        if self._openai_client:
-            await self._openai_client.close()
+        return None

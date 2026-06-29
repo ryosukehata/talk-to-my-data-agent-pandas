@@ -11,11 +11,7 @@ import httpx
 import pytest
 from openai import APIConnectionError
 from pydantic import BaseModel
-from utils.llm_client import (
-    AsyncLLMClient,
-    CompletionsProxy,
-    CompletionTokenCompatibilityProxy,
-)
+from utils.llm_client import AsyncLLMClient, CompletionsProxy
 
 from core import llm_client
 
@@ -50,16 +46,6 @@ class _RecordingTracker:
 class _FakeInstructorClient:
     def __init__(self, completions: _RecordingCompletions) -> None:
         self.chat = SimpleNamespace(completions=completions)
-
-
-class _FakeOpenAIClient:
-    def __init__(self, **kwargs: Any) -> None:
-        self.kwargs = kwargs
-        self.chat = SimpleNamespace(completions=_RecordingCompletions())
-        self.closed = False
-
-    async def close(self) -> None:
-        self.closed = True
 
 
 class _FakeDataRobotClient:
@@ -148,18 +134,6 @@ def test_completions_proxy_logs_verbose_llm_api_errors(
     assert "Error: APIConnectionError: network down" in caplog.text
 
 
-def test_completion_token_compatibility_proxy_rewrites_max_tokens() -> None:
-    completions = _RecordingCompletions()
-    proxy = CompletionTokenCompatibilityProxy(completions)
-
-    result = asyncio.run(proxy.create(messages=[], model="model", max_tokens=128))
-
-    assert result == "created"
-    assert completions.kwargs is not None
-    assert "max_tokens" not in completions.kwargs
-    assert completions.kwargs["max_completion_tokens"] == 128
-
-
 def test_llm_client_config_prefers_gateway_default_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -176,40 +150,63 @@ def test_llm_client_config_prefers_gateway_default_model(
     assert config.default_model == (
         "datarobot/bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0"
     )
-    assert config.should_use_litellm is True
 
 
-def test_async_llm_client_openai_fallback_uses_upstream_timeout(
+def test_async_llm_client_always_uses_litellm_even_without_config_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _clear_llm_env(monkeypatch)
-    created_clients: list[_FakeOpenAIClient] = []
+    completions = _RecordingCompletions()
+    captured: dict[str, Any] = {}
 
-    def fake_openai_client(**kwargs: Any) -> _FakeOpenAIClient:
-        client = _FakeOpenAIClient(**kwargs)
-        created_clients.append(client)
-        return client
+    monkeypatch.setattr(
+        llm_client,
+        "litellm",
+        SimpleNamespace(acompletion=lambda **_kwargs: None),
+        raising=False,
+    )
 
-    monkeypatch.setattr(llm_client, "AsyncOpenAI", fake_openai_client)
+    def fake_from_litellm(*args: Any, **kwargs: Any) -> _FakeInstructorClient:
+        captured["from_litellm"] = (args, kwargs)
+        return _FakeInstructorClient(completions)
+
+    monkeypatch.setattr(
+        llm_client.instructor,
+        "AsyncInstructor",
+        _FakeInstructorClient,
+    )
+    monkeypatch.setattr(
+        llm_client.instructor,
+        "from_litellm",
+        fake_from_litellm,
+        raising=False,
+    )
     monkeypatch.setattr(
         llm_client.instructor,
         "from_openai",
-        lambda *_args, **_kwargs: _FakeInstructorClient(_RecordingCompletions()),
+        lambda *_args, **_kwargs: pytest.fail("OpenAI fallback should not be used"),
     )
 
-    async def run_client() -> None:
+    async def run_client() -> str:
         async with AsyncLLMClient(
             dr_client=_FakeDataRobotClient(),
             deployment_base_url="https://example.test/deployments/abc/chat/completions",
             llm_config=llm_client.LLMClientConfig(),
-        ):
-            pass
+        ) as client:
+            return await client.chat.completions.create(
+                messages=[],
+                model="datarobot-deployed-llm",
+                max_tokens=128,
+                response_model=object,
+            )
 
-    asyncio.run(run_client())
+    result = asyncio.run(run_client())
 
-    assert created_clients[0].kwargs["timeout"] == 900
-    assert created_clients[0].kwargs["max_retries"] == 2
-    assert created_clients[0].closed is True
+    assert result == "created"
+    assert "from_litellm" in captured
+    assert completions.kwargs is not None
+    assert completions.kwargs["timeout"] == 900
+    assert completions.kwargs["max_retries"] == 2
 
 
 def test_llm_client_config_uses_upstream_config_defaults(
@@ -225,7 +222,6 @@ def test_llm_client_config_uses_upstream_config_defaults(
     assert config.datarobot_endpoint == "https://app.datarobot.example/api/v2"
     assert config.datarobot_api_token == "token-123"
     assert config.timeout == 900
-    assert config.should_use_litellm is True
 
 
 def test_async_llm_client_uses_litellm_gateway_configuration(
