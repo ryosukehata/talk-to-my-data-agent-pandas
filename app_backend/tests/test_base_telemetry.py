@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from core.base_telemetry import BaseTelemetry
+from core.telemetry import OTel
 from opentelemetry import context as otel_context
 
 
@@ -46,6 +47,36 @@ def test_trace_async_generator_close_does_not_detach_in_different_context(
     caplog,
 ) -> None:
     telemetry = BaseTelemetry()
+    monkeypatch.setattr(
+        telemetry,
+        "get_tracer",
+        lambda _name: _ContextAttachingTracer(),
+    )
+
+    @telemetry.trace
+    async def stream_values():
+        yield "first"
+        yield "second"
+
+    async def run() -> None:
+        stream = stream_values()
+        assert await _run_in_context(contextvars.Context(), stream.__anext__()) == (
+            "first"
+        )
+
+        with caplog.at_level(logging.ERROR, logger="opentelemetry.context"):
+            await _run_in_context(contextvars.Context(), stream.aclose())
+
+    asyncio.run(run())
+
+    assert "Failed to detach context" not in caplog.text
+
+
+def test_otel_trace_async_generator_close_does_not_detach_in_different_context(
+    monkeypatch,
+    caplog,
+) -> None:
+    telemetry = OTel()
     monkeypatch.setattr(
         telemetry,
         "get_tracer",

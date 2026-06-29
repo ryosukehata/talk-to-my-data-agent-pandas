@@ -30,6 +30,7 @@ from utils.schema import (
     AnalystDataset,
     ChatRequest,
     CodeGeneration,
+    GetBusinessAnalysisResult,
     RunAnalysisRequest,
     RunAnalysisResult,
     RunAnalysisResultMetadata,
@@ -394,6 +395,195 @@ async def _assert_run_complete_analysis_passes_tracker_and_telemetry_to_run_anal
     )
 
 
+def test_run_complete_analysis_stages_results_and_yields_business_once(
+    monkeypatch,
+) -> None:
+    asyncio.run(
+        _assert_run_complete_analysis_stages_results_and_yields_business_once(
+            monkeypatch
+        )
+    )
+
+
+async def _assert_run_complete_analysis_stages_results_and_yields_business_once(
+    monkeypatch,
+) -> None:
+    class FakeAnalystDB:
+        def __init__(self) -> None:
+            self.user_message = AnalystChatMessage(
+                id="user-1",
+                role="user",
+                content="sum amount",
+                components=[],
+                in_progress=True,
+            )
+            self.updates: list[AnalystChatMessage] = []
+
+        async def get_chat_message(self, message_id: str) -> AnalystChatMessage | None:
+            if message_id == "user-1":
+                return self.user_message
+            return None
+
+        async def add_chat_message(
+            self, chat_id: str, message: AnalystChatMessage
+        ) -> str:
+            assert chat_id == "chat-1"
+            message.id = "assistant-1"
+            return message.id
+
+        async def update_chat_message(
+            self, message_id: str, message: AnalystChatMessage
+        ) -> None:
+            assert message_id in {"user-1", "assistant-1"}
+            self.updates.append(message.model_copy(deep=True))
+
+    async def fake_rephrase_message(*args, **kwargs) -> str:
+        return "enhanced question"
+
+    async def fake_run_analysis(*args, **kwargs) -> RunAnalysisResult:
+        return RunAnalysisResult(
+            status="success",
+            dataset=AnalystDataset(
+                name="analysis_result",
+                data=pd.DataFrame({"total_amount": [300]}),
+            ),
+            metadata=RunAnalysisResultMetadata(
+                duration=0,
+                attempts=1,
+                datasets_analyzed=1,
+            ),
+        )
+
+    async def fake_extract_and_store_datasets(
+        analyst_db: FakeAnalystDB,
+        assistant_message: AnalystChatMessage,
+    ) -> AnalystChatMessage:
+        return assistant_message
+
+    async def fake_execute_business_analysis_and_charts(*args, **kwargs):
+        return (
+            None,
+            GetBusinessAnalysisResult(
+                status="success",
+                bottom_line="total is 300",
+                additional_insights="sales are stable",
+                follow_up_questions=["by month?"],
+            ),
+        )
+
+    monkeypatch.setattr(api, "rephrase_message", fake_rephrase_message)
+    monkeypatch.setattr(api, "run_analysis", fake_run_analysis)
+    monkeypatch.setattr(
+        api, "extract_and_store_datasets", fake_extract_and_store_datasets
+    )
+    monkeypatch.setattr(
+        api,
+        "execute_business_analysis_and_charts",
+        fake_execute_business_analysis_and_charts,
+    )
+
+    analyst_db = FakeAnalystDB()
+    results = [
+        component
+        async for component in api.run_complete_analysis(
+            chat_request=ChatRequest(
+                messages=[{"role": "user", "content": "sum amount"}]
+            ),
+            data_source=InternalDataSourceType.FILE,
+            dataset_metadata=[_dataset_metadata("sales")],
+            analyst_db=analyst_db,  # type: ignore[arg-type]
+            chat_id="chat-1",
+            message_id="user-1",
+            request=None,
+            enable_chart_generation=False,
+            enable_business_insights=True,
+        )
+    ]
+
+    business_results = [
+        result for result in results if isinstance(result, GetBusinessAnalysisResult)
+    ]
+    assert len(business_results) == 1
+    assert "ANALYZING_RESULTS" in [message.step_value for message in analyst_db.updates]
+
+
+def test_run_complete_analysis_outer_exception_uses_friendly_llm_error(
+    monkeypatch,
+) -> None:
+    asyncio.run(
+        _assert_run_complete_analysis_outer_exception_uses_friendly_llm_error(
+            monkeypatch
+        )
+    )
+
+
+async def _assert_run_complete_analysis_outer_exception_uses_friendly_llm_error(
+    monkeypatch,
+) -> None:
+    class FakeAnalystDB:
+        def __init__(self) -> None:
+            self.user_message = AnalystChatMessage(
+                id="user-1",
+                role="user",
+                content="sum amount",
+                components=[],
+                in_progress=True,
+            )
+            self.updates: list[AnalystChatMessage] = []
+
+        async def get_chat_message(self, message_id: str) -> AnalystChatMessage | None:
+            if message_id == "user-1":
+                return self.user_message
+            return None
+
+        async def add_chat_message(
+            self, chat_id: str, message: AnalystChatMessage
+        ) -> str:
+            message.id = "assistant-1"
+            return message.id
+
+        async def update_chat_message(
+            self, message_id: str, message: AnalystChatMessage
+        ) -> None:
+            self.updates.append(message.model_copy(deep=True))
+
+    async def fake_rephrase_message(*args, **kwargs) -> str:
+        return "enhanced question"
+
+    async def fake_run_analysis(*args, **kwargs) -> RunAnalysisResult:
+        raise asyncio.TimeoutError()
+
+    monkeypatch.setattr(api, "rephrase_message", fake_rephrase_message)
+    monkeypatch.setattr(api, "run_analysis", fake_run_analysis)
+
+    analyst_db = FakeAnalystDB()
+    results = [
+        component
+        async for component in api.run_complete_analysis(
+            chat_request=ChatRequest(
+                messages=[{"role": "user", "content": "sum amount"}]
+            ),
+            data_source=InternalDataSourceType.FILE,
+            dataset_metadata=[_dataset_metadata("sales")],
+            analyst_db=analyst_db,  # type: ignore[arg-type]
+            chat_id="chat-1",
+            message_id="user-1",
+            request=None,
+            enable_chart_generation=False,
+            enable_business_insights=False,
+        )
+    ]
+
+    error = next(
+        result for result in results if isinstance(result, api.AnalysisGenerationError)
+    )
+    assert error.message == (
+        "Error running initial analysis. Try rephrasing: "
+        "The LLM service did not respond in time. Please try again."
+    )
+    assert analyst_db.updates[-1].error == error.message
+
+
 @pytest.mark.parametrize(
     "case_name",
     ["database", "external_data_store", "remote_registry"],
@@ -660,3 +850,67 @@ async def _assert_run_database_analysis_passes_generator_context_without_argumen
         "token_tracker": token_tracker,
         "telemetry_json": telemetry_json,
     }
+
+
+def test_run_database_analysis_updates_steps_with_analysis_context(
+    monkeypatch,
+) -> None:
+    asyncio.run(
+        _assert_run_database_analysis_updates_steps_with_analysis_context(monkeypatch)
+    )
+
+
+async def _assert_run_database_analysis_updates_steps_with_analysis_context(
+    monkeypatch,
+) -> None:
+    class FakeAnalystDB:
+        def __init__(self) -> None:
+            self.updates: list[AnalystChatMessage] = []
+
+        async def update_chat_message(
+            self, message_id: str, message: AnalystChatMessage
+        ) -> None:
+            assert message_id == "assistant-1"
+            self.updates.append(message.model_copy(deep=True))
+
+    class FakeDatabase:
+        async def execute_query(self, query: str) -> list[dict[str, int]]:
+            assert query == "select 300 as total_amount"
+            return [{"total_amount": 300}]
+
+    async def fake_generate_database_analysis_code(
+        database: FakeDatabase,
+        request: api.RunDatabaseAnalysisRequest,
+        analyst_db: FakeAnalystDB,
+        validation_error: object | None = None,
+        token_tracker: TokenUsageTracker | None = None,
+        telemetry_json: dict[str, Any] | None = None,
+    ) -> str:
+        return "select 300 as total_amount"
+
+    monkeypatch.setattr(
+        api,
+        "_generate_database_analysis_code",
+        fake_generate_database_analysis_code,
+    )
+
+    analyst_db = FakeAnalystDB()
+    context = _analysis_context(analyst_db)
+
+    result = await api.run_database_analysis(
+        request=api.RunDatabaseAnalysisRequest(
+            dataset_names=["PUBLIC.sales"],
+            question="sum amount",
+        ),
+        analyst_db=analyst_db,  # type: ignore[arg-type]
+        database_override=FakeDatabase(),  # type: ignore[arg-type]
+        analysis_context=context,
+    )
+
+    await context.await_message_update()
+
+    assert result.status == "success"
+    assert [message.step_value for message in analyst_db.updates] == [
+        "GENERATING_QUERY",
+        "RUNNING_QUERY",
+    ]

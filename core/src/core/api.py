@@ -1907,13 +1907,22 @@ async def _generate_database_analysis_code(
 @telemetry.trace
 async def _run_database_analysis(
     request: RunDatabaseAnalysisRequest,
-    analyst_db: AnalystDB,
+    analyst_db: AnalystDB | None = None,
     database_override: DatabaseOperator[Any] | None = None,
     exception_history: list[InvalidGeneratedCode] | None = None,
     token_tracker: TokenUsageTracker | None = None,
     telemetry_json: dict[str, Any] | None = None,
+    analysis_context: RunCompleteAnalysisRequestContext | None = None,
 ) -> RunDatabaseAnalysisResult:
     start_time = datetime.now()
+    if analysis_context:
+        analyst_db = analysis_context.analyst_db
+        token_tracker = analysis_context.token_tracker
+        database_override = database_override or analysis_context.database
+
+    if analyst_db is None:
+        raise ValueError("analyst_db is required")
+
     if not request.dataset_names:
         raise ValueError(VALUE_ERROR_MESSAGE)
 
@@ -1924,6 +1933,15 @@ async def _run_database_analysis(
         get_external_database() if database_override is None else database_override
     )
 
+    if (
+        analysis_context
+        and analysis_context.assistant_message_id
+        and analysis_context.assistant_message
+    ):
+        analysis_context.assistant_message.step_value = "GENERATING_QUERY"
+        analysis_context.assistant_message.step_reattempt = len(exception_history)
+        analysis_context.stage_message_update()
+
     sql_code = await _generate_database_analysis_code(
         database,
         request,
@@ -1932,6 +1950,15 @@ async def _run_database_analysis(
         token_tracker,
         telemetry_json=telemetry_json,
     )
+    if (
+        analysis_context
+        and analysis_context.assistant_message_id
+        and analysis_context.assistant_message
+    ):
+        analysis_context.assistant_message.step_value = "RUNNING_QUERY"
+        analysis_context.assistant_message.step_reattempt = len(exception_history)
+        analysis_context.stage_message_update()
+
     try:
         results = await database.execute_query(query=sql_code)
         results = cast(list[dict[str, Any]], results)
@@ -1960,10 +1987,11 @@ async def _run_database_analysis(
 @telemetry.meter_and_trace
 async def run_database_analysis(
     request: RunDatabaseAnalysisRequest,
-    analyst_db: AnalystDB,
+    analyst_db: AnalystDB | None = None,
     database_override: DatabaseOperator[Any] | None = None,
     token_tracker: TokenUsageTracker | None = None,
-    telemetry_json: dict[str, Any] = None,
+    telemetry_json: dict[str, Any] | None = None,
+    analysis_context: RunCompleteAnalysisRequestContext | None = None,
 ) -> RunDatabaseAnalysisResult:
     """Execute analysis workflow on datasets."""
     try:
@@ -1973,6 +2001,7 @@ async def run_database_analysis(
             database_override=database_override,
             token_tracker=token_tracker,
             telemetry_json=telemetry_json,
+            analysis_context=analysis_context,
         )
     except MaxReflectionAttempts as e:
         return RunDatabaseAnalysisResult(
@@ -2160,12 +2189,12 @@ async def run_complete_analysis(
 
     except Exception as e:
         logger.error(f"Error rephrasing message: {e}", exc_info=True)
-        user_message.error = f"Failed to process your question: {str(e)}"
-        user_message.in_progress = False
-        await analyst_db.update_chat_message(
-            message_id=message_id,
-            message=user_message,
+        user_message.error = (
+            f"Failed to process your question: {_friendly_llm_error(e)}"
         )
+        user_message.in_progress = False
+        analysis_context.stage_message_update(target="user")
+        await analysis_context.await_message_update()
         yield AnalysisGenerationError(user_message.error)
 
         return
@@ -2190,12 +2219,10 @@ async def run_complete_analysis(
         chat_id=chat_id,
         message=assistant_message,
     )
+    analysis_context.stage_message_update()
 
     user_message.in_progress = False
-    await analyst_db.update_chat_message(
-        message_id=message_id,
-        message=user_message,
-    )
+    analysis_context.stage_message_update(target="user")
     # Run main analysis
     logger.info("Start main analysis")
     try:
@@ -2217,6 +2244,7 @@ async def run_complete_analysis(
                 analyst_db,
                 token_tracker=token_tracker,
                 telemetry_json=telemetry_json,
+                analysis_context=analysis_context,
             )
         elif isinstance(data_source, ExternalDataStoreNameDataSourceType):
             logger.info("Running DataStore DataWrangling analysis")
@@ -2226,11 +2254,10 @@ async def run_complete_analysis(
             if not data_store_id:
                 assistant_message.in_progress = False
                 assistant_message.error = "A remote dataset was deleted and can no longer be used for analysis. Please refresh."
-                await analyst_db.update_chat_message(
-                    assistant_message.id, assistant_message
-                )
+                analysis_context.stage_message_update()
 
                 yield AnalysisGenerationError(assistant_message.error)
+                await analysis_context.await_message_update()
                 return
 
             if request:
@@ -2247,11 +2274,10 @@ async def run_complete_analysis(
             if result:
                 assistant_message.in_progress = False
                 assistant_message.error = "A remote dataset was deleted and can no longer be used for analysis. Please refresh."
-                await analyst_db.update_chat_message(
-                    assistant_message.id, assistant_message
-                )
+                analysis_context.stage_message_update()
 
                 yield AnalysisGenerationError(assistant_message.error)
+                await analysis_context.await_message_update()
                 return
 
             logger.debug(
@@ -2271,6 +2297,7 @@ async def run_complete_analysis(
                 database_override=recipe.as_database_operator(),
                 token_tracker=token_tracker,
                 telemetry_json=telemetry_json,
+                analysis_context=analysis_context,
             )
 
         else:
@@ -2294,11 +2321,10 @@ async def run_complete_analysis(
                 if refresh:
                     assistant_message.in_progress = False
                     assistant_message.error = "A remote dataset was deleted and can no longer be used for analysis. Please refresh."
-                    await analyst_db.update_chat_message(
-                        assistant_message.id, assistant_message
-                    )
+                    analysis_context.stage_message_update()
 
                     yield AnalysisGenerationError(assistant_message.error)
+                    await analysis_context.await_message_update()
 
                     return
 
@@ -2311,6 +2337,7 @@ async def run_complete_analysis(
                     database_override=recipe.as_database_operator(),
                     token_tracker=token_tracker,
                     telemetry_json=telemetry_json,
+                    analysis_context=analysis_context,
                 )
             elif all(m.external_id is None for m in dataset_metadata):
                 logging.info("Running local analysis")
@@ -2333,39 +2360,43 @@ async def run_complete_analysis(
         logger.info("Getting analysis result done")
 
         if isinstance(analysis_result, BaseException):
-            error_message = f"Error running initial analysis. Try rephrasing: {str(analysis_result)}"
+            error_message = (
+                "Error running initial analysis. Try rephrasing: "
+                f"{_friendly_llm_error(analysis_result)}"
+            )
             assistant_message.in_progress = False
             assistant_message.error = error_message
-            await analyst_db.update_chat_message(
-                message_id=assistant_message.id, message=assistant_message
-            )
+            analysis_context.stage_message_update()
 
             yield AnalysisGenerationError(error_message)
 
+            await analysis_context.await_message_update()
             return
 
         yield analysis_result
 
         assistant_message.components.append(analysis_result)
+        assistant_message.step_value = "ANALYZING_RESULTS"
+        analysis_context.stage_message_update()
 
         assistant_message = await extract_and_store_datasets(
             analyst_db, assistant_message
         )
+        analysis_context.assistant_message = assistant_message
 
-        await analyst_db.update_chat_message(
-            message_id=assistant_message.id, message=assistant_message
-        )
+        analysis_context.stage_message_update()
 
     except Exception as e:
-        error_message = f"Error running initial analysis. Try rephrasing: {str(e)}"
+        error_message = (
+            f"Error running initial analysis. Try rephrasing: {_friendly_llm_error(e)}"
+        )
         assistant_message.in_progress = False
         assistant_message.error = error_message
-        await analyst_db.update_chat_message(
-            message_id=assistant_message.id, message=assistant_message
-        )
+        analysis_context.stage_message_update()
 
         yield AnalysisGenerationError(error_message)
 
+        await analysis_context.await_message_update()
         return
 
     # Only proceed with additional analysis if we have valid initial results
@@ -2375,9 +2406,8 @@ async def run_complete_analysis(
         and (enable_chart_generation or enable_business_insights)
     ):
         assistant_message.in_progress = False
-        await analyst_db.update_chat_message(
-            message_id=assistant_message.id, message=assistant_message
-        )
+        analysis_context.stage_message_update()
+        await analysis_context.await_message_update()
         return
 
     # Run concurrent analyses
@@ -2395,17 +2425,13 @@ async def run_complete_analysis(
         if isinstance(charts_result, BaseException):
             error_message = "Error generating charts"
             assistant_message.error = error_message
-            await analyst_db.update_chat_message(
-                message_id=assistant_message.id, message=assistant_message
-            )
+            analysis_context.stage_message_update()
 
             yield AnalysisGenerationError(error_message)
 
         elif charts_result is not None:
             assistant_message.components.append(charts_result)
-            await analyst_db.update_chat_message(
-                message_id=assistant_message.id, message=assistant_message
-            )
+            analysis_context.stage_message_update()
 
             yield charts_result
 
@@ -2413,33 +2439,26 @@ async def run_complete_analysis(
         if isinstance(business_result, BaseException):
             error_message = "Error generating business insights"
             assistant_message.error = error_message
-            await analyst_db.update_chat_message(
-                message_id=assistant_message.id, message=assistant_message
-            )
+            analysis_context.stage_message_update()
 
             yield AnalysisGenerationError(error_message)
 
         elif business_result is not None:
             assistant_message.components.append(business_result)
-            await analyst_db.update_chat_message(
-                message_id=assistant_message.id, message=assistant_message
-            )
+            analysis_context.stage_message_update()
 
             yield business_result
 
         assistant_message.in_progress = False
-        await analyst_db.update_chat_message(
-            message_id=assistant_message.id, message=assistant_message
-        )
-        yield business_result
+        analysis_context.stage_message_update()
 
     except Exception as e:
-        error_message = f"Error setting up additional analysis: {str(e)}"
+        error_message = (
+            f"Error setting up additional analysis: {_friendly_llm_error(e)}"
+        )
         assistant_message.in_progress = False
         assistant_message.error = error_message
-        await analyst_db.update_chat_message(
-            message_id=assistant_message.id, message=assistant_message
-        )
+        analysis_context.stage_message_update()
 
         yield AnalysisGenerationError(error_message)
 
@@ -2452,11 +2471,11 @@ async def run_complete_analysis(
 
             assistant_message.components.append(final_usage_component)
 
-            await analyst_db.update_chat_message(
-                message_id=assistant_message.id, message=assistant_message
-            )
+            analysis_context.stage_message_update()
 
             yield final_usage_component
+
+        await analysis_context.await_message_update()
 
 
 async def process_data_and_update_state(

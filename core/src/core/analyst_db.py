@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import numbers
 import os
 import re
 import uuid
@@ -36,7 +37,7 @@ from typing import (
 
 import aiologic
 import duckdb
-import langid
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 from anyio import Path as AsyncPath
@@ -502,7 +503,7 @@ class DatasetHandler(BaseDuckDBHandler):
         clobber: bool = False,
     ) -> None:
         """
-        Register a Polars DataFrame with explicit dataset type tracking.
+        Register a pandas DataFrame with explicit dataset type tracking.
 
         Args:
             df: The dataframe to register
@@ -528,7 +529,11 @@ class DatasetHandler(BaseDuckDBHandler):
 
         async with self._write_connection() as conn:
             # Create the table
-            arrow_table = pa.Table.from_pandas(df, preserve_index=False)
+            arrow_ready_df = self._normalize_dataframe_for_arrow(df)
+            arrow_table = pa.Table.from_pandas(
+                arrow_ready_df,
+                preserve_index=False,
+            )
 
             def create_table() -> None:
                 conn.register("temp_view", arrow_table)
@@ -584,6 +589,43 @@ class DatasetHandler(BaseDuckDBHandler):
                     metadata.original_column_types,
                 ],
             )
+
+    def _normalize_dataframe_for_arrow(self, df: pd.DataFrame) -> pd.DataFrame:
+        normalized_df: pd.DataFrame | None = None
+
+        for column in df.columns:
+            series = df[column]
+            if not pd.api.types.is_object_dtype(series.dtype):
+                continue
+
+            if self._object_column_needs_string_fallback(series):
+                if normalized_df is None:
+                    normalized_df = df.copy(deep=False)
+                normalized_df[column] = series.astype("string")
+
+        return df if normalized_df is None else normalized_df
+
+    @staticmethod
+    def _object_column_needs_string_fallback(series: pd.Series) -> bool:
+        non_null = series.dropna()
+        if non_null.empty:
+            return False
+
+        has_bool = non_null.map(lambda value: isinstance(value, (bool, np.bool_))).any()
+        has_non_bool_number = non_null.map(
+            lambda value: (
+                isinstance(value, numbers.Number)
+                and not isinstance(value, (bool, np.bool_))
+            )
+        ).any()
+        if has_bool and has_non_bool_number:
+            return True
+
+        try:
+            pa.array(series, from_pandas=True)
+        except (pa.ArrowInvalid, pa.ArrowTypeError):
+            return True
+        return False
 
     async def list_datasets(
         self,
@@ -2113,98 +2155,6 @@ class AnalystDB:
         await self.chat_handler._initialize_database()
         await self.user_recipe_handler._initialize_database()
         await self.data_source_handler._initialize_database()
-
-    async def _validate_and_fix_dtypes(self, df, dataset_name: str):
-        # MODIFY POINT
-        """Validate and fix dtypes for the given dataframe.
-
-        Converts object columns to numeric if possible, otherwise to string.
-        Logs warnings for columns that cannot be converted to numeric.
-
-        Args:
-            df: Input dataframe to validate and fix dtypes
-            dataset_name: Name of the dataset for logging purposes
-
-        Returns:
-            pd.DataFrame: The fixed dataframe with validated dtypes
-        """
-        dataset_df = df.to_df() if hasattr(df, "to_df") else df
-        failed_columns = []
-        for col in dataset_df.columns:
-            if dataset_df[col].dtype == object:
-                converted = pd.to_numeric(dataset_df[col], errors="coerce")
-                mask = (~dataset_df[col].isnull()) & (converted.isnull())
-                if mask.any():
-                    sample_vals = dataset_df[col][mask].astype(str).unique()[:5]
-                    failed_columns.append(
-                        {
-                            "column": col,
-                            "original_dtype": str(dataset_df[col].dtype),
-                            "sample_problematic_values": sample_vals.tolist(),
-                        }
-                    )
-                    dataset_df[col] = dataset_df[col].astype(str)
-                else:
-                    dataset_df[col] = converted
-        if failed_columns:
-            error_msg = (
-                f"Conversion failed for dataset '{dataset_name}'. "
-                f"The following columns could not be converted to numeric types:\n"
-            )
-            for col_info in failed_columns:
-                error_msg += (
-                    f"- Column: {col_info['column']} (dtype: {col_info['original_dtype']})\n"
-                    f"  Problematic values: {col_info['sample_problematic_values']}\n"
-                )
-            logger.warning(error_msg)
-        return dataset_df
-
-    async def _is_text_column(self, series: pd.Series) -> bool:
-        """
-        Detect if a column is a text column using language detection and heuristics.
-        Returns True if the column is considered text, False otherwise.
-        """
-        # Drop NA and convert to string
-        lines = series.dropna().astype(str)
-        if len(lines) == 0:
-            return False
-        # Detect language on a sample of lines
-        sample_lines = lines.sample(min(20, len(lines)), random_state=42)
-        lang_counts = {}
-        for line in sample_lines:
-            lang, _ = langid.classify(line)
-            lang_counts[lang] = lang_counts.get(lang, 0) + 1
-        if not lang_counts:
-            return False
-        detected_lang = max(lang_counts, key=lang_counts.get)
-        # Heuristics
-        n_lines = len(lines)
-        n_unique = lines.nunique()
-        unique_ratio = n_unique / n_lines
-        mean_len = lines.str.len().mean()
-        longest_line = lines.str.len().max()
-        # For percentiles
-        pct_7_chars = (lines.str.len() >= 7).mean()
-        # For word-based stats
-        mean_spaces = lines.str.count(r" ").mean()
-        pct_4_words = (lines.str.split().apply(len) >= 4).mean()
-        longest_words = lines.str.split().apply(len).max()
-        # For CJK
-        if detected_lang in {"ja", "zh", "ko"}:
-            criteria = [
-                unique_ratio > 0.3 or n_unique > 1000,
-                mean_len >= 4,
-                pct_7_chars >= 0.1,
-                longest_line >= 12,
-            ]
-        else:
-            criteria = [
-                unique_ratio > 0.3 or n_unique > 1000,
-                mean_spaces >= 1.5,
-                pct_4_words >= 0.1,
-                longest_words >= 6,
-            ]
-        return sum(criteria) >= 3
 
     async def register_dataset(
         self,
