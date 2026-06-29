@@ -504,9 +504,7 @@ async def _assert_run_complete_analysis_stages_results_and_yields_business_once(
         result for result in results if isinstance(result, GetBusinessAnalysisResult)
     ]
     assert len(business_results) == 1
-    assert "ANALYZING_RESULTS" in [
-        message.step_value for message in analyst_db.updates
-    ]
+    assert "ANALYZING_RESULTS" in [message.step_value for message in analyst_db.updates]
 
 
 def test_run_complete_analysis_outer_exception_uses_friendly_llm_error(
@@ -857,7 +855,9 @@ async def _assert_run_database_analysis_passes_generator_context_without_argumen
 def test_run_database_analysis_updates_steps_with_analysis_context(
     monkeypatch,
 ) -> None:
-    asyncio.run(_assert_run_database_analysis_updates_steps_with_analysis_context(monkeypatch))
+    asyncio.run(
+        _assert_run_database_analysis_updates_steps_with_analysis_context(monkeypatch)
+    )
 
 
 async def _assert_run_database_analysis_updates_steps_with_analysis_context(

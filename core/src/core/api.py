@@ -2453,7 +2453,9 @@ async def run_complete_analysis(
         analysis_context.stage_message_update()
 
     except Exception as e:
-        error_message = f"Error setting up additional analysis: {_friendly_llm_error(e)}"
+        error_message = (
+            f"Error setting up additional analysis: {_friendly_llm_error(e)}"
+        )
         assistant_message.in_progress = False
         assistant_message.error = error_message
         analysis_context.stage_message_update()

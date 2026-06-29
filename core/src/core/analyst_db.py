@@ -611,12 +611,12 @@ class DatasetHandler(BaseDuckDBHandler):
         if non_null.empty:
             return False
 
-        has_bool = non_null.map(
-            lambda value: isinstance(value, (bool, np.bool_))
-        ).any()
+        has_bool = non_null.map(lambda value: isinstance(value, (bool, np.bool_))).any()
         has_non_bool_number = non_null.map(
-            lambda value: isinstance(value, numbers.Number)
-            and not isinstance(value, (bool, np.bool_))
+            lambda value: (
+                isinstance(value, numbers.Number)
+                and not isinstance(value, (bool, np.bool_))
+            )
         ).any()
         if has_bool and has_non_bool_number:
             return True
