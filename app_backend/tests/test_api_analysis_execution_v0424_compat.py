@@ -11,6 +11,7 @@ from datarobot_genai.core.utils.token_tracking import (
     TiktokenCountingStrategy,
     TokenUsageTracker,
 )
+from starlette.requests import Request
 
 os.environ.setdefault("DATAROBOT_API_TOKEN", "test-token")
 os.environ.setdefault("DATAROBOT_ENDPOINT", "https://example.com")
@@ -85,6 +86,62 @@ def _analysis_context(analyst_db: Any) -> api.RunCompleteAnalysisRequestContext:
         in_progress=True,
     )
     return context
+
+
+def test_chat_router_task_passes_telemetry_json_to_run_complete_analysis(
+    monkeypatch,
+) -> None:
+    asyncio.run(_assert_chat_router_task_passes_telemetry_json(monkeypatch))
+
+
+async def _assert_chat_router_task_passes_telemetry_json(monkeypatch) -> None:
+    from core.routers import chats
+
+    captured_kwargs: dict[str, Any] = {}
+
+    class FakeAnalystDB:
+        user_id = "user-1"
+
+        async def list_analyst_dataset_metadata(
+            self, data_source: InternalDataSourceType
+        ) -> list[DatasetMetadata]:
+            assert data_source in {
+                InternalDataSourceType.REGISTRY,
+                InternalDataSourceType.FILE,
+            }
+            return [_dataset_metadata("sales")]
+
+    async def fake_run_complete_analysis(**kwargs: Any):
+        captured_kwargs.update(kwargs)
+        if False:
+            yield None
+
+    monkeypatch.setattr(chats, "run_complete_analysis", fake_run_complete_analysis)
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/chats/chat-1/messages",
+            "headers": [(b"x-user-email", b"analyst@example.com")],
+        }
+    )
+
+    await chats.run_complete_analysis_task(
+        chat_request=ChatRequest(messages=[{"role": "user", "content": "sum amount"}]),
+        data_source=InternalDataSourceType.FILE.value,
+        analyst_db=FakeAnalystDB(),  # type: ignore[arg-type]
+        chat_id="chat-1",
+        message_id="message-1",
+        enable_chart_generation=True,
+        enable_business_insights=False,
+        request=request,
+    )
+
+    assert captured_kwargs["telemetry_json"] == {
+        "user_email": "analyst@example.com",
+        "user_msg": "sum amount",
+    }
 
 
 def test_stage_message_update_persists_ordered_message_snapshots() -> None:
