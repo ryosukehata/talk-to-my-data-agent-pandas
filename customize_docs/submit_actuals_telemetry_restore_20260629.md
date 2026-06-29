@@ -20,6 +20,9 @@
   `datarobot_association_id` を使うようにした。`datarobot_moderations.association_id` は
   moderation 用の ID で、prediction export の `association_id` とは一致しないため使用しない。
 - `datarobot_association_id` が取得できない場合は、別IDへフォールバックせずにエラーにする。
+- actuals submit の HTTP レスポンスを追跡できるように、POST 先 URL、association ID、
+  status code、Location ヘッダー、レスポンス本文の先頭をログに出すようにした。
+  actualValue の中身はログに出さない。
 
 ## 実APIでの整合性確認
 
@@ -44,3 +47,5 @@ prediction export CSV では、`datarobot_association_id` と同じ
 - 既存回帰: `run_complete_analysis()` 内部の telemetry propagation と router split の既存テストを実行する。
 - association ID: `datarobot_association_id` を使い、`datarobot_moderations.association_id` に
   フォールバックしないことを単体テストで固定する。
+- actuals logging: HTTP クライアントを fake にして、成功時は status code と Location、
+  失敗時は status code と response body がログに出ることを単体テストで固定する。

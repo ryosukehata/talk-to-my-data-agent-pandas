@@ -11,6 +11,7 @@ from core.logging_helper import get_logger
 from core.resources import LLMDeployment
 
 logger = get_logger()
+_ACTUALS_RESPONSE_BODY_LOG_LIMIT = 1000
 
 
 def initialize_deployment() -> tuple[RESTClientObject, str]:
@@ -35,6 +36,8 @@ async def async_submit_actuals_to_datarobot(
 ) -> None:
     dr_client, deployment_chat_base_url = initialize_deployment()
     deployment_chat_actuals_url = deployment_chat_base_url + "actuals/fromJSON/"
+    if telemetry_json is None:
+        telemetry_json = {}
     telemetry_json["endTimestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = {
         "data": [
@@ -47,9 +50,37 @@ async def async_submit_actuals_to_datarobot(
     headers = dr_client.headers
     async with httpx.AsyncClient() as client:
         try:
-            await client.post(
+            logger.info(
+                "Posting actuals to DataRobot: "
+                f"url={deployment_chat_actuals_url} "
+                f"association_id={association_id} "
+                f"query_type={telemetry_json.get('query_type')}"
+            )
+            response = await client.post(
                 deployment_chat_actuals_url, json=payload, headers=headers, timeout=5
             )
-            logger.info("Actuals posted (async).")
+            status_code = getattr(response, "status_code", None)
+            location = getattr(response, "headers", {}).get("Location") or getattr(
+                response, "headers", {}
+            ).get("location")
+            response_text = getattr(response, "text", "")
+            response_body = response_text[:_ACTUALS_RESPONSE_BODY_LOG_LIMIT]
+            log_message = (
+                "Actuals post response: "
+                f"url={deployment_chat_actuals_url} "
+                f"association_id={association_id} "
+                f"status_code={status_code} "
+                f"location={location} "
+                f"response_body={response_body!r}"
+            )
+            if status_code is not None and 200 <= status_code < 300:
+                logger.info(log_message)
+            else:
+                logger.error(f"Actuals post failed: {log_message}")
         except Exception as e:
-            logger.error(f"Failed posting actuals: {e}")
+            logger.error(
+                "Failed posting actuals: "
+                f"url={deployment_chat_actuals_url} "
+                f"association_id={association_id} "
+                f"error={e}"
+            )
