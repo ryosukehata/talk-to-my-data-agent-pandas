@@ -28,7 +28,7 @@ prompt_tokens = datarobot.CustomModelGuardConfigurationArgs(
     intervention=datarobot.CustomModelGuardConfigurationInterventionArgs(
         action=ModerationAction.REPORT,
         condition=Condition(
-            comparand="4096",
+            comparand="8192",
             comparator=GuardConditionComparator.GREATER_THAN,
         ).model_dump_json(),
     ),
@@ -41,7 +41,7 @@ response_tokens = datarobot.CustomModelGuardConfigurationArgs(
     intervention=datarobot.CustomModelGuardConfigurationInterventionArgs(
         action=ModerationAction.REPORT,
         condition=Condition(
-            comparand="4096",
+            comparand="8192",
             comparator=GuardConditionComparator.GREATER_THAN,
         ).model_dump_json(),
     ),
