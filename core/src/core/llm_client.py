@@ -39,6 +39,7 @@ from openai import (
 )
 from opentelemetry import trace
 
+from core.config import Config
 from core.constants import get_llm_model
 
 try:
@@ -54,7 +55,7 @@ _MODEL_ALIASES_FOR_CONFIG_DEFAULT = {
     "unknown",
     "",
 }
-_DEFAULT_REQUEST_TIMEOUT_SECONDS = 180.0
+_DEFAULT_REQUEST_TIMEOUT_SECONDS = 900.0
 _DEFAULT_MAX_RETRIES = 2
 _CAPTURE_CONTENT_ENV = "LLM_CAPTURE_CONTENT"
 
@@ -117,19 +118,30 @@ class LLMClientConfig:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "LLMClientConfig":
-        """Create config from environment variables only."""
+        """Create config from environment variables and upstream Config defaults."""
         env = os.environ if env is None else env
+        try:
+            config = Config()
+        except Exception:
+            config = None
+
         return cls(
-            default_model=env.get("LLM_DEFAULT_MODEL") or None,
+            default_model=env.get("LLM_DEFAULT_MODEL")
+            or getattr(config, "llm_default_model", None),
             use_datarobot_llm_gateway=_env_bool(
                 env,
                 "USE_DATAROBOT_LLM_GATEWAY",
+                bool(getattr(config, "use_datarobot_llm_gateway", False)),
             ),
             llm_deployment_id=(
-                env.get("LLM_DEPLOYMENT_ID") or env.get("TEXTGEN_DEPLOYMENT_ID")
+                env.get("LLM_DEPLOYMENT_ID")
+                or env.get("TEXTGEN_DEPLOYMENT_ID")
+                or getattr(config, "llm_deployment_id", None)
             ),
-            datarobot_endpoint=env.get("DATAROBOT_ENDPOINT") or None,
-            datarobot_api_token=env.get("DATAROBOT_API_TOKEN") or None,
+            datarobot_endpoint=env.get("DATAROBOT_ENDPOINT")
+            or getattr(config, "datarobot_endpoint", None),
+            datarobot_api_token=env.get("DATAROBOT_API_TOKEN")
+            or getattr(config, "datarobot_api_token", None),
             timeout=_env_float(
                 env,
                 "LLM_REQUEST_TIMEOUT_SECONDS",
@@ -191,6 +203,28 @@ def _normalize_completion_token_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]
     if max_tokens is not None and "max_completion_tokens" not in normalized_kwargs:
         normalized_kwargs["max_completion_tokens"] = max_tokens
     return normalized_kwargs
+
+
+def _create_litellm_instructor() -> instructor.AsyncInstructor:
+    litellm_instructor = instructor.from_litellm(
+        litellm.acompletion,
+        mode=instructor.Mode.MD_JSON,
+    )
+    if isinstance(litellm_instructor, instructor.AsyncInstructor):
+        return litellm_instructor
+
+    # instructor 1.3.4 checks inspect.isawaitable() in from_litellm(), which
+    # misclassifies coroutine functions such as litellm.acompletion as sync.
+    # Prefer upstream from_litellm(), then keep the async fallback required for
+    # create_with_completion.
+    return instructor.AsyncInstructor(
+        client=None,
+        create=instructor.patch(
+            create=litellm.acompletion,
+            mode=instructor.Mode.MD_JSON,
+        ),
+        mode=instructor.Mode.MD_JSON,
+    )
 
 
 def _usage_value(response: Any, *names: str) -> int | None:
@@ -453,7 +487,7 @@ class CompletionsProxy:
 
             # Track tokens if tracker is available
             if self._tracker:
-                self._tracker.track_call(messages, result, model)
+                self._tracker.track_call(messages, org, model)
 
             log.debug(f"LLM API call completed successfully - model: {model}")
             return result, org
@@ -607,7 +641,7 @@ class AsyncLLMClient:
         self._openai_client = AsyncOpenAI(
             api_key=self._dr_client.token,
             base_url=self._deployment_base_url,
-            timeout=180,
+            timeout=self._llm_config.timeout,
             max_retries=2,
         )
         setattr(
@@ -635,18 +669,7 @@ class AsyncLLMClient:
             if dr_token:
                 llm_config = replace(llm_config, datarobot_api_token=dr_token)
 
-        # instructor 1.3.4 checks inspect.isawaitable() in from_litellm(), which
-        # misclassifies coroutine functions such as litellm.acompletion as sync.
-        # Build the AsyncInstructor explicitly so create_with_completion awaits
-        # the LiteLLM coroutine before reading _raw_response.
-        self._instructor_client = instructor.AsyncInstructor(
-            client=None,
-            create=instructor.patch(
-                create=litellm.acompletion,
-                mode=instructor.Mode.MD_JSON,
-            ),
-            mode=instructor.Mode.MD_JSON,
-        )
+        self._instructor_client = _create_litellm_instructor()
         return TokenTrackingProxy(
             self._instructor_client,
             self.token_tracker,

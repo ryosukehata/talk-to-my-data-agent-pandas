@@ -643,6 +643,7 @@ async def _get_dictionary_batch(
                     response_model=DictionaryGeneration,
                     model=ALTERNATIVE_LLM_SMALL,
                     messages=messages,
+                    timeout=900,
                 )
 
         # Convert to dictionary format
@@ -1003,6 +1004,7 @@ async def _generate_run_charts_python_code(
                 model=ALTERNATIVE_LLM_BIG,
                 temperature=0,
                 messages=messages,
+                timeout=900,
             )
     association_id = response_org.datarobot_moderations["association_id"]
     logger.info(f"Association ID: {association_id}")
@@ -1167,6 +1169,7 @@ async def _generate_run_analysis_python_code(
                 temperature=0.1,
                 messages=messages,
                 max_retries=10,
+                timeout=900,
             )
     association_id = completion_org.datarobot_moderations["association_id"]
     logger.info(f"Association ID: {association_id}")
@@ -1347,6 +1350,7 @@ async def rephrase_message(
                 response_model=EnhancedQuestionGeneration,
                 model=ALTERNATIVE_LLM_BIG,
                 messages=prompt_messages,
+                timeout=900,
             )
 
     association_id = completion_org.datarobot_moderations["association_id"]
@@ -1531,6 +1535,7 @@ async def get_business_analysis(
                     model=ALTERNATIVE_LLM_BIG,
                     temperature=0.1,
                     messages=messages,
+                    timeout=900,
                 )
         association_id = completion_org.datarobot_moderations["association_id"]
         logger.info(f"Association ID: {association_id}")
@@ -1880,6 +1885,7 @@ async def _generate_database_analysis_code(
                     model=ALTERNATIVE_LLM_BIG,
                     temperature=0.1,
                     messages=messages,
+                    timeout=900,
                 )
             except ValidationError as e:
                 logger.error(f"LLM returned invalid database analysis response: {e}")

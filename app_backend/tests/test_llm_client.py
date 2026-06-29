@@ -113,7 +113,7 @@ def test_completions_proxy_tracks_tokens_for_create_with_completion() -> None:
     assert completions.kwargs is not None
     assert completions.kwargs["timeout"] == 12
     assert completions.kwargs["max_completion_tokens"] == 128
-    assert tracker.calls == [(messages, "created", "model")]
+    assert tracker.calls == [(messages, "raw", "model")]
 
 
 def test_completions_proxy_logs_verbose_llm_api_errors(
@@ -179,7 +179,7 @@ def test_llm_client_config_prefers_gateway_default_model(
     assert config.should_use_litellm is True
 
 
-def test_async_llm_client_preserves_legacy_openai_timeout(
+def test_async_llm_client_openai_fallback_uses_upstream_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _clear_llm_env(monkeypatch)
@@ -201,14 +201,31 @@ def test_async_llm_client_preserves_legacy_openai_timeout(
         async with AsyncLLMClient(
             dr_client=_FakeDataRobotClient(),
             deployment_base_url="https://example.test/deployments/abc/chat/completions",
+            llm_config=llm_client.LLMClientConfig(),
         ):
             pass
 
     asyncio.run(run_client())
 
-    assert created_clients[0].kwargs["timeout"] == 180
+    assert created_clients[0].kwargs["timeout"] == 900
     assert created_clients[0].kwargs["max_retries"] == 2
     assert created_clients[0].closed is True
+
+
+def test_llm_client_config_uses_upstream_config_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.example/api/v2")
+    monkeypatch.setenv("DATAROBOT_API_TOKEN", "token-123")
+
+    config = llm_client.LLMClientConfig.from_env()
+
+    assert config.default_model == "custom-model"
+    assert config.datarobot_endpoint == "https://app.datarobot.example/api/v2"
+    assert config.datarobot_api_token == "token-123"
+    assert config.timeout == 900
+    assert config.should_use_litellm is True
 
 
 def test_async_llm_client_uses_litellm_gateway_configuration(
@@ -228,6 +245,11 @@ def test_async_llm_client_uses_litellm_gateway_configuration(
         litellm_calls["kwargs"] = kwargs
         return completions.create
 
+    def fake_from_litellm(*args: Any, **kwargs: Any) -> _FakeInstructorClient:
+        litellm_calls["from_litellm_args"] = args
+        litellm_calls["from_litellm_kwargs"] = kwargs
+        return _FakeInstructorClient(completions)
+
     monkeypatch.setattr(
         llm_client,
         "litellm",
@@ -242,7 +264,7 @@ def test_async_llm_client_uses_litellm_gateway_configuration(
     monkeypatch.setattr(
         llm_client.instructor,
         "from_litellm",
-        lambda *_args, **_kwargs: pytest.fail("from_litellm should not be used"),
+        fake_from_litellm,
         raising=False,
     )
     monkeypatch.setattr(
@@ -266,11 +288,16 @@ def test_async_llm_client_uses_litellm_gateway_configuration(
     result = asyncio.run(run_client())
 
     assert result == "created"
+    assert litellm_calls["from_litellm_args"] == (llm_client.litellm.acompletion,)
+    assert (
+        litellm_calls["from_litellm_kwargs"]["mode"]
+        is llm_client.instructor.Mode.MD_JSON
+    )
     assert litellm_calls["completion_fn"] is llm_client.litellm.acompletion
     assert litellm_calls["kwargs"]["mode"] is llm_client.instructor.Mode.MD_JSON
     assert completions.kwargs is not None
     assert completions.kwargs["model"] == "datarobot/bedrock/test-model"
-    assert completions.kwargs["timeout"] == 180
+    assert completions.kwargs["timeout"] == 900
     assert completions.kwargs["max_retries"] == 2
     assert "max_tokens" not in completions.kwargs
     assert completions.kwargs["max_completion_tokens"] == 128
@@ -300,6 +327,11 @@ def test_async_llm_client_litellm_create_with_completion_uses_async_adapter(
         captured["patched_mode"] = kwargs["mode"]
         return fake_create_fn
 
+    def fake_from_litellm(*args: Any, **kwargs: Any) -> _FakeInstructorClient:
+        captured["from_litellm_args"] = args
+        captured["from_litellm_kwargs"] = kwargs
+        return _FakeInstructorClient(_RecordingCompletions())
+
     monkeypatch.setattr(
         llm_client,
         "litellm",
@@ -310,9 +342,7 @@ def test_async_llm_client_litellm_create_with_completion_uses_async_adapter(
     monkeypatch.setattr(
         llm_client.instructor,
         "from_litellm",
-        lambda *_args, **_kwargs: pytest.fail(
-            "from_litellm treats coroutine functions as a sync client in instructor 1.3.4"
-        ),
+        fake_from_litellm,
         raising=False,
     )
 
@@ -331,10 +361,12 @@ def test_async_llm_client_litellm_create_with_completion_uses_async_adapter(
 
     assert response is structured_response
     assert raw is raw_response
+    assert captured["from_litellm_args"] == (llm_client.litellm.acompletion,)
+    assert captured["from_litellm_kwargs"]["mode"] is llm_client.instructor.Mode.MD_JSON
     assert captured["patched_create"] is fake_acompletion
     assert captured["patched_mode"] is llm_client.instructor.Mode.MD_JSON
     assert captured["create_fn_kwargs"]["model"] == "datarobot/bedrock/test-model"
-    assert captured["create_fn_kwargs"]["timeout"] == 180
+    assert captured["create_fn_kwargs"]["timeout"] == 900
     assert captured["create_fn_kwargs"]["max_retries"] == 2
 
 
@@ -369,7 +401,7 @@ def test_async_llm_client_injects_deployed_llm_api_base(
     monkeypatch.setattr(
         llm_client.instructor,
         "from_litellm",
-        lambda *_args, **_kwargs: pytest.fail("from_litellm should not be used"),
+        lambda *_args, **_kwargs: _FakeInstructorClient(_RecordingCompletions()),
         raising=False,
     )
 
@@ -397,7 +429,7 @@ def test_async_llm_client_injects_deployed_llm_api_base(
     assert completions.kwargs["timeout"] == 45
 
 
-def test_async_llm_client_deployed_llm_uses_provider_when_default_model_missing(
+def test_async_llm_client_deployed_llm_uses_config_default_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _clear_llm_env(monkeypatch)
@@ -440,7 +472,7 @@ def test_async_llm_client_deployed_llm_uses_provider_when_default_model_missing(
         "https://app.datarobot.example/api/v2/deployments/"
         "deployment-123/chat/completions"
     )
-    assert completions.kwargs["model"] == "datarobot/datarobot-deployed-llm"
+    assert completions.kwargs["model"] == "datarobot/custom-model"
 
 
 def test_async_llm_client_litellm_exit_does_not_close_shared_async_clients(
