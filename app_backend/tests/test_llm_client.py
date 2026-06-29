@@ -430,6 +430,7 @@ def test_async_llm_client_deployed_llm_uses_config_default_model(
 ) -> None:
     _clear_llm_env(monkeypatch)
     monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.example/api/v2")
+    monkeypatch.setenv("DATAROBOT_API_TOKEN", "token-123")
     monkeypatch.setenv("TEXTGEN_DEPLOYMENT_ID", "deployment-123")
     completions = _RecordingCompletions()
 
