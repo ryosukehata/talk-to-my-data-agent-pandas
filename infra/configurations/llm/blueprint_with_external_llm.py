@@ -91,7 +91,7 @@ llm_blueprint = datarobot.LlmBlueprint(
     playground_id=playground.id,
     llm_id=default_llm_id,
     llm_settings=datarobot.LlmBlueprintLlmSettingsArgs(
-        max_completion_length=2048,
+        max_completion_length=4096,
         temperature=0.1,
         top_p=None,
     ),
