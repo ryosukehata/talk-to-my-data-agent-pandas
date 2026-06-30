@@ -1183,6 +1183,7 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
 
 - 現象: Sidebar上のReport Builder導線がDatasets / Chatsと違う見た目で、ファイルアイコンのみのため見つけづらい。
 - 修正: Sidebarを `Datasets` -> `Chats` -> `Reports` の一連の流れにし、Reportsも同じセクション見出しと `+ New Report` ボタンで表示する。
+- Chatsの履歴が長い場合でもReportsを必ず表示するため、Sidebar全体ではなくChatsリスト内部だけを伸縮・スクロールさせ、Reportsセクションは固定枠として残す。
 - `+ New Report` は `/reports?new=1` に遷移し、Reports画面の作成フォームを開いた状態にする。
 - 既存ReportのSidebar項目には `key` を設定し、クリック時の詳細遷移とactive表示に使えるようにする。
 - 日本語UI向けに `New Report` -> `新しいレポート` の翻訳を追加。
@@ -1190,6 +1191,7 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
   - `app_frontend/tests/components/Sidebar.test.tsx`
     - feature flagがoffのときReportsとNew Reportを非表示にする。
     - feature flagがonのとき `Datasets` -> `Chats` -> `Reports` の順に表示し、`New Report` ボタンを表示する。
+    - Chatsセクションが伸縮領域、Reportsセクションが固定領域であることを確認する。
 
 ---
 

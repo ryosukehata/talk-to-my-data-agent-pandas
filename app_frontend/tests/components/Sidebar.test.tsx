@@ -94,6 +94,10 @@ describe("Sidebar Report Builder feature flag", () => {
     expect(
       screen.getByRole("button", { name: "New Report" }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-chats-section")).toHaveClass("flex-1");
+    expect(screen.getByTestId("sidebar-reports-section")).toHaveClass(
+      "flex-none",
+    );
     expect(
       screen
         .getAllByText(/Datasets|Chats|Reports/)
