@@ -49,7 +49,7 @@ const DatasetList = ({ highlight }: { highlight: boolean }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="relative flex h-full flex-1 flex-col">
+    <div className="relative flex max-h-[160px] min-h-0 flex-none flex-col">
       <div className="flex items-center justify-between pb-3 pl-2">
         <div>
           <p className="mn-label-large">{t("Datasets")}</p>
@@ -86,7 +86,10 @@ const ChatList = ({ highlight }: { highlight: boolean }) => {
   const { t } = useTranslation();
 
   return (
-    <div className="relative flex h-full flex-1 flex-col">
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      data-testid="sidebar-chats-section"
+    >
       <div className="flex items-center justify-between pb-3 pl-2">
         <div>
           <p className="mn-label-large">{t("Chats")}</p>
@@ -130,7 +133,10 @@ const ReportList = () => {
     })) || [];
 
   return (
-    <div className="relative flex h-full flex-1 flex-col">
+    <div
+      className="relative flex max-h-[200px] min-h-[92px] flex-none flex-col"
+      data-testid="sidebar-reports-section"
+    >
       <div className="flex items-center justify-between pb-3 pl-2">
         <div>
           <p className="mn-label-large">{t("Reports")}</p>
@@ -202,8 +208,8 @@ export const Sidebar = () => {
             )}
           </p>
         </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup className="h-full">
+        <SidebarContent className="overflow-hidden">
+          <SidebarGroup className="h-full min-h-0">
             <DatasetList highlight={highlightDatasets} />
             <Separator className="my-6" />
             <ChatList highlight={highlightChats} />
