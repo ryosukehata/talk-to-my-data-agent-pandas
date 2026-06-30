@@ -10,7 +10,6 @@ import asyncio
 import json
 import os
 import shutil
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -82,14 +81,12 @@ class ReportStorage(IReportRepository):
             # 1) まずローカルを原子的に更新（ローカルを常に正とする）
             atomic_write_json(str(local_path), report.to_dict())
 
-            # 2) リモート保存は非同期でスケジュール（読み込みの体感速度を優先）
-            asyncio.create_task(
-                self._storage.save_to_storage(
-                    self._metadata_key(report.report_id), str(local_path)
-                )
+            # 2) 新しい run でも復元できるよう、永続化完了まで待つ
+            await self._storage.save_to_storage(
+                self._metadata_key(report.report_id), str(local_path)
             )
             logger.info(
-                f"Report saved locally and scheduled remote persist: {report.report_id}"
+                f"Report saved locally and persisted remotely: {report.report_id}"
             )
         except Exception as e:
             logger.error(
@@ -183,9 +180,9 @@ class ReportStorage(IReportRepository):
         if local_word.exists():
             local_word.unlink(missing_ok=True)
 
-        # 2) リモート削除は非同期でスケジュール
-        asyncio.create_task(self._storage.delete_file(self._metadata_key(report_id)))
-        asyncio.create_task(self._storage.delete_file(self._word_key(report_id)))
+        # 2) リモート削除も完了まで待つ
+        await self._storage.delete_file(self._metadata_key(report_id))
+        await self._storage.delete_file(self._word_key(report_id))
 
         # インデックスを更新
         await self._update_index(report_id, add=False)
@@ -203,11 +200,9 @@ class ReportStorage(IReportRepository):
             )
             word_copy_path = Path(local_path)
 
-        # リモート保存は非同期でスケジュール（ローカル優先）
-        asyncio.create_task(
-            self._storage.save_to_storage(
-                self._word_key(report_id), str(word_copy_path)
-            )
+        # 新しい run でもダウンロードできるよう、永続化完了まで待つ
+        await self._storage.save_to_storage(
+            self._word_key(report_id), str(word_copy_path)
         )
 
         return self._word_key(report_id)
@@ -268,60 +263,35 @@ class ReportStorage(IReportRepository):
         current_ids = await self._get_index()
 
         if add:
-            if report_id in current_ids:
-                return
-
-            # 新しいIDを追加（完全更新ではなく追記）
-            current_ids.append(report_id)
-
-            # 古い内容を保持したまま保存するため、一時ファイルを使って差分保存
-            with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
-                tmp_path = tmp.name
-
-            try:
-                atomic_write_json(tmp_path, {"report_ids": current_ids})
-                # リモート保存は非同期でスケジュール
-                asyncio.create_task(
-                    self._storage.save_to_storage(self._index_key(), tmp_path)
-                )
-            finally:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-
-            # ローカルキャッシュも更新
-            atomic_write_json(str(self._index_path()), {"report_ids": current_ids})
-
-        else:
             if report_id not in current_ids:
-                return
+                current_ids.append(report_id)
 
-            # IDを削除
-            current_ids.remove(report_id)
-
-            # 空になった場合は「空を永続化しない」ポリシーに従い、
-            # ストレージキーを削除しローカルキャッシュも削除する
-            if not current_ids:
-                try:
-                    # リモート削除は非同期でスケジュール
-                    asyncio.create_task(self._storage.delete_file(self._index_key()))
-                except Exception as e:  # pragma: no cover
-                    logger.warning(
-                        f"Failed to schedule index delete: {type(e).__name__}: {e}"
-                    )
-
-                index_path = self._index_path()
-                try:
-                    if index_path.exists():
-                        index_path.unlink(missing_ok=True)
-                except Exception as e:  # pragma: no cover
-                    logger.warning(
-                        f"Failed to delete local empty index: {type(e).__name__}: {e}"
-                    )
-                return
-
-            # 空でない場合のみ保存（原子的に書き込み→永続化[非同期]）
             index_path = self._index_path()
             atomic_write_json(str(index_path), {"report_ids": current_ids})
-            asyncio.create_task(
-                self._storage.save_to_storage(self._index_key(), str(index_path))
-            )
+            await self._storage.save_to_storage(self._index_key(), str(index_path))
+            return
+
+        if report_id not in current_ids:
+            return
+
+        # IDを削除
+        current_ids.remove(report_id)
+
+        # 空になった場合は「空を永続化しない」ポリシーに従い、
+        # ストレージキーを削除しローカルキャッシュも削除する
+        if not current_ids:
+            await self._storage.delete_file(self._index_key())
+            index_path = self._index_path()
+            try:
+                if index_path.exists():
+                    index_path.unlink(missing_ok=True)
+            except Exception as e:  # pragma: no cover
+                logger.warning(
+                    f"Failed to delete local empty index: {type(e).__name__}: {e}"
+                )
+            return
+
+        # 空でない場合のみ保存（原子的に書き込み→永続化）
+        index_path = self._index_path()
+        atomic_write_json(str(index_path), {"report_ids": current_ids})
+        await self._storage.save_to_storage(self._index_key(), str(index_path))

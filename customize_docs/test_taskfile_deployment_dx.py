@@ -75,7 +75,7 @@ def test_cli_base_uses_runtime_database_connection_selection() -> None:
     assert {
         option.get("value", option["name"])
         for option in env_entries["DATABASE_CONNECTION_TYPE"]["options"]
-    } == {"no_database", "snowflake", "bigquery", "sap"}
+    } == {"no_database", "snowflake", "bigquery", "sap", "datarobot_jdbc"}
     assert "enable_snowflake" not in key_entries
     assert "enable_bigquery" not in key_entries
     assert "enable_sap_datasphere" not in key_entries
