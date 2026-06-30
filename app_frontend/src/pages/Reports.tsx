@@ -3,7 +3,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { useTranslation } from "@/i18n";
 import {
@@ -807,7 +807,14 @@ export const Reports = () => {
   const { reportId } = useParams();
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showCreateForm, setShowCreateForm] = useState(
+    () => searchParams.get("new") === "1",
+  );
+
+  useEffect(() => {
+    setShowCreateForm(searchParams.get("new") === "1");
+  }, [searchParams]);
 
   const handleReportCreated = (newReportId: string) => {
     setShowCreateForm(false);
@@ -831,7 +838,12 @@ export const Reports = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">{t("Report Builder")}</h1>
           {!showCreateForm && (
-            <Button onClick={() => setShowCreateForm(true)}>
+            <Button
+              onClick={() => {
+                setShowCreateForm(true);
+                setSearchParams({ new: "1" });
+              }}
+            >
               <Plus className="mr-2 size-4" />
               {t("New Report")}
             </Button>
@@ -841,7 +853,13 @@ export const Reports = () => {
         {showCreateForm && (
           <>
             <CreateReportForm onSuccess={handleReportCreated} />
-            <Button variant="ghost" onClick={() => setShowCreateForm(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowCreateForm(false);
+                setSearchParams({});
+              }}
+            >
               {t("Cancel")}
             </Button>
             <Separator />

@@ -1179,6 +1179,18 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
   - `app_backend/tests/test_report_storage.py::test_list_by_user_recovers_reports_from_storage_after_new_run`
     - 別run相当の空ローカルキャッシュから、PersistentStorageのindexとmetadataを使って一覧復元できることを確認。
 
+### Sidebar導線改善（2026-06-30）
+
+- 現象: Sidebar上のReport Builder導線がDatasets / Chatsと違う見た目で、ファイルアイコンのみのため見つけづらい。
+- 修正: Sidebarを `Datasets` -> `Chats` -> `Reports` の一連の流れにし、Reportsも同じセクション見出しと `+ New Report` ボタンで表示する。
+- `+ New Report` は `/reports?new=1` に遷移し、Reports画面の作成フォームを開いた状態にする。
+- 既存ReportのSidebar項目には `key` を設定し、クリック時の詳細遷移とactive表示に使えるようにする。
+- 日本語UI向けに `New Report` -> `新しいレポート` の翻訳を追加。
+- 追加テスト:
+  - `app_frontend/tests/components/Sidebar.test.tsx`
+    - feature flagがoffのときReportsとNew Reportを非表示にする。
+    - feature flagがonのとき `Datasets` -> `Chats` -> `Reports` の順に表示し、`New Report` ボタンを表示する。
+
 ---
 
 ## 冗長箇所メモ

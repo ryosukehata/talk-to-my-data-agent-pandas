@@ -78,9 +78,12 @@ describe("Sidebar Report Builder feature flag", () => {
     renderWithProviders(<Sidebar />);
 
     expect(screen.queryByText("Reports")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "New Report" }),
+    ).not.toBeInTheDocument();
   });
 
-  test("shows Report Builder navigation when the flag is enabled", () => {
+  test("shows Report Builder after chats when the flag is enabled", () => {
     mockUseFetchFeatureFlags.mockReturnValue({
       data: { ...featureFlags, reportBuilderEnabled: true },
     } as any);
@@ -88,5 +91,13 @@ describe("Sidebar Report Builder feature flag", () => {
     renderWithProviders(<Sidebar />);
 
     expect(screen.getByText("Reports")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "New Report" }),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByText(/Datasets|Chats|Reports/)
+        .map((node) => node.textContent),
+    ).toEqual(["Datasets", "Chats", "Reports"]);
   });
 });
