@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText, Loader2, Settings } from "lucide-react";
+import { Loader2, Plus, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useFetchAllChats, getChatsMenu } from "@/api/chat-messages";
@@ -124,22 +124,29 @@ const ReportList = () => {
 
   const reportMenuOptions: SidebarMenuOptionType[] =
     data?.reports?.map((report) => ({
+      key: report.report_id,
       id: report.report_id,
       name: report.title,
     })) || [];
 
   return (
-    <div className="relative flex max-h-[200px] flex-none flex-col">
+    <div className="relative flex h-full flex-1 flex-col">
       <div className="flex items-center justify-between pb-3 pl-2">
         <div>
           <p className="mn-label-large">{t("Reports")}</p>
         </div>
         <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(ROUTES.REPORTS)}
+          className="mr-2"
+          variant="secondary"
+          onClick={() =>
+            navigate({
+              pathname: ROUTES.REPORTS,
+              search: "?new=1",
+            })
+          }
         >
-          <FileText />
+          <Plus />
+          {t("New Report")}
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -195,15 +202,10 @@ export const Sidebar = () => {
             )}
           </p>
         </SidebarHeader>
-        <SidebarContent className="max-h-[300px] flex-none">
-          <Separator className="my-6" />
-          <SidebarGroup className="h-full">
-            <DatasetList highlight={highlightDatasets} />
-          </SidebarGroup>
-        </SidebarContent>
-        <Separator className="my-6" />
         <SidebarContent>
           <SidebarGroup className="h-full">
+            <DatasetList highlight={highlightDatasets} />
+            <Separator className="my-6" />
             <ChatList highlight={highlightChats} />
             {showReportBuilder && (
               <>
