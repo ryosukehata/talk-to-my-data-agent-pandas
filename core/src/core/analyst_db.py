@@ -595,15 +595,30 @@ class DatasetHandler(BaseDuckDBHandler):
 
         for column in df.columns:
             series = df[column]
-            if not pd.api.types.is_object_dtype(series.dtype):
-                continue
 
-            if self._object_column_needs_string_fallback(series):
+            if self._series_needs_string_fallback(series):
                 if normalized_df is None:
                     normalized_df = df.copy(deep=False)
                 normalized_df[column] = series.astype("string")
 
         return df if normalized_df is None else normalized_df
+
+    @classmethod
+    def _series_needs_string_fallback(cls, series: pd.Series) -> bool:
+        dtype = series.dtype
+        if isinstance(dtype, pd.IntervalDtype):
+            return True
+        if isinstance(dtype, pd.CategoricalDtype):
+            categories = getattr(dtype, "categories", None)
+            if categories is not None and isinstance(
+                categories.dtype, pd.IntervalDtype
+            ):
+                return True
+
+        if not pd.api.types.is_object_dtype(dtype):
+            return False
+
+        return cls._object_column_needs_string_fallback(series)
 
     @staticmethod
     def _object_column_needs_string_fallback(series: pd.Series) -> bool:

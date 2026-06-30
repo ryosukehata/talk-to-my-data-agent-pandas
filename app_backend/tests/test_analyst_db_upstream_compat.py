@@ -73,6 +73,65 @@ def test_extract_and_store_datasets_handles_numpy_bool_mixed_object_column(
     )
 
 
+def test_extract_and_store_datasets_handles_interval_category_column(
+    tmp_path,
+) -> None:
+    asyncio.run(
+        _assert_extract_and_store_datasets_handles_interval_category_column(tmp_path)
+    )
+
+
+async def _assert_extract_and_store_datasets_handles_interval_category_column(
+    tmp_path,
+) -> None:
+    analyst_db = await AnalystDB.create(user_id="user-1", db_path=tmp_path)
+    source_df = pd.DataFrame({"lamp_time": range(8), "bleedout": [0, 1] * 4})
+    source_df["lamp_time_bin"] = pd.qcut(
+        source_df["lamp_time"],
+        q=4,
+        duplicates="drop",
+    )
+    bin_summary = (
+        source_df.groupby("lamp_time_bin", observed=True)["bleedout"]
+        .agg(bleedout_rate="mean", sample_count="size")
+        .reset_index()
+    )
+    message = AnalystChatMessage(
+        role="assistant",
+        content="analysis",
+        components=[
+            RunAnalysisResult(
+                status="success",
+                dataset=AnalystDataset(name="analysis_result", data=bin_summary),
+                metadata=RunAnalysisResultMetadata(
+                    duration=0,
+                    attempts=1,
+                    datasets_analyzed=1,
+                ),
+            )
+        ],
+        in_progress=True,
+    )
+
+    stored_message = await extract_and_store_datasets(analyst_db, message)
+    stored_component = stored_message.components[0]
+    assert isinstance(stored_component, RunAnalysisResult)
+    assert stored_component.dataset_id is not None
+
+    restored = await analyst_db.dataset_handler.get_dataframe(
+        stored_component.dataset_id,
+        expected_type=DatasetType.ANALYST_RESULT_DATASET,
+        max_rows=None,
+    )
+
+    assert restored["lamp_time_bin"].dropna().tolist() == [
+        "(-0.001, 1.75]",
+        "(1.75, 3.5]",
+        "(3.5, 5.25]",
+        "(5.25, 7.0]",
+    ]
+
+
 async def _assert_extract_and_store_datasets_handles_numpy_bool_mixed_object_column(
     tmp_path,
 ) -> None:
