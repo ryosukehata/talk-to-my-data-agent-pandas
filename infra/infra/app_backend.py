@@ -313,7 +313,9 @@ app_backend_app_source_args: dict[str, pulumi.Input[str]] = {
     "base_environment_id": base_environment_id,
 }
 if should_set_base_environment_version and base_environment_version_id is not None:
-    app_backend_app_source_args["base_environment_version_id"] = base_environment_version_id
+    app_backend_app_source_args["base_environment_version_id"] = (
+        base_environment_version_id
+    )
 
 app_backend_app_resource_name: str = f"Data Analyst Application [{PROJECT_NAME}]"
 app_backend_app_runtime_parameters = [

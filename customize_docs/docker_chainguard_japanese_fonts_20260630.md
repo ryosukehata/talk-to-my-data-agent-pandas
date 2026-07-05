@@ -12,6 +12,7 @@ DataRobot の Python FIPS dev ベースイメージへ移行するため、Docke
 - 日本語表示に必要な `font-noto-cjk` と、フォント検出に必要な `fontconfig` を `apk add --no-cache` で導入する。
 - `fc-cache -f` でフォントキャッシュを更新する。
 - `poetry` と `uv` は `python -m pip install --no-cache-dir poetry uv` で導入する。
+- package install 後は `/opt/code` を non-root UID/GID `65532:65532` に chown し、最終実行ユーザーも `65532:65532` に戻す。
 - Debian 前提の `SHELL ["/bin/bash", ...]` と `apt-get` は削除する。
 - Plotly の静的画像出力では `Noto Sans CJK JP, Noto Sans JP, sans-serif` を指定し、Wolfi の `font-noto-cjk` で見つかりやすい `Noto Sans CJK JP` を優先する。
 - Pulumi はデフォルトで `docker/Dockerfile` から `datarobot.ExecutionEnvironment` を作成し、その `version_id` を `ApplicationSource.base_environment_version_id` に渡す。
@@ -25,6 +26,7 @@ DataRobot の Python FIPS dev ベースイメージへ移行するため、Docke
 - Dockerfile が `datarobot/mirror_chainguard_datarobot.com_python-fips:3.12-dev` を使用していること。
 - `apk add --no-cache` で `fontconfig` と `font-noto-cjk` を導入していること。
 - `apt-get` が残っていないこと。
+- Dockerfile の最終 `USER` が root ではなく `65532:65532` であること。
 - Pulumi が `USE_JAPANESE_FONT_ENV` なしで Dockerfile の `ExecutionEnvironment` を作成し、`version_id` を ApplicationSource に渡すこと。
 - CD workflow が既存環境 ID を渡さず、Pulumi 管理の Dockerfile 環境を使うこと。
 - `RunChartsResult` が `fig1` / `fig2` の Plotly figure 復元時に日本語フォントのフォールバックを設定すること。
@@ -35,3 +37,4 @@ DataRobot の Python FIPS dev ベースイメージへ移行するため、Docke
 - `uv run --project infra pulumi version`: 成功。
 - `infra/` で `pulumi stack select dev --non-interactive`: 成功。
 - `infra/` で `.env` を読み込んだ `uv run pulumi preview --non-interactive`: `deployed_llm.py` が要求する `TEXTGEN_DEPLOYMENT_ID` 未設定で停止。Dockerfile 環境作成ロジックに到達する前の LLM 設定不足。
+- PR #117 CI follow-up: hadolint `DL3002 Last USER should not be root` 対応として、Dockerfile の最終実行ユーザーを `65532:65532` に戻した。

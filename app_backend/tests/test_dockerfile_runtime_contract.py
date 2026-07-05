@@ -24,12 +24,25 @@ def test_dockerfile_installs_japanese_fonts_with_wolfi_apk() -> None:
     assert "apt-get" not in dockerfile
 
 
+def test_dockerfile_runs_application_as_non_root_user() -> None:
+    dockerfile_lines = DOCKERFILE.read_text(encoding="utf-8").splitlines()
+    user_lines = [
+        line.strip() for line in dockerfile_lines if line.strip().startswith("USER ")
+    ]
+
+    assert user_lines[0] == "USER root"
+    assert user_lines[-1] == "USER 65532:65532"
+    assert "chown -R 65532:65532 /opt/code" in "\n".join(dockerfile_lines)
+
+
 def test_pulumi_manages_app_environment_from_dockerfile_by_default() -> None:
     source = APP_BACKEND_INFRA.read_text(encoding="utf-8")
 
     assert "USE_JAPANESE_FONT_ENV" not in source
     assert "datarobot.ExecutionEnvironment(" in source
-    assert 'docker_context_path=os.fspath((project_root / "docker").resolve())' in source
+    assert (
+        'docker_context_path=os.fspath((project_root / "docker").resolve())' in source
+    )
     assert "base_environment_id = app_environment.id" in source
     assert "base_environment_version_id = app_environment.version_id" in source
     assert "RuntimeEnvironments.PYTHON_312_APPLICATION_BASE" not in source
