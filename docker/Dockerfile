@@ -1,22 +1,9 @@
-FROM python:3.12-slim
+FROM datarobot/mirror_chainguard_datarobot.com_python-fips:3.12-dev
 
-# Set SHELL with pipefail for safer pipe operations
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+USER root
 
-# 必要なフォントをインストール（存在するパッケージを自動選択し、Candidate にピン留め）
-# hadolint は式展開を解釈できない場合がありますが、実際には =version で固定しています
-# hadolint ignore=DL3008
-RUN set -eux; \
-    apt-get update; \
-    PKG="fonts-noto-cjk"; \
-    CANDIDATE=$(apt-cache policy "$PKG" | sed -n 's/\s\+Candidate: //p'); \
-    if [ -z "$CANDIDATE" ] || [ "$CANDIDATE" = "(none)" ]; then \
-        PKG="fonts-noto-cjk-extra"; \
-        CANDIDATE=$(apt-cache policy "$PKG" | sed -n 's/\s\+Candidate: //p'); \
-    fi; \
-    test -n "$CANDIDATE"; \
-    apt-get install -y --no-install-recommends "$PKG=$CANDIDATE"; \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache fontconfig font-noto-cjk \
+    && fc-cache -f
 
 # This makes print statements show up in the logs API
 ENV PYTHONUNBUFFERED=1
@@ -24,6 +11,13 @@ ENV PYTHONUNBUFFERED=1
 # This allows code to access ~ and not default to /, which may not be accessible
 ENV HOME=/opt/code
 
+# Add .local/bin to PATH for user-installed packages (gunicorn, flask, etc.)
+ENV PATH=/opt/code/.local/bin:$PATH
+
 WORKDIR /opt/code
+
+# Install 'uv' for fast package resolution and 'poetry' for dependency management.
+# This enables support for pyproject.toml based configurations as part of APP-5254.
+RUN python -m pip install --no-cache-dir poetry uv
 
 EXPOSE 8080
