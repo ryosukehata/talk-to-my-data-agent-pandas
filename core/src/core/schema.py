@@ -48,6 +48,8 @@ from typing_extensions import Self, TypedDict
 
 from .code_execution import MaxReflectionAttempts
 
+PLOTLY_JAPANESE_FONT_FAMILY = "Noto Sans CJK JP, Noto Sans JP, sans-serif"
+
 
 class SanitizedJsonModel(BaseModel):
     """Base class for models that sanitize JSON from LLM responses.
@@ -579,7 +581,7 @@ class RunChartsResult(BaseModel):
     def fig1(self) -> go.Figure | None:
         if self.fig1_json:
             fig = go.Figure(json.loads(self.fig1_json))
-            fig.update_layout(font=dict(family="Noto Sans JP"))
+            fig.update_layout(font=dict(family=PLOTLY_JAPANESE_FONT_FAMILY))
             return fig
         return None
 
@@ -587,7 +589,7 @@ class RunChartsResult(BaseModel):
     def fig2(self) -> go.Figure | None:
         if self.fig2_json:
             fig = go.Figure(json.loads(self.fig2_json))
-            fig.update_layout(font=dict(family="Noto Sans JP"))
+            fig.update_layout(font=dict(family=PLOTLY_JAPANESE_FONT_FAMILY))
             return fig
         return None
 

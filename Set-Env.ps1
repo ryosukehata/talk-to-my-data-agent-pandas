@@ -5,15 +5,34 @@ function Import-EnvFile {
         Write-Host "Please create a .env file with VAR_NAME=value pairs."
         return $false
     }
-    
-    $envVarsJson = python -c "import json; from quickstart import load_dotenv; env_vars = load_dotenv(); print(json.dumps(env_vars))"
-    
-    $envVars = $envVarsJson | ConvertFrom-Json
-    
-    $envVars.PSObject.Properties | ForEach-Object {
-        [System.Environment]::SetEnvironmentVariable($_.Name, $_.Value)
+
+    Get-Content '.env' | ForEach-Object {
+        $line = $_.Trim()
+        if (-not $line -or $line.StartsWith('#')) {
+            return
+        }
+
+        $parts = $line -split '=', 2
+        if ($parts.Count -ne 2) {
+            return
+        }
+
+        $name = $parts[0].Trim()
+        if ($name -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+            return
+        }
+
+        $value = $parts[1].Trim()
+        if ($value -match '\s#') {
+            $value = ($value -split '\s#', 2)[0].Trim()
+        }
+        if (($value.StartsWith("'") -and $value.EndsWith("'")) -or ($value.StartsWith('"') -and $value.EndsWith('"'))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+
+        [System.Environment]::SetEnvironmentVariable($name, $value)
     }
-    
+
     Write-Host "Environment variables from .env have been set."
     return $true
 }

@@ -23,8 +23,10 @@ exit /b
         echo Please create a .env file with VAR_NAME=value pairs.
         exit /b 1
     )
-    @echo off
-    python -c "from quickstart import load_dotenv; env_vars = load_dotenv(); f = open('set_env_vars.bat', 'w'); [f.write(f'set \"{key}={value.replace(\"\n\", \" \").replace(\"\\r\", \" \")}\"\n') for key, value in env_vars.items()]; f.close()"
+    if exist set_env_vars.bat del set_env_vars.bat
+    for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
+        if not "%%A"=="" echo set "%%A=%%~B" >> set_env_vars.bat
+    )
     exit /b 0
 
 :activate_virtual_environment
@@ -40,4 +42,3 @@ exit /b
     del set_env_vars.bat
     echo Environment variables have been set.
     exit /b 0
-

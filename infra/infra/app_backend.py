@@ -41,7 +41,6 @@ from core.schema import AppInfra, DatabaseConnectionType
 from datarobot_pulumi_utils.pulumi import export
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 from datarobot_pulumi_utils.schema.apps import CustomAppResourceBundles
-from datarobot_pulumi_utils.schema.exec_envs import RuntimeEnvironments
 
 from . import llm as llm_module
 from . import project_dir, use_case
@@ -283,12 +282,6 @@ with open(app_backend_application_path / "app_infra.json", "w") as infra_selecti
         ).model_dump_json()
     )
 
-use_japanese_font_env_raw = os.environ.get("USE_JAPANESE_FONT_ENV")
-USE_JAPANESE_FONT_ENV = (
-    use_japanese_font_env_raw.lower() in {"1", "true", "yes", "y", "on"}
-    if use_japanese_font_env_raw is not None
-    else False
-)
 app_environment_id = os.environ.get("APPLICATION_EXECUTION_ENVIRONMENT_ID")
 app_environment_version_id = os.environ.get(
     "APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID"
@@ -300,7 +293,9 @@ if app_environment_id:
         resource_name="Data Analyst app environment [PRE-EXISTING]",
     )
     base_environment_id: pulumi.Input[str] = app_environment.id
-elif USE_JAPANESE_FONT_ENV:
+    base_environment_version_id: pulumi.Input[str] | None = app_environment_version_id
+    should_set_base_environment_version = bool(app_environment_version_id)
+else:
     app_environment = datarobot.ExecutionEnvironment(
         resource_name=f"App Environment for Data Analyst[{PROJECT_NAME}]",
         programming_language="python",
@@ -310,16 +305,16 @@ elif USE_JAPANESE_FONT_ENV:
         name="Python 3.12 Data Analyst Environment with Japanese Font",
     )
     base_environment_id = app_environment.id
-else:
-    base_environment_id = RuntimeEnvironments.PYTHON_312_APPLICATION_BASE.value.id
+    base_environment_version_id = app_environment.version_id
+    should_set_base_environment_version = True
 
 app_backend_app_source_args: dict[str, pulumi.Input[str]] = {
     "resource_name": f"Data Analyst App Source [{PROJECT_NAME}]",
     "base_environment_id": base_environment_id,
 }
-if app_environment_version_id:
+if should_set_base_environment_version and base_environment_version_id is not None:
     app_backend_app_source_args["base_environment_version_id"] = (
-        app_environment_version_id
+        base_environment_version_id
     )
 
 app_backend_app_resource_name: str = f"Data Analyst Application [{PROJECT_NAME}]"

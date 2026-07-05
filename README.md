@@ -31,7 +31,7 @@ This intuitive experience is designed for **scalability and flexibility**, ensur
 
 ## 🚀 Quick Start
 
-### Quickstart with DataRobot CLI
+### Start with DataRobot CLI
 
 #### 1. Install the DataRobot CLI
 
@@ -115,36 +115,22 @@ If you want to locate the credentials manually:
 
 See the [React Frontend Development Guide](app_frontend/README.md) and [FastAPI Backend Development Guide](app_backend/README.md).
 
-Run the following to deploy or update your application:
-```bash
-source set_env.sh  # On Windows use `set_env.bat`
-pulumi up
-```
-Alternatively, run the following command for a simpler setup:
+Run the following to install dependencies and deploy or update your application:
 
-```sh
-python quickstart.py YOUR_PROJECT_NAME
-# Windows users may need:  py quickstart.py YOUR_PROJECT_NAME
+```bash
+task install
+task infra:select -- YOUR_PROJECT_NAME --create
+task deploy
 ```
-Replace `YOUR_PROJECT_NAME` with any name you prefer, then press **Enter**.
+
+Replace `YOUR_PROJECT_NAME` with any name you prefer. If the Pulumi stack is already selected, rerun only `task deploy` for subsequent updates.
 
 When deployment completes, the terminal will display a link to your running application.\
 👉 **Click the link to open and start using your app!**
 
-**What does `quickstart.py` do?**
+`task deploy` runs Pulumi from the split `infra/` project using its `uv` environment, matching the CD workflow.
 
-The quickstart script automates the entire setup process for you:
-
-- Creates and activates a Python virtual environment
-- Installs all required dependencies (using `uv` for faster installation, falling back to `pip`)
-- Loads your `.env` configuration
-- Sets up the Pulumi stack with your project name
-- Runs `pulumi up` to deploy your application
-- Displays your application URL when complete
-
-This single command replaces all the manual steps described in the [advanced setup section](#setup-for-advanced-users).
-
-Python 3.10 - 3.12 are supported
+Python 3.11 - 3.13 are supported for the infrastructure project.
 
 Advanced users desiring control over virtual environment creation, dependency installation, environment variable setup
 and `pulumi` invocation see [here](#setup-for-advanced-users).
@@ -317,7 +303,7 @@ You can help the data analyst python agent by providing tools that can assist wi
 ## Delete all provisioned resources
 
 ```bash
-pulumi down
+task infra:down-yes
 ```
 
 ## Setup for advanced users
@@ -325,23 +311,19 @@ pulumi down
 For manual control over the setup process adapt the following steps for MacOS/Linux to your environment:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-source set_env.sh
-pulumi stack init YOUR_PROJECT_NAME
-pulumi up
+dr dotenv setup
+task install
+task infra:select -- YOUR_PROJECT_NAME --create
+task deploy
 ```
 
-e.g. for Windows/conda/cmd.exe this would be:
+For direct Pulumi control, run commands from the split infrastructure project:
 
 ```bash
-conda create --prefix .venv pip
-conda activate .\.venv
-pip install -r requirements.txt
-set_env.bat
-pulumi stack init YOUR_PROJECT_NAME
-pulumi up
+cd infra
+uv sync --all-extras --dev
+uv run pulumi stack select YOUR_PROJECT_NAME --create
+uv run pulumi up
 ```
 
 For projects that will be maintained, DataRobot recommends forking the repo so upstream fixes and improvements can be merged in the future.

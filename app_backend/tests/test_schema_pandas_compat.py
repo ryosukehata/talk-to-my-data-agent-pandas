@@ -3,6 +3,7 @@ import io
 from datetime import datetime, timezone
 
 import pandas as pd
+import plotly.graph_objects as go
 from openpyxl import load_workbook
 from utils.analyst_db import DatasetMetadata, DatasetType, InternalDataSourceType
 from utils.schema import (
@@ -10,6 +11,7 @@ from utils.schema import (
     DataDictionary,
     RunAnalysisResult,
     RunAnalysisResultMetadata,
+    RunChartsResult,
 )
 
 
@@ -57,6 +59,23 @@ async def _assert_analysis_result_download_uses_pandas_csv_writer() -> None:
 
 def test_chat_excel_export_writes_pandas_analysis_result_sheet() -> None:
     asyncio.run(_assert_chat_excel_export_writes_pandas_analysis_result_sheet())
+
+
+def test_run_charts_result_uses_japanese_plotly_font_fallbacks() -> None:
+    fig_json = go.Figure(data=[go.Bar(x=["東京", "大阪"], y=[1, 2])]).to_json()
+
+    result = RunChartsResult(
+        status="success",
+        fig1_json=fig_json,
+        fig2_json=fig_json,
+        metadata=RunAnalysisResultMetadata(duration=0, attempts=1),
+    )
+
+    expected_family = "Noto Sans CJK JP, Noto Sans JP, sans-serif"
+    assert result.fig1 is not None
+    assert result.fig1.layout.font.family == expected_family
+    assert result.fig2 is not None
+    assert result.fig2.layout.font.family == expected_family
 
 
 async def _assert_chat_excel_export_writes_pandas_analysis_result_sheet() -> None:
