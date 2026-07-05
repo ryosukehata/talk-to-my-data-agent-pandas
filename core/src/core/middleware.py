@@ -32,6 +32,7 @@ from core.analyst_db import AnalystDB
 from core.data_analyst_telemetry import telemetry
 from core.datarobot_client import use_user_token
 from core.logging_helper import get_logger
+from core.telemetry import dr_user_id_var
 
 logger = get_logger()
 
@@ -170,6 +171,7 @@ async def session_middleware(request: Request, call_next):  # type: ignore[no-un
     user_id: str | None = None
 
     if request.method in request_methods:
+        dr_user_id_var.set(request.headers.get("x-user-id"))
         session_state, session_id, user_id = await _initialize_session(request)
         request.state.session = session_state
 

@@ -855,12 +855,34 @@ _JDBC_TABLE_DISCOVERY_SQL: dict[str, str] = {
         FROM INFORMATION_SCHEMA.TABLES
         WHERE TABLE_TYPE = 'BASE TABLE'
     """,
+    "snowflake": """
+        SELECT TABLE_NAME
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = CURRENT_SCHEMA()
+          AND TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+        ORDER BY TABLE_TYPE, TABLE_NAME
+    """,
+    "sap": """
+        SELECT TABLE_NAME FROM SYS.TABLES WHERE SCHEMA_NAME = CURRENT_SCHEMA
+        UNION ALL
+        SELECT VIEW_NAME FROM SYS.VIEWS WHERE SCHEMA_NAME = CURRENT_SCHEMA
+        ORDER BY TABLE_NAME
+    """,
+    "bigquery": """
+        SELECT table_name
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE table_type IN ('BASE TABLE', 'VIEW')
+        ORDER BY table_name
+    """,
 }
 
 _JDBC_DIALECT_NAMES = {
     "postgresql": "PostgreSQL",
     "mysql": "MySQL",
     "sqlserver": "SQL Server",
+    "snowflake": "Snowflake",
+    "sap": "SAP Datasphere",
+    "bigquery": "BigQuery",
 }
 
 
@@ -882,6 +904,12 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
             return "mysql"
         if uri.startswith("jdbc:sqlserver://"):
             return "sqlserver"
+        if uri.startswith("jdbc:snowflake://"):
+            return "snowflake"
+        if uri.startswith("jdbc:sap://"):
+            return "sap"
+        if uri.startswith("jdbc:bigquery://"):
+            return "bigquery"
         raise ValueError(f"Unsupported JDBC URI scheme: {uri.split(':')[1]!r}")
 
     def _dialect_name(self) -> str:
@@ -895,6 +923,10 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
                 return f"`{name}`"
             case "sqlserver":
                 return f"[{name}]"
+            case "snowflake" | "sap":
+                return f'"{name}"'
+            case "bigquery":
+                return f"`{name}`"
             case _:
                 raise ValueError(f"Unsupported dialect: {self._dialect_key!r}")
 
@@ -1063,6 +1095,9 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
             "postgresql": SYSTEM_PROMPT_POSTGRES,
             "mysql": SYSTEM_PROMPT_MYSQL,
             "sqlserver": SYSTEM_PROMPT_SQLSERVER,
+            "snowflake": SYSTEM_PROMPT_SNOWFLAKE,
+            "sap": SYSTEM_PROMPT_SAP_DATASPHERE,
+            "bigquery": SYSTEM_PROMPT_BIGQUERY,
         }[self._dialect_key]
         return ChatCompletionSystemMessageParam(role="system", content=prompt)
 
@@ -1070,6 +1105,18 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
 def get_database_operator(
     app_infra: AppInfra, schema: str | None = None
 ) -> DatabaseOperator[Any]:
+    if app_infra.database in ("snowflake", "sap", "bigquery", "datarobot_jdbc"):
+        try:
+            return JdbcPreviewOperator(JDBCCredentials())
+        except (ValidationError, ValueError):
+            logger.warning(
+                "JDBC credentials not properly configured for %s",
+                app_infra.database,
+                exc_info=True,
+            )
+            if app_infra.database == "datarobot_jdbc":
+                return NoDatabaseOperator(NoDatabaseCredentials())
+
     if app_infra.database == "bigquery":
         credentials: (
             GoogleCredentialsBQ

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.credentials import JDBCCredentials, NoDatabaseCredentials
 from core.database_helpers import (
     BigQueryOperator,
     DatabaseOperator,
@@ -47,7 +48,9 @@ def get_external_database(schema: str | None = None) -> DatabaseOperator[Any]:
 __all__ = [
     "BigQueryOperator",
     "DatabaseOperator",
+    "JDBCCredentials",
     "JdbcPreviewOperator",
+    "NoDatabaseCredentials",
     "NoDatabaseOperator",
     "SAPDatasphereOperator",
     "SnowflakeOperator",

@@ -90,7 +90,7 @@ verify_llm_gateway_model_availability(default_model)
 
 # LiteLLM support DataRobot as a provider, so this validates
 # everything is working and the default LLM you've chosen is available
-verify_llm(f"{default_model}")
+verify_llm(f"{default_model}", use_llm_gateway=True)
 
 playground = datarobot.Playground(
     use_case_id=use_case.id,
@@ -120,10 +120,22 @@ llm_custom_model = datarobot.CustomModel(
     guard_configurations=llm_guard_configurations,
 )
 
-prediction_environment = datarobot.PredictionEnvironment(
-    resource_name="LLM Prediction Environment " + llm_resource_name,
-    platform=dr.enums.PredictionEnvironmentPlatform.DATAROBOT_SERVERLESS,
-)
+if prediction_environment_id := os.environ.get(
+    "DATAROBOT_DEFAULT_PREDICTION_ENVIRONMENT"
+):
+    pulumi.info(f"Using existing prediction environment '{prediction_environment_id}'")
+
+    prediction_environment = datarobot.PredictionEnvironment.get(
+        id=prediction_environment_id,
+        resource_name="LLM Prediction Environment "
+        + llm_resource_name
+        + " [PRE-EXISTING]",
+    )
+else:
+    prediction_environment = datarobot.PredictionEnvironment(
+        resource_name="LLM Prediction Environment " + llm_resource_name,
+        platform=dr.enums.PredictionEnvironmentPlatform.DATAROBOT_SERVERLESS,
+    )
 
 # Register the custom model
 llm_registered_model = datarobot.RegisteredModel(
@@ -188,8 +200,28 @@ custom_model_runtime_parameters = [
         value=default_model,
     ),
 ]
+# TODO(APP-5859): Move datarobot_url to af-component-base infra/__init__.py
+datarobot_url = (
+    os.getenv("DATAROBOT_ENDPOINT", "https://app.datarobot.com/api/v2")
+    .rstrip("/")
+    .removesuffix("/api/v2")
+)
+rag_playground_url = pulumi.Output.format(
+    "{0}/usecases/{1}/playgrounds/{2}/comparison/chats",
+    datarobot_url,
+    use_case.id,
+    playground.id,
+)
+deployment_url = pulumi.Output.format(
+    "{0}/console-nextgen/deployments/{1}/overview",
+    datarobot_url,
+    llm_deployment.id,
+)
+
 pulumi.export("Deployment ID " + llm_resource_name, llm_deployment.id)
+pulumi.export("Deployment Console " + llm_resource_name, deployment_url)
 export("LLM_DEPLOYMENT_ID", llm_deployment.id)
 export("USE_DATAROBOT_LLM_GATEWAY", "1")
 export("USE_BUILDER_API_TOKEN", default_use_builder_api_token)
 export("LLM_DEFAULT_MODEL", default_model)
+pulumi.export("RAG Playground URL " + llm_resource_name, rag_playground_url)

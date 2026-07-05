@@ -115,6 +115,22 @@ def test_jdbc_credentials_validate_supported_uri(monkeypatch: pytest.MonkeyPatch
         JDBCCredentials()
 
 
+@pytest.mark.parametrize(
+    "jdbc_uri",
+    [
+        "jdbc:snowflake://account.snowflakecomputing.com/",
+        "jdbc:sap://host:443",
+        "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443",
+    ],
+)
+def test_jdbc_credentials_validate_platform_jdbc_uris(
+    monkeypatch: pytest.MonkeyPatch, jdbc_uri: str
+) -> None:
+    monkeypatch.setenv("JDBC_URI", jdbc_uri)
+
+    assert JDBCCredentials().jdbc_uri == jdbc_uri
+
+
 def test_get_database_operator_returns_jdbc_preview_operator(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -124,3 +140,29 @@ def test_get_database_operator_returns_jdbc_preview_operator(
 
     assert isinstance(operator, JdbcPreviewOperator)
     assert operator.query_friendly_name("sales") == "`sales`"
+
+
+@pytest.mark.parametrize(
+    ("database", "jdbc_uri", "quoted_name"),
+    [
+        ("snowflake", "jdbc:snowflake://account.snowflakecomputing.com/", '"sales"'),
+        ("sap", "jdbc:sap://host:443", '"sales"'),
+        (
+            "bigquery",
+            "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443",
+            "`sales`",
+        ),
+    ],
+)
+def test_platform_database_types_use_jdbc_preview_operator(
+    monkeypatch: pytest.MonkeyPatch,
+    database: str,
+    jdbc_uri: str,
+    quoted_name: str,
+) -> None:
+    monkeypatch.setenv("JDBC_URI", jdbc_uri)
+
+    operator = get_database_operator(AppInfra(llm="llm", database=database))
+
+    assert isinstance(operator, JdbcPreviewOperator)
+    assert operator.query_friendly_name("sales") == quoted_name

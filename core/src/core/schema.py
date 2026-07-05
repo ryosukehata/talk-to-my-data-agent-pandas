@@ -670,6 +670,7 @@ RuntimeCredentialType = Literal["llm", "db"]
 DatabaseConnectionType = Literal[
     "snowflake", "bigquery", "sap", "no_database", "datarobot_jdbc"
 ]
+# "snowflake", "sap", and "bigquery" are kept for backwards-compatibility — all now route to JdbcPreviewOperator
 
 
 class AppInfra(BaseModel):
