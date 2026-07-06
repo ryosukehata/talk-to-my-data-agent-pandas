@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import yaml
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DOCKERFILE = REPOSITORY_ROOT / "docker" / "Dockerfile"
 START_SCRIPT = REPOSITORY_ROOT / "app_backend" / "start-app.sh"
@@ -86,9 +88,16 @@ def test_env_template_documents_pulumi_managed_dockerfile_environment() -> None:
     assert "APPLICATION_EXECUTION_ENVIRONMENT_ID" in env_template
 
 
-def test_cd_uses_pulumi_managed_dockerfile_environment() -> None:
-    workflow = PULUMI_UP_WORKFLOW.read_text(encoding="utf-8")
+def test_cd_uses_pulumi_managed_dockerfile_environment_for_dev() -> None:
+    workflow = yaml.safe_load(PULUMI_UP_WORKFLOW.read_text(encoding="utf-8"))
+    env = workflow["jobs"]["update"]["env"]
 
-    assert "APPLICATION_EXECUTION_ENVIRONMENT_ID" not in workflow
-    assert "APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID" not in workflow
-    assert "USE_JAPANESE_FONT_ENV" not in workflow
+    assert env["APPLICATION_EXECUTION_ENVIRONMENT_ID"] == (
+        "${{ github.ref == 'refs/heads/main' && "
+        "secrets.APPLICATION_EXECUTION_ENVIRONMENT_ID || '' }}"
+    )
+    assert env["APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID"] == (
+        "${{ github.ref == 'refs/heads/main' && "
+        "secrets.APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID || '' }}"
+    )
+    assert "USE_JAPANESE_FONT_ENV" not in env

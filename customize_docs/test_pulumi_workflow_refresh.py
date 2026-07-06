@@ -44,8 +44,7 @@ def test_pulumi_up_workflow_deploys_from_split_infra_project() -> None:
     )
     assert job["env"]["INFRA_ENABLE_LLM"] == "blueprint_with_external_llm.py"
     assert job["env"]["LLM_DEFAULT_MODEL"] == (
-        "${{ vars.LLM_DEFAULT_MODEL || secrets.LLM_DEFAULT_MODEL || "
-        "'azure/gpt-4o' }}"
+        "${{ vars.LLM_DEFAULT_MODEL || secrets.LLM_DEFAULT_MODEL || 'azure/gpt-4o' }}"
     )
     assert job["env"]["LLM_DEFAULT_LLM_ID"] == (
         "${{ vars.LLM_DEFAULT_LLM_ID || secrets.LLM_DEFAULT_LLM_ID || "
@@ -57,6 +56,14 @@ def test_pulumi_up_workflow_deploys_from_split_infra_project() -> None:
     )
     assert "TEXTGEN_DEPLOYMENT_ID" not in job["env"]
     assert job["env"]["OPENAI_API_KEY"] == "${{ secrets.OPENAI_API_KEY }}"
+    assert job["env"]["APPLICATION_EXECUTION_ENVIRONMENT_ID"] == (
+        "${{ github.ref == 'refs/heads/main' && "
+        "secrets.APPLICATION_EXECUTION_ENVIRONMENT_ID || '' }}"
+    )
+    assert job["env"]["APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID"] == (
+        "${{ github.ref == 'refs/heads/main' && "
+        "secrets.APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID || '' }}"
+    )
 
     node_step = _step_by_name(steps, "Set up Node.js")
     assert node_step["with"] == {"node-version": "22"}

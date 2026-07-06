@@ -38,6 +38,10 @@ jobs:
       OPENAI_API_VERSION: ${{ secrets.OPENAI_API_VERSION }}
       OPENAI_API_DEPLOYMENT_ID: ${{ secrets.OPENAI_API_DEPLOYMENT_ID }}
       FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE || 'react' }}
+      APPLICATION_EXECUTION_ENVIRONMENT_ID: ${{ github.ref == 'refs/heads/main' && secrets.APPLICATION_EXECUTION_ENVIRONMENT_ID
+        || '' }}
+      APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID: ${{ github.ref == 'refs/heads/main' && secrets.APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID
+        || '' }}
       SKIP_PULUMI_FRONTEND_BUILD: "true"
       SKIP_PULUMI_CUSTOM_JOBS: "true"
       DISALLOW_MONITORING_RESOURCES: "true"
