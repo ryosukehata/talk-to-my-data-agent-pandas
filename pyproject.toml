@@ -123,7 +123,7 @@ module = "datarobot.*"
 implicit_reexport = true
 
 [tool.pytest.ini_options]
-norecursedirs = "tests/e2e"
+norecursedirs = "tests/e2e core"
 asyncio_default_fixture_loop_scope = "module"
 filterwarnings = ["ignore::DeprecationWarning::"]
 pythonpath = ["app_backend", "."]

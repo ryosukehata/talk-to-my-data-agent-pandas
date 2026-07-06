@@ -9,9 +9,9 @@ from typing import Any
 
 import httpx
 import pytest
+from core.llm_client import AsyncLLMClient, CompletionsProxy
 from openai import APIConnectionError
 from pydantic import BaseModel
-from utils.llm_client import AsyncLLMClient, CompletionsProxy
 
 from core import llm_client
 

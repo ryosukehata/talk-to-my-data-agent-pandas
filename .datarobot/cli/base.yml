@@ -28,6 +28,15 @@ root:
     options:
       - name: None
         value: no_database
+      - name: Snowflake
+        value: snowflake
+        requires: jdbc_config
+      - name: BigQuery
+        value: bigquery
+        requires: jdbc_config
+      - name: SAP Datasphere
+        value: sap
+        requires: jdbc_config
       - name: JDBC (PostgreSQL / MySQL / SQL Server / Snowflake / SAP Datasphere / BigQuery)
         value: datarobot_jdbc
         requires: jdbc_config

@@ -3,19 +3,19 @@ from types import TracebackType
 from typing import Any
 
 import pytest
+from core.customize.domain.report.domain import (
+    ReportQuestionsGenerationRequest,
+    ReportQuestionsGenerationResult,
+)
+from core.customize.infrastructure.llm import llm as refiner_llm
+from core.customize.infrastructure.llm import report_questions_generator
+from core.customize.usecase.prompt.builder import IRefinerDataInfoMessageFactory
+from core.customize.usecase.report.generate_questions import GenerateQuestionsUseCase
 from datarobot_genai.core.utils.token_tracking import TokenUsageTracker
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_user_message_param import (
     ChatCompletionUserMessageParam,
 )
-from utils.customize.domain.report.domain import (
-    ReportQuestionsGenerationRequest,
-    ReportQuestionsGenerationResult,
-)
-from utils.customize.infrastructure.llm import llm as refiner_llm
-from utils.customize.infrastructure.llm import report_questions_generator
-from utils.customize.usecase.prompt.builder import IRefinerDataInfoMessageFactory
-from utils.customize.usecase.report.generate_questions import GenerateQuestionsUseCase
 
 
 class _SlowCompletions:
