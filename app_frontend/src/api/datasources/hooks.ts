@@ -1,18 +1,26 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { dataSourceKeys } from './keys';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AxiosError } from "axios";
+import { dataSourceKeys } from "./keys";
 import {
   externalDataSourceName,
   ExternalDataStore,
   listAvailableExternalDataStores,
   selectSourcesForDataStore,
-} from './api-requests';
-import { dictionaryKeys, DictionaryTable } from '../dictionaries';
+} from "./api-requests";
+import { dictionaryKeys, DictionaryTable } from "../dictionaries";
+import { ApiError } from "@/state/types";
 
 export const useListAvailableDataStores = () => {
-  const queryResult = useQuery({
+  const queryResult = useQuery<ExternalDataStore[], AxiosError<ApiError>>({
     queryKey: dataSourceKeys.available,
     queryFn: listAvailableExternalDataStores,
     refetchInterval: 5 * 60 * 1000,
+    retry: (failureCount, error) => {
+      if (error.response?.data?.detail?.code === "USER_ACCESS_DENIED") {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
   return queryResult;
 };
@@ -35,21 +43,26 @@ export const useSelectDataSourcesMutation = ({
       selectedDataSourceNames: string[];
     }) => {
       const selectedDataSourceNamesSet = new Set(selectedDataSourceNames);
-      const selectedDataSources = selectedDataStore.defined_data_sources.filter(d =>
-        selectedDataSourceNamesSet.has(externalDataSourceName(d))
+      const selectedDataSources = selectedDataStore.defined_data_sources.filter(
+        (d) => selectedDataSourceNamesSet.has(externalDataSourceName(d)),
       );
-      await selectSourcesForDataStore(selectedDataStore.id, selectedDataSources);
+      await selectSourcesForDataStore(
+        selectedDataStore.id,
+        selectedDataSources,
+      );
       return { selectedDataStore, selectedDataSources };
     },
     onMutate: async ({ selectedDataSourceNames }) => {
       const previousDictionaries =
         queryClient.getQueryData<DictionaryTable[]>(dictionaryKeys.all) || [];
 
-      const previousDictionaryNames = new Set(previousDictionaries.map(d => d.name));
+      const previousDictionaryNames = new Set(
+        previousDictionaries.map((d) => d.name),
+      );
 
       const placeholderDictionaries: DictionaryTable[] = selectedDataSourceNames
-        .filter(name => !previousDictionaryNames.has(name))
-        .map(name => ({
+        .filter((name) => !previousDictionaryNames.has(name))
+        .map((name) => ({
           name: name,
           in_progress: true,
           column_descriptions: [],
@@ -62,7 +75,7 @@ export const useSelectDataSourcesMutation = ({
 
       return { previousDictionaries };
     },
-    onSuccess: async data => {
+    onSuccess: async (data) => {
       onSuccess(data);
       await queryClient.invalidateQueries({ queryKey: dictionaryKeys.all });
     },
@@ -71,7 +84,7 @@ export const useSelectDataSourcesMutation = ({
       if (context) {
         queryClient.setQueryData<DictionaryTable[]>(
           dictionaryKeys.all,
-          context.previousDictionaries
+          context.previousDictionaries,
         );
       }
     },

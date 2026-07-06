@@ -49,11 +49,19 @@ def _has_retain_on_delete_true(call: ast.Call) -> bool:
 
 
 def test_application_sources_are_retained_on_delete() -> None:
-    infra_main = Path(__file__).parents[1] / "infra" / "__main__.py"
-    tree = ast.parse(infra_main.read_text())
+    repo_root = Path(__file__).parents[1]
+    app_backend_tree = ast.parse(
+        (repo_root / "infra" / "infra" / "app_backend.py").read_text()
+    )
+    jobs_tree = ast.parse(
+        (repo_root / "infra" / "configurations" / "jobs" / "custom_jobs.py").read_text()
+    )
 
-    assignments = _application_source_assignments(tree)
+    assignments = {
+        **_application_source_assignments(app_backend_tree),
+        **_application_source_assignments(jobs_tree),
+    }
 
-    assert set(assignments) >= {"app_source", "dashboard_source"}
-    assert _has_retain_on_delete_true(assignments["app_source"])
+    assert set(assignments) >= {"app_backend_app_source", "dashboard_source"}
+    assert _has_retain_on_delete_true(assignments["app_backend_app_source"])
     assert _has_retain_on_delete_true(assignments["dashboard_source"])

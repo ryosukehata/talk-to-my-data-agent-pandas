@@ -1,26 +1,36 @@
 // Template Selector Modal Component
 
-import { useState, useMemo, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useTranslation } from '@/i18n';
-import { cn } from '@/lib/utils';
-import { useFetchTemplates, useFetchTemplateCategories } from '@/api/templates/hooks';
-import { useFetchCustomPrompts } from '@/api/custom-prompts/hooks';
-import { useFetchFeatureFlags } from '@/api/feature-flag';
-import type { PromptTemplate } from '@/api/templates/types';
-import { TemplateList } from './TemplateList';
-import { TemplateCategoryFilter } from './TemplateCategoryFilter';
-import { Loading } from '@/components/ui-custom/loading';
-import { convertCustomPromptsToTemplates } from './utils';
-import { useCustomPromptState } from '@/components/custom-prompts';
+import { useState, useMemo, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useTranslation } from "@/i18n";
+import { cn } from "@/lib/utils";
+import {
+  useFetchTemplates,
+  useFetchTemplateCategories,
+} from "@/api/templates/hooks";
+import { useFetchCustomPrompts } from "@/api/custom-prompts/hooks";
+import { useFetchFeatureFlags } from "@/api/feature-flag";
+import type { PromptTemplate } from "@/api/templates/types";
+import { TemplateList } from "./TemplateList";
+import { TemplateCategoryFilter } from "./TemplateCategoryFilter";
+import { Loading } from "@/components/ui-custom/loading";
+import { convertCustomPromptsToTemplates } from "./utils";
+import { useCustomPromptState } from "@/components/custom-prompts";
+import { LoaderCircle } from "lucide-react";
 
 interface TemplateSelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectTemplate: (template: PromptTemplate) => void;
   onSendDirectly?: (message: string) => void;
-  mode?: 'select' | 'send';
+  mode?: "select" | "send";
   className?: string;
 }
 
@@ -29,11 +39,11 @@ export const TemplateSelector = ({
   onOpenChange,
   onSelectTemplate,
   onSendDirectly,
-  mode = 'select',
-  className = '',
+  mode = "select",
+  className = "",
 }: TemplateSelectorProps) => {
   const { t } = useTranslation();
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const { pendingUpdate } = useCustomPromptState();
   const { data: featureFlags } = useFetchFeatureFlags();
 
@@ -47,12 +57,15 @@ export const TemplateSelector = ({
     error: templatesError,
   } = useFetchTemplates({
     category:
-      selectedCategory === 'all' || selectedCategory === 'カスタム' ? undefined : selectedCategory,
+      selectedCategory === "all" || selectedCategory === "カスタム"
+        ? undefined
+        : selectedCategory,
   });
 
   // Fetch custom prompts when category is 'all' or 'カスタム' AND feature is enabled
   const shouldFetchCustomPrompts =
-    customPromptsEnabled && (selectedCategory === 'all' || selectedCategory === 'カスタム');
+    customPromptsEnabled &&
+    (selectedCategory === "all" || selectedCategory === "カスタム");
   const {
     data: customPromptsResponse,
     isLoading: customPromptsLoading,
@@ -60,50 +73,64 @@ export const TemplateSelector = ({
   } = useFetchCustomPrompts({ enabled: shouldFetchCustomPrompts });
 
   // Fetch available categories
-  const { data: categoriesResponse, isLoading: categoriesLoading } = useFetchTemplateCategories();
+  const { data: categoriesResponse, isLoading: categoriesLoading } =
+    useFetchTemplateCategories();
 
   // Combine regular templates and custom prompts
   const combinedTemplates = useMemo(() => {
     const regularTemplates = templatesResponse?.templates || [];
-    const customPrompts = customPromptsEnabled ? customPromptsResponse?.custom_prompts || [] : [];
+    const customPrompts = customPromptsEnabled
+      ? customPromptsResponse?.custom_prompts || []
+      : [];
 
-    if (selectedCategory === 'カスタム') {
+    if (selectedCategory === "カスタム") {
       // カスタムカテゴリのみ表示（フィーチャーフラグが有効な場合のみ）
-      return customPromptsEnabled ? convertCustomPromptsToTemplates(customPrompts) : [];
-    } else if (selectedCategory === 'all') {
+      return customPromptsEnabled
+        ? convertCustomPromptsToTemplates(customPrompts)
+        : [];
+    } else if (selectedCategory === "all") {
       // 全てのテンプレート + カスタムプロンプト（フィーチャーフラグが有効な場合）
       return [
         ...regularTemplates,
-        ...(customPromptsEnabled ? convertCustomPromptsToTemplates(customPrompts) : []),
+        ...(customPromptsEnabled
+          ? convertCustomPromptsToTemplates(customPrompts)
+          : []),
       ];
     } else {
       // 選択されたカテゴリのテンプレートのみ
       return regularTemplates;
     }
-  }, [templatesResponse, customPromptsResponse, selectedCategory, customPromptsEnabled]);
+  }, [
+    templatesResponse,
+    customPromptsResponse,
+    selectedCategory,
+    customPromptsEnabled,
+  ]);
 
   // Combine categories to include 'カスタム' only if feature is enabled
   const combinedCategories = useMemo(() => {
     const regularCategories = categoriesResponse?.categories || [];
     // カスタムプロンプト機能が有効な場合のみカスタムカテゴリを追加
-    if (customPromptsEnabled && !regularCategories.includes('カスタム')) {
-      return [...regularCategories, 'カスタム'];
+    if (customPromptsEnabled && !regularCategories.includes("カスタム")) {
+      return [...regularCategories, "カスタム"];
     }
     return regularCategories;
   }, [categoriesResponse, customPromptsEnabled]);
 
   // カスタムプロンプト機能が無効になった場合、カスタムカテゴリが選択されていたら'all'にリセット
   useEffect(() => {
-    if (!customPromptsEnabled && selectedCategory === 'カスタム') {
-      setSelectedCategory('all');
+    if (!customPromptsEnabled && selectedCategory === "カスタム") {
+      setSelectedCategory("all");
     }
   }, [customPromptsEnabled, selectedCategory]);
 
   // Loading state - 通常のローディングとカスタムプロンプトローディングを組み合わせ
-  const isLoading = templatesLoading || (shouldFetchCustomPrompts && customPromptsLoading);
+  const isLoading =
+    templatesLoading || (shouldFetchCustomPrompts && customPromptsLoading);
 
   // Error state
-  const hasError = templatesError || (shouldFetchCustomPrompts && customPromptsError);
+  const hasError =
+    templatesError || (shouldFetchCustomPrompts && customPromptsError);
 
   const handleSelectTemplate = (template: PromptTemplate) => {
     onSelectTemplate(template);
@@ -119,19 +146,25 @@ export const TemplateSelector = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn('max-w-2xl max-h-[85vh] flex flex-col', className)}>
+      <DialogContent
+        className={cn("flex max-h-[85vh] max-w-2xl flex-col", className)}
+      >
         <DialogHeader className="shrink-0">
           <DialogTitle>
-            {mode === 'send' ? t('Quick Ask - Select a Template') : t('Select Prompt Template')}
+            {mode === "send"
+              ? t("Quick Ask - Select a Template")
+              : t("Select Prompt Template")}
           </DialogTitle>
         </DialogHeader>
 
         {/* Category Filter */}
-        <div className="py-4 border-b shrink-0">
+        <div className="shrink-0 border-b py-4">
           {categoriesLoading ? (
             <div className="flex items-center gap-2">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span className="text-sm text-muted-foreground">{t('Loading categories...')}</span>
+              <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <span className="text-sm text-muted-foreground">
+                {t("Loading categories...")}
+              </span>
             </div>
           ) : (
             <TemplateCategoryFilter
@@ -143,30 +176,28 @@ export const TemplateSelector = ({
         </div>
 
         {/* Templates List - Scrollable Area */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-hidden">
           {customPromptsEnabled &&
             pendingUpdate &&
-            (selectedCategory === 'all' || selectedCategory === 'カスタム') && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                  <span className="text-sm text-blue-700">
-                    {t('Custom prompt update in progress, please wait...')}
-                  </span>
-                </div>
-              </div>
+            (selectedCategory === "all" || selectedCategory === "カスタム") && (
+              <Alert variant="info" className="mb-4 py-3">
+                <LoaderCircle className="animate-spin" />
+                <AlertDescription>
+                  {t("Custom prompt update in progress, please wait...")}
+                </AlertDescription>
+              </Alert>
             )}
 
           {customPromptsEnabled &&
             customPromptsLoading &&
             shouldFetchCustomPrompts &&
             !pendingUpdate && (
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-transparent" />
-                  <span className="text-sm text-gray-700">{t('Loading custom prompts...')}</span>
-                </div>
-              </div>
+              <Alert variant="info" className="mb-4 py-3">
+                <LoaderCircle className="animate-spin" />
+                <AlertDescription>
+                  {t("Loading custom prompts...")}
+                </AlertDescription>
+              </Alert>
             )}
 
           {isLoading ? (
@@ -176,15 +207,15 @@ export const TemplateSelector = ({
           ) : hasError ? (
             <div className="flex items-center justify-center py-8">
               <p className="text-sm text-destructive">
-                {t('Failed to load templates. Please try again.')}
+                {t("Failed to load templates. Please try again.")}
               </p>
             </div>
           ) : combinedTemplates.length === 0 ? (
             <div className="flex items-center justify-center py-8">
               <p className="text-sm text-muted-foreground">
-                {selectedCategory === 'all'
-                  ? t('No templates available.')
-                  : t('No templates found for this category.')}
+                {selectedCategory === "all"
+                  ? t("No templates available.")
+                  : t("No templates found for this category.")}
               </p>
             </div>
           ) : (

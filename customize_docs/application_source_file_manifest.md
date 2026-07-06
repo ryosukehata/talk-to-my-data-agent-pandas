@@ -4,7 +4,7 @@
 
 GitHub Actions の Pulumi CD で、DataRobot `ApplicationSource` 更新時に `filePath` の重複で 422 が返った。
 
-`infra/settings_app_infra.py` の `get_app_files()` は `utils/**/*.py` で `utils/customize/**/*.py` も収集していたが、その後に `utils/customize/**/*.py` を同じ配置先パスで再追加していた。
+旧 `infra/settings_app_infra.py` の `get_app_files()` は `utils/**/*.py` で `utils/customize/**/*.py` も収集していたが、その後に `utils/customize/**/*.py` を同じ配置先パスで再追加していた。PR #103 follow-up後は同じ責務を `infra/infra/app_backend.py` の `get_app_backend_app_files()` が持つ。
 
 ## 対応
 
@@ -30,6 +30,8 @@ GitHub Actions の Pulumi CD で、DataRobot `ApplicationSource` 更新時に `f
 - `customize_docs/test_application_source_retention.py`
   - App と Dashboard の `ApplicationSource` に `retain_on_delete=True` が設定されていることを検証する。
 - `.github/workflows/pulumi-up.yml`
-  - YAML として parse できること、refresh 前の `app_infra.json` 作成 step、frontend build step、state file 補完 step があること、main/dev 両方の Pulumi action に `refresh: true` が設定されていることを確認する。
+  - YAML として parse できること、`main` / `dev` push で起動すること、`infra/` Pulumi project を `work-dir` にして `refresh: true` 付きの Pulumi update を実行することを確認する。
+  - refresh 前の `app_infra.json` 作成 step、frontend build step、state file 補完 step、stale resource prune step があることを確認する。
+  - CD の LLM 設定は従来の OpenAI 利用に合わせて `blueprint_with_external_llm.py` を使い、`OPENAI_*` secrets と `LLM_DEFAULT_*` 値を渡す。
 - `.github/scripts/prepare_pulumi_refresh_files.py`
   - Pulumi state の ApplicationSource `files` から missing file を抽出し、同種の現在 asset または placeholder で補完できることを確認する。

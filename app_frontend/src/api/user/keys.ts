@@ -1,1 +1,1 @@
-export const dataRobotInfoKey = ['datarobot-account'];
+export const dataRobotInfoKey = ["datarobot-account"];

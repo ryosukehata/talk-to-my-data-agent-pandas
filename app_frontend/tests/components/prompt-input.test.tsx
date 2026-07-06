@@ -1,185 +1,244 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { vi } from 'vitest';
-import { PromptInput } from '@/components/ui-custom/prompt-input';
+import { render, screen, fireEvent } from "@testing-library/react";
+import { vi } from "vitest";
+import { PromptInput } from "@/components/ui-custom/prompt-input";
+import { MAX_PROMPT_LENGTH } from "@/constants/chat";
 
-describe('PromptInput', () => {
-  it('renders correctly', () => {
+describe("PromptInput", () => {
+  it("renders correctly", () => {
     render(<PromptInput />);
-    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 
-  it('applies custom class name', () => {
+  it("applies custom class name", () => {
     render(<PromptInput className="custom-class" />);
-    expect(screen.getByRole('textbox')).toHaveClass('custom-class');
+    expect(screen.getByRole("textbox")).toHaveClass("custom-class");
   });
 
-  it('renders with send button appended by default', () => {
+  it("renders with send button appended by default", () => {
     render(<PromptInput testId="test-prompt-input-container" />);
-    expect(screen.getByTestId('send-message-button')).toBeInTheDocument();
+    expect(screen.getByTestId("send-message-button")).toBeInTheDocument();
     // Check the main container for the default flex-row class
-    const container = screen.getByTestId('test-prompt-input-container');
-    expect(container).toHaveClass('flex-row');
+    const container = screen.getByTestId("test-prompt-input-container");
+    expect(container).toHaveClass("flex-row");
   });
 
-  it('renders with send button prepended', () => {
+  it("renders with send button prepended", () => {
     render(<PromptInput sendButtonArrangement="prepend" />);
-    expect(screen.getByTestId('send-message-button')).toBeInTheDocument();
+    expect(screen.getByTestId("send-message-button")).toBeInTheDocument();
     // Verify the order, assuming the button is the first child
-    expect(screen.getByTestId('send-message-button').previousElementSibling).toBeNull();
+    expect(
+      screen.getByTestId("send-message-button").previousElementSibling,
+    ).toBeNull();
   });
 
-  it('disables send button when processing is true', () => {
+  it("disables send button when processing is true", () => {
     render(<PromptInput isProcessing={true} />);
-    expect(screen.getByTestId('send-message-button')).toBeDisabled();
+    expect(screen.getByTestId("send-message-button")).toBeDisabled();
   });
 
-  it('calls onSend when send button is clicked', () => {
+  it("calls onSend when send button is clicked", () => {
     const handleSend = vi.fn();
     render(<PromptInput onSend={handleSend} initialValue="test message" />);
-    fireEvent.click(screen.getByTestId('send-message-button'));
+    fireEvent.click(screen.getByTestId("send-message-button"));
     expect(handleSend).toHaveBeenCalledTimes(1);
-    expect(handleSend).toHaveBeenCalledWith('test message');
+    expect(handleSend).toHaveBeenCalledWith("test message");
   });
 
-  it('calls onSend when Enter key is pressed', () => {
+  it("calls onSend when Enter key is pressed", () => {
     const handleSend = vi.fn();
     render(<PromptInput onSend={handleSend} initialValue="test message" />);
-    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', code: 'Enter' });
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      code: "Enter",
+    });
     expect(handleSend).toHaveBeenCalledTimes(1);
-    expect(handleSend).toHaveBeenCalledWith('test message');
+    expect(handleSend).toHaveBeenCalledWith("test message");
   });
 
-  it('does not call onSend when Enter is pressed with Shift', () => {
+  it("does not call onSend when Enter is pressed with Shift", () => {
     const handleSend = vi.fn();
     render(<PromptInput onSend={handleSend} initialValue="test message" />);
-    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', code: 'Enter', shiftKey: true });
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      code: "Enter",
+      shiftKey: true,
+    });
     expect(handleSend).not.toHaveBeenCalled();
   });
 
-  it('disables input and send button when isDisabled is true', () => {
+  it("disables input and send button when isDisabled is true", () => {
     const handleSend = vi.fn();
     render(<PromptInput onSend={handleSend} isDisabled={true} />);
-    const textarea = screen.getByRole('textbox');
-    const sendButton = screen.getByTestId('send-message-button');
+    const textarea = screen.getByRole("textbox");
+    const sendButton = screen.getByTestId("send-message-button");
 
     expect(textarea).toBeDisabled();
     expect(sendButton).toBeDisabled();
 
-    fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
+    fireEvent.keyDown(textarea, { key: "Enter", code: "Enter" });
     expect(handleSend).not.toHaveBeenCalled();
     fireEvent.click(sendButton);
     expect(handleSend).not.toHaveBeenCalled();
   });
 
-  it('does not call onSend when processing is true', () => {
+  it("does not call onSend when processing is true", () => {
     const handleSend = vi.fn();
-    render(<PromptInput onSend={handleSend} isProcessing={true} initialValue="test message" />);
-    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', code: 'Enter' });
+    render(
+      <PromptInput
+        onSend={handleSend}
+        isProcessing={true}
+        initialValue="test message"
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      code: "Enter",
+    });
     expect(handleSend).not.toHaveBeenCalled();
   });
 
-  it('manages message state internally', () => {
+  it("manages message state internally", () => {
     render(<PromptInput initialValue="initial text" />);
-    const textarea = screen.getByRole('textbox');
-    expect(textarea).toHaveValue('initial text');
+    const textarea = screen.getByRole("textbox");
+    expect(textarea).toHaveValue("initial text");
 
-    fireEvent.change(textarea, { target: { value: 'updated text' } });
-    expect(textarea).toHaveValue('updated text');
+    fireEvent.change(textarea, { target: { value: "updated text" } });
+    expect(textarea).toHaveValue("updated text");
   });
 
-  it('clears message after sending', () => {
+  it("clears message after sending", () => {
     const handleSend = vi.fn();
     render(<PromptInput onSend={handleSend} initialValue="test message" />);
 
-    const textarea = screen.getByRole('textbox');
-    expect(textarea).toHaveValue('test message');
+    const textarea = screen.getByRole("textbox");
+    expect(textarea).toHaveValue("test message");
 
-    fireEvent.click(screen.getByTestId('send-message-button'));
-    expect(handleSend).toHaveBeenCalledWith('test message');
-    expect(textarea).toHaveValue('');
+    fireEvent.click(screen.getByTestId("send-message-button"));
+    expect(handleSend).toHaveBeenCalledWith("test message");
+    expect(textarea).toHaveValue("");
   });
 
-  it('disables send button when message is empty', () => {
+  it("disables send button when message is empty", () => {
     render(<PromptInput />);
-    const sendButton = screen.getByTestId('send-message-button');
+    const sendButton = screen.getByTestId("send-message-button");
     expect(sendButton).toBeDisabled();
   });
 
-  it('enables send button when message has content', () => {
+  it("enables send button when message has content", () => {
     render(<PromptInput initialValue="test" />);
-    const sendButton = screen.getByTestId('send-message-button');
+    const sendButton = screen.getByTestId("send-message-button");
     expect(sendButton).not.toBeDisabled();
   });
 
-  it('disables send button when message is only whitespace', () => {
+  it("disables send button when message is only whitespace", () => {
     render(<PromptInput initialValue="   " />);
-    const sendButton = screen.getByTestId('send-message-button');
+    const sendButton = screen.getByTestId("send-message-button");
     expect(sendButton).toBeDisabled();
   });
 
-  it('does not call onSend when message is empty', () => {
+  it("does not call onSend when message is empty", () => {
     const handleSend = vi.fn();
     render(<PromptInput onSend={handleSend} />);
 
-    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', code: 'Enter' });
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      code: "Enter",
+    });
     expect(handleSend).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByTestId('send-message-button'));
+    fireEvent.click(screen.getByTestId("send-message-button"));
     expect(handleSend).not.toHaveBeenCalled();
   });
 
-  it('does not call onSend when message is only whitespace', () => {
+  it("does not call onSend when message is only whitespace", () => {
     const handleSend = vi.fn();
     render(<PromptInput onSend={handleSend} initialValue="   " />);
 
-    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', code: 'Enter' });
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      code: "Enter",
+    });
     expect(handleSend).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByTestId('send-message-button'));
+    fireEvent.click(screen.getByTestId("send-message-button"));
     expect(handleSend).not.toHaveBeenCalled();
+  });
+
+  it("disables send and shows an error at the message length limit", () => {
+    const handleSend = vi.fn();
+    render(
+      <PromptInput
+        onSend={handleSend}
+        initialValue={"a".repeat(MAX_PROMPT_LENGTH)}
+      />,
+    );
+
+    expect(screen.getByTestId("send-message-button")).toBeDisabled();
+    expect(screen.getByTestId("char-counter")).toHaveTextContent(
+      `Message limit reached (${MAX_PROMPT_LENGTH} characters)`,
+    );
+
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      code: "Enter",
+    });
+    expect(handleSend).not.toHaveBeenCalled();
+  });
+
+  it("shows a character counter near the message length limit", () => {
+    const messageLength = Math.floor(MAX_PROMPT_LENGTH * 0.81);
+
+    render(<PromptInput initialValue={"a".repeat(messageLength)} />);
+
+    expect(screen.getByTestId("char-counter")).toHaveTextContent(
+      `${messageLength}/${MAX_PROMPT_LENGTH}`,
+    );
   });
 });
 
-describe('PromptInput Tooltip', () => {
+describe("PromptInput Tooltip", () => {
   it('shows "Processing..." tooltip when isProcessing is true', () => {
     render(<PromptInput isProcessing={true} />);
-    const sendButtonSpan = screen.getByTestId('send-message-button').parentElement;
-    expect(sendButtonSpan).toHaveAttribute('title', 'Processing... Waiting for response.');
+    const sendButtonSpan = screen.getByTestId(
+      "send-message-button",
+    ).parentElement;
+    expect(sendButtonSpan).toHaveAttribute(
+      "title",
+      "Processing... Waiting for response.",
+    );
   });
 
   it('shows "Ask a question" tooltip when isDisabled is true and not processing', () => {
     render(<PromptInput isDisabled={true} />);
-    const sendButtonSpan = screen.getByTestId('send-message-button').parentElement;
-    expect(sendButtonSpan).toHaveAttribute('title', 'Ask a question');
+    const sendButtonSpan = screen.getByTestId(
+      "send-message-button",
+    ).parentElement;
+    expect(sendButtonSpan).toHaveAttribute("title", "Ask a question");
   });
 
   it('shows "Ask a question" tooltip when message is empty and not disabled/processing', () => {
     render(<PromptInput initialValue="" />);
-    const sendButtonSpan = screen.getByTestId('send-message-button').parentElement;
-    expect(sendButtonSpan).toHaveAttribute('title', 'Ask a question');
+    const sendButtonSpan = screen.getByTestId(
+      "send-message-button",
+    ).parentElement;
+    expect(sendButtonSpan).toHaveAttribute("title", "Ask a question");
   });
 
   it('shows "Send message" tooltip when message has content and not disabled/processing', () => {
     render(<PromptInput initialValue="Hello" />);
-    const sendButton = screen.getByTestId('send-message-button');
-    expect(sendButton).toHaveAttribute('title', 'Send message');
+    const sendButton = screen.getByTestId("send-message-button");
+    expect(sendButton).toHaveAttribute("title", "Send message");
   });
 });
 
-describe('PromptInput Icon Change', () => {
-  it('shows faHourglassHalf icon when processing is true', () => {
+describe("PromptInput Icon Change", () => {
+  it("shows hourglass icon when processing is true", () => {
     render(<PromptInput isProcessing={true} initialValue="test" />);
-    const hourglassIcon = screen
-      .getByTestId('send-message-button')
-      .querySelector('[data-icon="hourglass-half"]');
-    expect(hourglassIcon).toBeInTheDocument();
+    expect(screen.getByTestId("processing-icon")).toBeInTheDocument();
   });
 
-  it('shows faPaperPlane icon when processing is false', () => {
+  it("shows send icon when processing is false", () => {
     render(<PromptInput isProcessing={false} initialValue="test" />);
-    const paperPlaneIcon = screen
-      .getByTestId('send-message-button')
-      .querySelector('[data-icon="paper-plane"]');
-    expect(paperPlaneIcon).toBeInTheDocument();
+    expect(screen.getByTestId("send-icon")).toBeInTheDocument();
   });
 });

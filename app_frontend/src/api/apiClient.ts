@@ -1,46 +1,15 @@
-import axios from 'axios';
-import { isDev, isServedStatic } from '@/lib/utils';
-import { VITE_DEFAULT_PORT } from '@/constants/dev';
-
-const getApiUrl = () => {
-  // Adjust API URL based on the environment
-  let apiBaseURL: string = window.location.origin;
-  if (window.ENV?.APP_BASE_URL) {
-    apiBaseURL = `${apiBaseURL}/${window.ENV.APP_BASE_URL}`;
-  }
-  if (window.ENV?.APP_BASE_URL?.includes('notebook-sessions') && isDev()) {
-    apiBaseURL += `/ports/` + VITE_DEFAULT_PORT;
-  }
-  if (
-    window.ENV?.APP_BASE_URL?.includes('notebook-sessions') &&
-    window.ENV?.API_PORT &&
-    isServedStatic()
-  ) {
-    apiBaseURL += `/ports/` + window.ENV.API_PORT;
-  }
-  apiBaseURL += '/api';
-  return apiBaseURL;
-};
+import axios from "axios";
+import { getApiUrl } from "@/lib/utils";
 
 const apiClient = axios.create({
-  baseURL: `${getApiUrl()}`,
+  baseURL: getApiUrl(),
   headers: {
-    Accept: 'application/json',
-    'Content-type': 'application/json',
+    Accept: "application/json",
+    "Content-type": "application/json",
   },
   withCredentials: true,
 });
 
 export default apiClient;
 
-const drClient = axios.create({
-  // DATAROBOT_ENDPOINT on STS and onPrem is internal API URL which is not working from frontend
-  baseURL: `${window.location.origin}/api/v2`,
-  headers: {
-    Accept: 'application/json',
-    'Content-type': 'application/json',
-  },
-  withCredentials: true,
-});
-
-export { drClient, apiClient };
+export { apiClient };

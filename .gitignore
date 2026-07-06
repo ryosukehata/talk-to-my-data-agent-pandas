@@ -174,9 +174,6 @@ utils/customize/infrastructure/storage/data/
 .DS_Store
 .vscode/
 
-frontend/metadata.yaml
-frontend/app_infra.json
-
 #e2e
 e2e/downloads/
 
@@ -186,6 +183,7 @@ e2e/downloads/
 !.env.template
 node_modules/
 uv.lock
+!app_backend/uv.lock
 .python-version
 
 # Logs

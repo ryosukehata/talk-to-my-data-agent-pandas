@@ -1,13 +1,13 @@
-import React, { useState, ReactNode } from 'react';
-import { CustomPromptStateContext } from './context';
+import React, { useState, ReactNode } from "react";
+import { CustomPromptStateContext } from "./context";
 
 interface CustomPromptStateProviderProps {
   children: ReactNode;
 }
 
-export const CustomPromptStateProvider: React.FC<CustomPromptStateProviderProps> = ({
-  children,
-}) => {
+export const CustomPromptStateProvider: React.FC<
+  CustomPromptStateProviderProps
+> = ({ children }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [pendingUpdate, setPendingUpdate] = useState(false);
 

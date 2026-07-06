@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/button';
-import { Copy, Check } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
+import { Copy, Check } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 
 interface CopyToClipboardButtonProps {
   content: string;
@@ -11,8 +11,8 @@ interface CopyToClipboardButtonProps {
 
 export function CopyToClipboardButton({
   content,
-  label = 'Copy to clipboard',
-  copiedLabel = 'Copied!',
+  label = "Copy to clipboard",
+  copiedLabel = "Copied!",
   onCopy,
 }: CopyToClipboardButtonProps) {
   const [isCopied, setIsCopied] = useState(false);
@@ -39,7 +39,7 @@ export function CopyToClipboardButton({
 
   return (
     <Button variant="ghost" onClick={handleCopy}>
-      {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+      {isCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
       {isCopied ? copiedLabel : label}
     </Button>
   );

@@ -14,12 +14,12 @@ export const isTemplateEditEnabled = (): boolean => {
   const envValue = import.meta.env.VITE_ENABLE_TEMPLATE_EDIT;
 
   // Default to true if not set (backwards compatibility)
-  if (envValue === undefined || envValue === '') {
+  if (envValue === undefined || envValue === "") {
     return true;
   }
 
   // Convert string to boolean
-  return envValue.toLowerCase() === 'true' || envValue === '1';
+  return envValue.toLowerCase() === "true" || envValue === "1";
 };
 
 /**

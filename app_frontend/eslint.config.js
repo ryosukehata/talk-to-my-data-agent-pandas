@@ -6,6 +6,7 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import tanstackQuery from '@tanstack/eslint-plugin-query';
+import eslintPluginBetterTailwindcss from 'eslint-plugin-better-tailwindcss';
 
 export default tseslint.config(
   { ignores: ['dist'] },
@@ -61,6 +62,30 @@ export default tseslint.config(
     files: ['**/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    files: ['**/*.{jsx,tsx}'],
+    plugins: {
+      'better-tailwindcss': eslintPluginBetterTailwindcss,
+    },
+    rules: {
+      'better-tailwindcss/enforce-consistent-class-order': ['error', { order: 'official' }],
+      'better-tailwindcss/enforce-shorthand-classes': 'error',
+      'better-tailwindcss/no-conflicting-classes': 'error',
+      'better-tailwindcss/no-duplicate-classes': 'error',
+      'better-tailwindcss/no-unnecessary-whitespace': 'error',
+      'better-tailwindcss/no-deprecated-classes': 'off',
+      'better-tailwindcss/enforce-consistent-variable-syntax': ['error', { syntax: 'shorthand' }],
+      'better-tailwindcss/enforce-consistent-important-position': [
+        'error',
+        { position: 'recommended' },
+      ],
+    },
+    settings: {
+      'better-tailwindcss': {
+        entryPoint: 'src/index.css',
+      },
     },
   }
 );

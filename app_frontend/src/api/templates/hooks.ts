@@ -1,16 +1,18 @@
 // Prompt Template React Query Hooks
 
-import { useQuery } from '@tanstack/react-query';
-import { templatesApi } from './requests';
-import type { FetchTemplatesParams } from './types';
+import { useQuery } from "@tanstack/react-query";
+import { templatesApi } from "./requests";
+import type { FetchTemplatesParams } from "./types";
 
 // Template query keys for cache management
 export const templateQueryKeys = {
-  all: ['templates'] as const,
-  templates: (params?: FetchTemplatesParams) => [...templateQueryKeys.all, 'list', params] as const,
-  categories: () => [...templateQueryKeys.all, 'categories'] as const,
-  summary: () => [...templateQueryKeys.all, 'summary'] as const,
-  template: (name: string) => [...templateQueryKeys.all, 'detail', name] as const,
+  all: ["templates"] as const,
+  templates: (params?: FetchTemplatesParams) =>
+    [...templateQueryKeys.all, "list", params] as const,
+  categories: () => [...templateQueryKeys.all, "categories"] as const,
+  summary: () => [...templateQueryKeys.all, "summary"] as const,
+  template: (name: string) =>
+    [...templateQueryKeys.all, "detail", name] as const,
 };
 
 // Fetch templates with optional filtering
@@ -44,7 +46,10 @@ export const useFetchTemplateSummary = () => {
 };
 
 // Fetch specific template by name
-export const useFetchTemplate = (templateName: string, enabled: boolean = true) => {
+export const useFetchTemplate = (
+  templateName: string,
+  enabled: boolean = true,
+) => {
   return useQuery({
     queryKey: templateQueryKeys.template(templateName),
     queryFn: () => templatesApi.getTemplate(templateName),

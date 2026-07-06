@@ -5,6 +5,124 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.6.2] - 2026-03-26
+
+### Fixed
+
+- Revert from using dr file system. (APP-5650)
+
+## [11.6.0] - 2026-03-16
+
+### Removed
+
+- Removed deprecated Streamlit frontend (`frontend/` directory, CI workflow, e2e tests, `FRONTEND_TYPE` config)
+- Removed Streamlit dependencies (`streamlit`, `st-theme`, `streamlit-javascript`, `nest-asyncio`)
+
+## [11.5.5] - 2026-03-16
+
+### Added
+
+- Support Data Connector Integration with Apache Impala (APP-5077)
+- Support Data Connector Integration with MySQL (APP-5385)
+- Updated README with Codespace links for different regions (APP-5592)
+
+### Fixed
+
+- Fix Add Data modal stuck loading on empty selections (APP-4858)
+
+## [11.5.4] - 2026-03-03
+
+### Added
+
+- Add error toasts to chat mutation hooks
+- Set a limit for input prompt length
+
+### Fixed
+
+- Handle 401 response for external users
+- Fix circular symlink between app_backend and core by moving telemetry into core
+
+## [11.5.3] - 2026-02-26
+
+### Added
+
+- Privacy notice when uploading datasets
+- App version number display on the React UI
+- Ability to use builder's token for shared applications
+- Error handler for 403 seat license with disabled data selection on access denied
+- Max length validation to chat name inputs
+- Frontend test coverage reporting to PRs
+
+### Changed
+
+- Redesigned Settings modal with instant-apply and visual overhaul
+- Moved version display from Sidebar header to Settings modal
+- Replaced all FontAwesome icons with Lucide icons
+- UX/Accessibility improvements to Add Data modal
+- Changed required API key scope level from 'user' to 'admin'
+- Replaced `tiktoken` token usage predictions with a local algorithm
+- Removed JSON-style logs in favor of standard logging
+- Set `no_database` as default for `DATABASE_CONNECTION_TYPE`
+- Added guidelines for chart titles and text in prompts
+- Minor wording improvements across the UI
+- Updated dr-ui version
+
+### Fixed
+
+- Fixed empty Data Registry dropdown on localhost with empty use case
+- Fixed handling of empty DATAROBOT_DEFAULT_USE_CASE (empty data registry, log errors)
+- Fixed whitespace-only search returning invalid results in dropdown menus
+- Fixed bug with missing builder token
+- Fixed empty "Connected as:" field in Settings modal
+- Hide download button on Raw Rows tab
+
+## [11.5.2] - 2026-02-11
+
+### Fixed
+
+- Fixed the default value for DATABASE_CONNECTION_TYPE in the CLI dotenv setup.
+
+## [11.5.1] - 2026-02-10
+
+This release significantly overhauls the developer experience of this application template. For previous users, the major important new commands are:
+
+- Running locally: `task dev` (instead of `source ./set_env.sh && make run-local-dev-backend` + `npm run dev`).
+- Deploying: `task deploy` (instead of `python quickstart.py`).
+
+For further details, refer to the `README.md`.
+
+### Changed
+
+- Switched to af-component-llm and replaced all client calls with litellm
+- Switched default model to Claude Sonnet 4.5
+- Replaced quickstart with task start and dr task compose
+- Updated af-component-base and migrate util to core
+
+### Added
+
+- Added flexible LLM options
+- Added dev-deploy task to deploy the LLM and Use case
+
+## [11.5.0] - 2026-01-27
+
+### Changed
+
+- Changing versioning to match validated DataRobot platform versions.
+
+### Added
+
+- Support Data Connector Integration with DataBricks
+- Support scoped API tokens
+
+### Fixed
+
+- Fixed compatibility with latest version of Datarobot PySDK
+
+### Changed
+
+- Updated LLM configuration system to be more flexible and easier to use with newer LLMs
+- Simplified LLM selection with configuration-based approach supporting multiple deployment options (LLM Gateway, External LLMs, Registered Models, and Deployed Models)
+
 ## [0.5.3] - 2026-01-12
 
 ### Added

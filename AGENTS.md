@@ -10,7 +10,8 @@
 - `uv run uvicorn app_backend.app.main:app --reload` starts the local API with auto-reload.
 - `pnpm --dir app_frontend dev` runs the React frontend (requires Node 18+, pnpm installed).
 - `uv run pytest` executes backend unit tests; append `--cov` for coverage like the scaffolded pipeline.
-- `python quickstart.py <project>` provisions the full stack via Pulumi for end-to-end validation.
+- `dr start` provisions the full stack, including `.env` setup and Pulumi deployment.
+- `task deploy` runs Pulumi from the split `infra/` project after a stack has been selected.
 
 ## Coding Style & Naming Conventions
 - Python: follow PEP 8 with type hints; prefer descriptive module names (`report_storage.py`, not `storage_utils.py`).

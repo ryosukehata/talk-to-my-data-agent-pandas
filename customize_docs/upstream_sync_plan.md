@@ -8,11 +8,11 @@
 ## 現在地
 
 - 取り込み元: `upstream/main`
-- fetch確認日: 2026-06-08
-- upstream次候補: `v0.5.2`
+- fetch確認日: 2026-06-27
+- upstream次候補: `v11.8.2`
 - upstream 0系最新: `v0.5.3`
-- upstream最新タグ: `v11.8.1`
-- `origin/dev` 最新: `b424579` (`v0.5.1` 取り込みPR #74 merge済み)
+- upstream最新タグ: `v11.8.2`
+- `origin/dev` 最新: `aee3e4d` (`v11.7.2` 取り込みPR #107 merge済み)
 - `origin/dev` は内容上 `v0.5.1` 済みだが、履歴上は `v0.5.1` タグを祖先に持たない。
 - 退避ブランチ: `backup/dev-before-upstream-sync-20260604`, `backup/dev-before-v0.4.24-sync-20260604`
 
@@ -24,6 +24,21 @@
 4. `utils -> core/src/core` の構成変更は、タグ同期PRとは分離して専用PRで移植する。
 5. 各段階で「取り込む / 見送る / 手動移植する」をこのファイルへ記録する。
 6. すでに手動移植済みの upstream タグは、内容差分なしの `ours` baseline merge で履歴上も取り込み済みにする。
+
+## upstream 追従時の検証注意点
+
+基本方針は upstream を優先して取り込むこと。以下は「ローカル差分を固定的に維持する」ためのメモではなく、upstream 取り込み時に同種の実行時エラーが再発しないか確認するための注意点。
+
+- `core/src/core/llm_client.py`
+  - 現 dev では `instructor==1.3.4` と `litellm.acompletion` の組み合わせで、`AttributeError: 'coroutine' object has no attribute '_raw_response'` / `coroutine 'acompletion' was never awaited` が発生した。
+  - upstream 取り込み時は upstream 実装を優先する。upstream 側で Instructor / LiteLLM の使い方や依存バージョンが更新されている場合は、その実装を採用する。
+  - 採用後、LiteLLM Gateway 経路の回帰確認として `app_backend/tests/test_llm_client.py::test_async_llm_client_litellm_create_with_completion_uses_async_adapter` または同等の upstream 向けテストを実行する。
+  - テストで同じエラーが再現した場合のみ、現 dev の `AsyncInstructor` 明示構築のような補正を再検討する。
+- `core/src/core/base_telemetry.py`
+  - 現 dev では async generator の tracing で、別 asyncio context から generator が close された場合に `opentelemetry.context: Failed to detach context` が発生した。
+  - upstream 取り込み時は upstream 実装を優先する。upstream 側で telemetry wrapper が整理されている場合は、その実装を採用する。
+  - 採用後、streaming / client disconnect 相当の回帰確認として `app_backend/tests/test_base_telemetry.py::test_trace_async_generator_close_does_not_detach_in_different_context` または同等の upstream 向けテストを実行する。
+  - テストで同じエラーが再現した場合のみ、`yield` をまたいで OpenTelemetry context を保持しない補正を再検討する。
 
 ## テスト方針
 
@@ -46,6 +61,12 @@
 | `v0.3.23` | `codex/upstream-sync-v0.3.23` | 取り込む | `infra/__main__.py`, `requirements.txt`, dataset handling | 実マージでは競合なし。`pulumi-datarobot>=0.10.22` 前提の `app_source.resources` 参照へ変更。ローカル解決で `ApplicationSource.resources` が存在することを確認。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped; `uv run ruff check infra/__main__.py utils/datarobot_dataset_handler.py`: passed |
 | `v0.4.24` | `codex/upstream-sync-v0.4.24` | 一部取り込む | data connection層の土台、React chat message metadata、依存関係、schema補助差分 | `git merge --no-commit --no-ff v0.4.24` で `frontend/01_connect_and_explore.py`, `frontend/02_chat_with_data.py`, `utils/analyst_db.py`, `utils/api.py`, `utils/data_connections/database/database_implementations.py`, `utils/rest_api.py` が競合。Streamlit は破棄方針のため `frontend/*` 差分は除外。自動適用できた差分から、既存importを壊す `utils/database_helpers.py` 削除、`utils/datarobot_dataset_handler.py` 移動、`notebooks/testing.ipynb` 削除も除外。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 16 passed, 2 skipped; `npm --prefix app_frontend test`: 103 passed; `npm --prefix app_frontend run lint`: passed; `uv run ruff check utils/data_connections utils/schema.py utils/credentials.py infra/settings_app_infra.py`: passed |
 | `v0.5.1` | `codex/upstream-sync-v0.5.1` | 取り込む | DataRobot CLI設定、Taskfile、quickstartのstack名省略対応、READMEのCLI quickstart化、DataSourceSelectorの説明文改善 | `v0.4.24` タグは履歴上の祖先ではないため、`v0.4.24..v0.5.1` の差分を手動適用。polars移植なし。upstream READMEの未閉じコードフェンスは本PRで補正する。 | `npm --prefix app_frontend test`: 104 passed; `npm --prefix app_frontend run lint`: passed; `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 43 passed, 2 skipped; `uv run ruff check quickstart.py`: passed; YAML parse + `task --list --sort none`: passed |
+| `v11.5.0` | `codex/upstream-sync-v11.5.0` | 取り込む | DataRobot PySDK 3.10対応、scoped token、DataBricks datasource、ApplicationSource admin scope | `v0.5.3` から通常merge。legacy Streamlitは既存fork側を優先し、DataRobot PySDK pinのみ更新。`utils/rest_api.py` は互換import pathを維持。polars移植なし。 | 詳細は `customize_docs/v11_5_0_integration_plan.md` |
+| `v11.5.1` | `codex/v1151-history-baseline` | 取り込み済み | `utils` -> `core/src/core` 移行、`utils/customize` -> `core/src/core/customize` 移行、LiteLLM/LLM構成刷新、Taskfile/CLI中心のDX、React小差分、history baseline | `utils.*` / `utils.customize.*` は互換importとして残し、pandas公開挙動を維持。upstream の router split / infra 大移動 / Polars 前提差分は全面採用せず、既存構成に必要な挙動だけ移植。`v11.5.1` は ours merge で履歴上の処理済みにする。router split / infra package 移動 / workflow-lock 再編は `customize_docs/upstream_followup_backlog.md` で継続管理する。 | 詳細は `customize_docs/v11_5_1_integration_plan.md` |
+| `v11.5.2` | `codex/upstream-sync-v11.5.2` | 取り込む | CLI dotenv の `DATABASE_CONNECTION_TYPE` default 修正 | `None` 表示の選択肢は残しつつ、書き出し値を infra 標準の `no_database` にする。backend/frontend 挙動変更なし。 | 詳細は `customize_docs/v11_5_2_integration_plan.md` |
+| `v11.6.3` | `codex/upstream-sync-v11.6.3` | 一部取り込む | legacy Streamlit削除、chat mutation error toast、prompt 4096文字制限、Add Data空選択loading修正、DataRobot auth-required 401 header、telemetry core集約、DataRobot datastore helper拡張、persistent_fs/rw_lock追加、infra dependency更新 | `v11.5.3` は `ours` baseline mergeで履歴上の処理済みにした。`v11.6.3` 通常mergeでは app web layer の `app_backend/app/routers` 移動、root project削除、lockfile追加、Polars前提差分が再衝突したため、既存 `core.rest_api` / `core.routers` / root pytest設定 / pandas公開挙動は維持し、必要な上流挙動だけ移植した。Streamlit `frontend/` と `FRONTEND_TYPE` 分岐は upstream に合わせて削除。root/app_backend/core の `uv.lock` は `.gitignore` 対象のため、管理対象の `infra/uv.lock` のみ更新した。 | `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py`: 114 passed, 2 skipped。`uv run --project core pytest` は repo root の `pytest.ini` が優先され backend tests を core venv で収集して失敗するため、`uv run --project core pytest core/tests`: 1 passed で core 対象を確認。`npm --prefix app_frontend test`: 25 files / 153 tests passed。`npm --prefix app_frontend run lint`: passed with existing warnings。`uv run --project infra pytest` も同じ root 収集問題で失敗するため、infra project 内実行で 0 tests collected を確認。`task --list --sort none`: passed。 |
+| `v11.7.2` | `codex/upstream-sync-v11.7.2` | 一部取り込む | assistant feedback API/UI、`message_feedback`、dictionary failure persistence、`core:transfer-database`、pre-built execution environment、LLM GenAI semantic attributes、feedback i18n | pandas公開挙動、`core/src/core/customize`、custom prompts、question refiner、report builder、template selectorを維持。FastAPI request body validationはPydantic modelに寄せ、LLM telemetry本文は `LLM_CAPTURE_CONTENT=true` のときだけ扱う。PR3対象のv11.8 transfer hang修正、Polars前提差分、不要なtheme/docs churnは見送り。 | 詳細は `customize_docs/v11_7_2_integration_plan.md` |
+| `v11.8.2` | `codex/upstream-sync-v11.8.2` | 一部取り込む | transfer database hang修正、`datarobot>=3.13.0`、`used_datasets` schema/frontend表示、`datarobot_jdbc`、OTel env config、locale修正 | `git merge v11.8.2` は legacy upstream churn とPolars前提差分の再衝突が大きいため、必要差分を手動移植した。pandas公開挙動、`core/src/core/customize`、custom prompts、question refiner、report builder、template selectorを維持。LLM prompt/completion本文は引き続き `LLM_CAPTURE_CONTENT=true` のときだけ扱う。 | 詳細は `customize_docs/v11_8_2_integration_plan.md` |
 
 ## `v0.4.24` の次アクション
 
@@ -93,6 +114,11 @@
 - Direct database経路は既に `telemetry_json` を渡していたため、External Data Store と Remote Registry の `database_override` 経路に追加する。
 - External Data Store は `ExternalDataStoreNameDataSourceType` で `.value` を持たないため、telemetryの `data_source` には `.name` を使う。Internal sourceは従来どおり `.value` を使う。
 - 2026-06-08: `run_database_analysis()` の内側も確認し、`_run_database_analysis()` から `_generate_database_analysis_code()` への呼び出しで `database` が余分に1つ渡されていた問題を修正する。`run_database_analysis` / `_run_database_analysis` / `_generate_database_analysis_code` の全呼び出しに `telemetry_json` keyword があることをASTテストで固定する。
+
+## v11.6.3 CI対応メモ
+
+- 2026-06-27: PR #106 の初回CIで `app_backend` の `task lint-check` が Ruff import sort により失敗したため、対象ファイルのimport orderを修正した。
+- 2026-06-27: `app_frontend` の Node 24 CIでは `package-lock.json` なしの `npm install` により Prettier が浮動解決され、ローカルと異なる整形結果になった。CI再現用の一時worktreeで確認し、`app_frontend/package.json` の `prettier` を `3.6.2` に exact pin して lint 結果を固定した。
 
 ## v0.5.x 以降の更新計画
 

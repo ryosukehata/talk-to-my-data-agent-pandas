@@ -7,7 +7,6 @@ on:
       - '**.sh'
     branches:
       - main
-      - dev
       - 'release/*'
   pull_request:
     paths:

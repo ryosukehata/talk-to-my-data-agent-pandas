@@ -1,5 +1,5 @@
-import React from 'react';
-import { SuggestedPrompt } from './SuggestedPrompt';
+import React from "react";
+import { SuggestedPrompt } from "./SuggestedPrompt";
 
 interface SuggestedQuestionsSectionProps {
   questions?: string[] | null;
@@ -7,11 +7,9 @@ interface SuggestedQuestionsSectionProps {
   hasInProgressMessages: boolean;
 }
 
-export const SuggestedQuestionsSection: React.FC<SuggestedQuestionsSectionProps> = ({
-  questions,
-  chatId,
-  hasInProgressMessages,
-}) => {
+export const SuggestedQuestionsSection: React.FC<
+  SuggestedQuestionsSectionProps
+> = ({ questions, chatId, hasInProgressMessages }) => {
   if (!questions || questions.length === 0) {
     return null;
   }
@@ -19,8 +17,8 @@ export const SuggestedQuestionsSection: React.FC<SuggestedQuestionsSectionProps>
   return (
     <>
       <div className="mn-label-large">Suggested follow-up questions</div>
-      <div className="mt-2 flex-col flex gap-2.5">
-        {questions.map(q => (
+      <div className="mt-2 flex flex-col gap-2.5">
+        {questions.map((q) => (
           <SuggestedPrompt
             key={q}
             message={q}

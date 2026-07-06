@@ -1,6 +1,6 @@
-import apiClient from '../apiClient';
-import { IChat, IChatMessage } from './types';
-import { getChatName } from './utils';
+import apiClient from "../apiClient";
+import { IChat, IChatMessage } from "./types";
+import { getChatName } from "./utils";
 
 interface IGetMessagesParams {
   chatId: string;
@@ -11,9 +11,12 @@ export const getChatMessages = async ({
   signal,
   chatId,
 }: IGetMessagesParams): Promise<IChatMessage[]> => {
-  const { data } = await apiClient.get<IChatMessage[]>(`/v1/chats/${chatId}/messages`, {
-    signal,
-  });
+  const { data } = await apiClient.get<IChatMessage[]>(
+    `/v1/chats/${chatId}/messages`,
+    {
+      signal,
+    },
+  );
 
   return data;
 };
@@ -29,9 +32,12 @@ export const getSingleMessage = async ({
   chatId,
   messageId,
 }: IGetSingleMessageParams): Promise<IChatMessage> => {
-  const { data } = await apiClient.get<IChatMessage>(`/v1/chats/${chatId}/messages/${messageId}`, {
-    signal,
-  });
+  const { data } = await apiClient.get<IChatMessage>(
+    `/v1/chats/${chatId}/messages/${messageId}`,
+    {
+      signal,
+    },
+  );
 
   return data;
 };
@@ -69,19 +75,23 @@ export async function postMessage({
   // If no chatId is provided, create a new chat with the message
   if (!chatId) {
     const { data } = await apiClient.post<IChatCreated>(
-      '/v1/chats/messages',
+      "/v1/chats/messages",
       { ...payload, chatName: getChatName() },
       {
         signal,
-      }
+      },
     );
     return data;
   }
 
   // If chatId exists, post to that chat
-  const { data } = await apiClient.post<IChatCreated>(`/v1/chats/${chatId}/messages`, payload, {
-    signal,
-  });
+  const { data } = await apiClient.post<IChatCreated>(
+    `/v1/chats/${chatId}/messages`,
+    payload,
+    {
+      signal,
+    },
+  );
 
   return data;
 }
@@ -96,10 +106,38 @@ export const deleteMessage = async ({
   signal,
 }: IDeleteMessageParams): Promise<IChatMessage[]> => {
   if (!messageId) {
-    throw new Error('Message ID is required for deleting messages');
+    throw new Error("Message ID is required for deleting messages");
   }
   const url = `/v1/chats/messages/${messageId}`;
   const { data } = await apiClient.delete<IChatMessage[]>(url, { signal });
+  return data;
+};
+
+interface IUpdateMessageFeedbackParams {
+  messageId: string;
+  userRating: -1 | 1;
+  userFeedback?: string;
+  signal?: AbortSignal;
+}
+
+export const updateMessageFeedback = async ({
+  messageId,
+  userRating,
+  userFeedback,
+  signal,
+}: IUpdateMessageFeedbackParams): Promise<IChatMessage> => {
+  const payload: { user_rating: -1 | 1; user_feedback?: string } = {
+    user_rating: userRating,
+  };
+  if (userFeedback !== undefined) {
+    payload.user_feedback = userFeedback;
+  }
+
+  const { data } = await apiClient.post<IChatMessage>(
+    `/v1/chats/messages/${messageId}/feedback`,
+    payload,
+    { signal },
+  );
   return data;
 };
 
@@ -108,7 +146,10 @@ interface IDeleteChatParams {
   signal?: AbortSignal;
 }
 
-export const deleteChat = async ({ chatId, signal }: IDeleteChatParams): Promise<void> => {
+export const deleteChat = async ({
+  chatId,
+  signal,
+}: IDeleteChatParams): Promise<void> => {
   await apiClient.delete(`/v1/chats/${chatId}`, { signal });
   return;
 };
@@ -118,7 +159,9 @@ interface IGetChatsParams {
   signal?: AbortSignal;
 }
 
-export const getChats = async ({ signal }: IGetChatsParams): Promise<IChat[]> => {
+export const getChats = async ({
+  signal,
+}: IGetChatsParams): Promise<IChat[]> => {
   const { data } = await apiClient.get<IChat[]>(`/v1/chats`, {
     signal,
   });
@@ -137,9 +180,9 @@ export const createChat = async ({
   signal,
 }: ICreateChatParams): Promise<IChat> => {
   const { data } = await apiClient.post<IChat>(
-    '/v1/chats',
+    "/v1/chats",
     { name, data_source: dataSource },
-    { signal }
+    { signal },
   );
   return data;
 };
@@ -170,7 +213,7 @@ export const renameChat = async ({
   chatId,
   name,
   signal,
-}: Pick<IUpdateChatParams, 'chatId' | 'name' | 'signal'>): Promise<void> => {
+}: Pick<IUpdateChatParams, "chatId" | "name" | "signal">): Promise<void> => {
   return updateChat({ chatId, name, signal });
 };
 
@@ -190,11 +233,14 @@ export const exportChatMessages = async ({
   messageId,
   signal,
 }: IExportChatMessagesParams): Promise<IExportResponse> => {
-  const response = await apiClient.get(`/v1/chats/${chatId}/messages/download/`, {
-    responseType: 'blob',
-    signal,
-    params: { message_id: messageId },
-  });
+  const response = await apiClient.get(
+    `/v1/chats/${chatId}/messages/download/`,
+    {
+      responseType: "blob",
+      signal,
+      params: { message_id: messageId },
+    },
+  );
 
   return {
     data: response.data,

@@ -2,7 +2,7 @@
  * Template reload API functions
  */
 
-import apiClient from '@/api/apiClient';
+import apiClient from "@/api/apiClient";
 
 export interface TemplateReloadResponse {
   message: string;
@@ -14,6 +14,6 @@ export interface TemplateReloadResponse {
  * Reload templates from data source
  */
 export const reloadTemplates = async (): Promise<TemplateReloadResponse> => {
-  const response = await apiClient.post('/v1/templates/reload');
+  const response = await apiClient.post("/v1/templates/reload");
   return response.data;
 };

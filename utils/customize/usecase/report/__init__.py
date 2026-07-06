@@ -1,20 +1,15 @@
-"""
-Report Builder - UseCase Layer
-
-レポート作成のユースケース層
-"""
-
 from typing import TYPE_CHECKING, Any
 
-from utils.customize.usecase.report.delete_report import DeleteReportUseCase
-from utils.customize.usecase.report.execute_questions import ExecuteQuestionsUseCase
-from utils.customize.usecase.report.generate_questions import GenerateQuestionsUseCase
-from utils.customize.usecase.report.get_report import GetReportUseCase
-from utils.customize.usecase.report.init_report import InitReportUseCase
-from utils.customize.usecase.report.list_reports import ListReportsUseCase
-
 if TYPE_CHECKING:
-    from utils.customize.usecase.report.generate_word import GenerateWordUseCase
+    from core.customize.usecase.report import (
+        DeleteReportUseCase,
+        ExecuteQuestionsUseCase,
+        GenerateQuestionsUseCase,
+        GenerateWordUseCase,
+        GetReportUseCase,
+        InitReportUseCase,
+        ListReportsUseCase,
+    )
 
 __all__ = [
     "InitReportUseCase",
@@ -28,9 +23,9 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    if name == "GenerateWordUseCase":
-        from utils.customize.usecase.report.generate_word import GenerateWordUseCase
+    if name in __all__:
+        from core.customize.usecase import report as core_report
 
-        return GenerateWordUseCase
+        return getattr(core_report, name)
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

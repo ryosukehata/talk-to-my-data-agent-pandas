@@ -1,5 +1,5 @@
 export const RESPONSE_TABS = {
-  SUMMARY: 'summary',
-  INSIGHTS: 'insights',
-  CODE: 'code',
+  SUMMARY: "summary",
+  INSIGHTS: "insights",
+  CODE: "code",
 };

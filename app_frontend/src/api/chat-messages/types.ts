@@ -25,21 +25,22 @@ export interface IMessageComponent {
 }
 
 export interface IAnalysisComponent extends IComponent {
-  type: 'analysis';
+  type: "analysis";
   metadata?: IMetadata;
   dataset_id?: string | null;
   code?: string | null;
+  used_datasets?: string[] | null;
 }
 
 export interface IChartsComponent extends IComponent {
-  type: 'charts';
+  type: "charts";
   fig1_json?: string | null;
   fig2_json?: string | null;
   code?: string | null;
 }
 
 export interface IBusinessComponent extends IComponent {
-  type: 'business';
+  type: "business";
   bottom_line?: string | null;
   additional_insights?: string | null;
   follow_up_questions?: string[] | null;
@@ -54,12 +55,12 @@ interface ITokenUsageInfo {
 }
 
 export interface IUsageInfoComponent {
-  type: 'usage_info';
+  type: "usage_info";
   usage: ITokenUsageInfo;
 }
 
 interface IComponent {
-  status?: 'success' | 'error';
+  status?: "success" | "error";
   metadata?: IMetadata;
 }
 
@@ -69,7 +70,7 @@ interface IChatMessageStep {
 }
 
 export interface IChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   content: string;
   components: (
     | IMessageComponent
@@ -84,6 +85,8 @@ export interface IChatMessage {
   chat_id?: string; // ID of the chat this message belongs to
   id?: string; // Unique identifier for the message
   error?: string;
+  user_rating?: -1 | 1;
+  user_feedback?: string;
 }
 
 export interface IUserMessage {

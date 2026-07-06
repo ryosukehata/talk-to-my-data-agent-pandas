@@ -1,4 +1,4 @@
-import apiClient from '../apiClient';
+import apiClient from "../apiClient";
 
 type CleansedColumnReport = {
   new_column_name: string;
@@ -44,10 +44,10 @@ export const getCleansedDataset = async ({
   signal?: AbortSignal;
 }): Promise<CleansedDataset> => {
   const encodedName = encodeURIComponent(name);
-  const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+  const searchParam = search ? `&search=${encodeURIComponent(search)}` : "";
   const { data } = await apiClient.get<CleansedDataset>(
     `/v1/datasets/${encodedName}/cleansed?skip=${skip}&limit=${limit}${searchParam}`,
-    { signal }
+    { signal },
   );
   return data;
 };
@@ -60,8 +60,11 @@ export const getDatasetMetadata = async ({
   signal?: AbortSignal;
 }): Promise<DatasetMetadata> => {
   const encodedName = encodeURIComponent(name);
-  const { data } = await apiClient.get<DatasetMetadata>(`/v1/datasets/${encodedName}/metadata`, {
-    signal,
-  });
+  const { data } = await apiClient.get<DatasetMetadata>(
+    `/v1/datasets/${encodedName}/metadata`,
+    {
+      signal,
+    },
+  );
   return data;
 };

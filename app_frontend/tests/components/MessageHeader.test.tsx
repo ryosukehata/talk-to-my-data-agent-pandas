@@ -1,39 +1,45 @@
-import { screen } from '@testing-library/react';
-import { test, describe, expect, vi, beforeEach } from 'vitest';
-import userEvent from '@testing-library/user-event';
-import { MessageHeader } from '@/components/chat/MessageHeader';
-import { IChatMessage } from '@/api/chat-messages/types';
-import { renderWithProviders } from '../test-utils';
+import { screen } from "@testing-library/react";
+import { test, describe, expect, vi, beforeEach } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { MessageHeader } from "@/components/chat/MessageHeader";
+import { IChatMessage } from "@/api/chat-messages/types";
+import { renderWithProviders } from "../test-utils";
 
-vi.mock('@/api/chat-messages/hooks', () => ({
+vi.mock("@/api/chat-messages/hooks", () => ({
   useFetchAllMessages: vi.fn(),
   useDeleteMessage: vi.fn(),
   usePostMessage: vi.fn(),
   useExport: vi.fn(),
+  useUpdateMessageFeedback: vi.fn(),
 }));
 
-import { useFetchAllMessages, useDeleteMessage, useExport } from '@/api/chat-messages/hooks';
+import {
+  useFetchAllMessages,
+  useDeleteMessage,
+  useExport,
+  useUpdateMessageFeedback,
+} from "@/api/chat-messages/hooks";
 
-describe('MessageHeader Component', () => {
+describe("MessageHeader Component", () => {
   const mockMessage = {
-    id: 'msg-1',
-    role: 'user' as const,
-    content: 'Test message',
-    created_at: '2024-01-01T00:00:00Z',
+    id: "msg-1",
+    role: "user" as const,
+    content: "Test message",
+    created_at: "2024-01-01T00:00:00Z",
     components: [],
   } as IChatMessage;
 
   const mockResponseMessage = {
-    id: 'resp-1',
-    role: 'assistant' as const,
-    content: 'Test response',
-    created_at: '2024-01-01T00:01:00Z',
+    id: "resp-1",
+    role: "assistant" as const,
+    content: "Test response",
+    created_at: "2024-01-01T00:01:00Z",
     components: [],
   } as IChatMessage;
 
   const defaultProps = {
-    messageId: 'msg-1' as const,
-    chatId: 'chat-1' as const,
+    messageId: "msg-1" as const,
+    chatId: "chat-1" as const,
     messages: [mockMessage, mockResponseMessage],
   };
 
@@ -41,59 +47,76 @@ describe('MessageHeader Component', () => {
     useFetchAllMessages: { data: [mockMessage, mockResponseMessage] } as any,
     useDeleteMessage: { mutate: vi.fn(), isPending: false } as any,
     useExport: { exportChat: vi.fn(), isLoading: false },
+    useUpdateMessageFeedback: { mutate: vi.fn(), isPending: false } as any,
     ...overrides,
   });
 
   beforeEach(() => {
     const mockHooks = createMockHooks();
-    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
+    vi.mocked(useFetchAllMessages).mockReturnValue(
+      mockHooks.useFetchAllMessages,
+    );
     vi.mocked(useDeleteMessage).mockReturnValue(mockHooks.useDeleteMessage);
     vi.mocked(useExport).mockReturnValue(mockHooks.useExport);
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue(
+      mockHooks.useUpdateMessageFeedback,
+    );
   });
 
-  test('renders basic header information for user message', () => {
+  test("renders basic header information for user message", () => {
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
-    expect(screen.getByText('You')).toBeInTheDocument();
+    expect(screen.getByText("You")).toBeInTheDocument();
     expect(screen.getByText(/Jan/)).toBeInTheDocument(); // Formatted date
   });
 
-  test('renders action buttons for user message', () => {
+  test("renders action buttons for user message", () => {
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
-    const deleteButton = screen.getByRole('button', { name: /delete message and response/i });
-    const exportButton = screen.getByRole('button', { name: /export chat/i });
+    const deleteButton = screen.getByRole("button", {
+      name: /delete message and response/i,
+    });
+    const exportButton = screen.getByRole("button", { name: /export chat/i });
 
     expect(deleteButton).toBeInTheDocument();
     expect(exportButton).toBeInTheDocument();
   });
 
-  test('calls export hook when export button clicked', async () => {
+  test("calls export hook when export button clicked", async () => {
     const user = userEvent.setup();
     const exportChat = vi.fn();
-    const mockHooks = createMockHooks({ useExport: { exportChat, isLoading: false } });
+    const mockHooks = createMockHooks({
+      useExport: { exportChat, isLoading: false },
+    });
     vi.mocked(useExport).mockReturnValue(mockHooks.useExport);
 
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
-    const exportButton = screen.getByRole('button', { name: /export chat/i });
+    const exportButton = screen.getByRole("button", { name: /export chat/i });
     await user.click(exportButton);
 
-    expect(exportChat).toHaveBeenCalledWith({ chatId: 'chat-1', messageId: 'msg-1' });
+    expect(exportChat).toHaveBeenCalledWith({
+      chatId: "chat-1",
+      messageId: "msg-1",
+    });
   });
 
-  test('shows confirm dialog when delete button is clicked', async () => {
+  test("shows confirm dialog when delete button is clicked", async () => {
     const user = userEvent.setup();
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
-    const deleteButton = screen.getByRole('button', { name: /delete message and response/i });
+    const deleteButton = screen.getByRole("button", {
+      name: /delete message and response/i,
+    });
     await user.click(deleteButton);
 
-    expect(screen.getByText('Delete message')).toBeInTheDocument();
-    expect(screen.getByText('Are you sure you want to delete this message?')).toBeInTheDocument();
+    expect(screen.getByText("Delete message")).toBeInTheDocument();
+    expect(
+      screen.getByText("Are you sure you want to delete this message?"),
+    ).toBeInTheDocument();
   });
 
-  test('calls delete hook when confirm dialog is confirmed', async () => {
+  test("calls delete hook when confirm dialog is confirmed", async () => {
     const user = userEvent.setup();
     const deleteMutate = vi.fn();
     const mockHooks = createMockHooks({
@@ -103,125 +126,282 @@ describe('MessageHeader Component', () => {
 
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
-    const deleteButton = screen.getByRole('button', { name: /delete message and response/i });
+    const deleteButton = screen.getByRole("button", {
+      name: /delete message and response/i,
+    });
     await user.click(deleteButton);
 
-    const confirmButton = screen.getByTestId('confirm-dialog-confirm');
+    const confirmButton = screen.getByTestId("confirm-dialog-confirm");
     await user.click(confirmButton);
 
-    expect(deleteMutate).toHaveBeenCalledWith({ messageId: 'msg-1', chatId: 'chat-1' });
+    expect(deleteMutate).toHaveBeenCalledWith({
+      messageId: "msg-1",
+      chatId: "chat-1",
+    });
   });
 
-  test('closes confirm dialog when cancel is clicked', async () => {
+  test("closes confirm dialog when cancel is clicked", async () => {
     const user = userEvent.setup();
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
-    const deleteButton = screen.getByRole('button', { name: /delete message and response/i });
+    const deleteButton = screen.getByRole("button", {
+      name: /delete message and response/i,
+    });
     await user.click(deleteButton);
 
-    const cancelButton = screen.getByTestId('confirm-dialog-cancel');
+    const cancelButton = screen.getByTestId("confirm-dialog-cancel");
     await user.click(cancelButton);
 
-    expect(screen.queryByText('Delete message')).not.toBeInTheDocument();
+    expect(screen.queryByText("Delete message")).not.toBeInTheDocument();
     // No side-effect hook expected on cancel
   });
 
-  test('disables export button when isExporting is true', () => {
-    const mockHooks = createMockHooks({ useExport: { exportChat: vi.fn(), isLoading: true } });
+  test("disables export button when isExporting is true", () => {
+    const mockHooks = createMockHooks({
+      useExport: { exportChat: vi.fn(), isLoading: true },
+    });
     vi.mocked(useExport).mockReturnValue(mockHooks.useExport);
     renderWithProviders(<MessageHeader {...defaultProps} />);
 
-    const exportButton = screen.getByRole('button', { name: /exporting/i });
+    const exportButton = screen.getByRole("button", { name: /exporting/i });
     expect(exportButton).toBeDisabled();
   });
 
-  test('disables export button when response is in progress', () => {
+  test("disables export button when response is in progress", () => {
     const inProgressResponseMessage = {
-      id: 'resp-1',
-      role: 'assistant' as const,
-      content: 'Response in progress...',
-      created_at: '2024-01-01T00:01:00Z',
+      id: "resp-1",
+      role: "assistant" as const,
+      content: "Response in progress...",
+      created_at: "2024-01-01T00:01:00Z",
       components: [],
       in_progress: true,
     } as IChatMessage;
     const mockHooks = createMockHooks({
-      useFetchAllMessages: { data: [mockMessage, inProgressResponseMessage] } as any,
+      useFetchAllMessages: {
+        data: [mockMessage, inProgressResponseMessage],
+      } as any,
     });
-    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
-
-    renderWithProviders(
-      <MessageHeader {...defaultProps} messages={[mockMessage, inProgressResponseMessage]} />
+    vi.mocked(useFetchAllMessages).mockReturnValue(
+      mockHooks.useFetchAllMessages,
     );
 
-    const exportButton = screen.getByRole('button', {
-      name: 'Wait for agent to finish responding',
+    renderWithProviders(
+      <MessageHeader
+        {...defaultProps}
+        messages={[mockMessage, inProgressResponseMessage]}
+      />,
+    );
+
+    const exportButton = screen.getByRole("button", {
+      name: "Wait for agent to finish responding",
     });
     expect(exportButton).toBeDisabled();
-    expect(exportButton).toHaveAttribute('title', 'Wait for agent to finish responding');
+    expect(exportButton).toHaveAttribute(
+      "title",
+      "Wait for agent to finish responding",
+    );
   });
 
-  test('disables export button when response is failing', () => {
+  test("disables export button when response is failing", () => {
     const erroredResponseMessage = {
-      id: 'resp-1',
-      role: 'assistant' as const,
-      content: 'Error occurred',
-      created_at: '2024-01-01T00:01:00Z',
+      id: "resp-1",
+      role: "assistant" as const,
+      content: "Error occurred",
+      created_at: "2024-01-01T00:01:00Z",
       components: [],
-      error: 'boom',
+      error: "boom",
     } as IChatMessage;
     const mockHooks = createMockHooks({
-      useFetchAllMessages: { data: [mockMessage, erroredResponseMessage] } as any,
+      useFetchAllMessages: {
+        data: [mockMessage, erroredResponseMessage],
+      } as any,
     });
-    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
-
-    renderWithProviders(
-      <MessageHeader {...defaultProps} messages={[mockMessage, erroredResponseMessage]} />
+    vi.mocked(useFetchAllMessages).mockReturnValue(
+      mockHooks.useFetchAllMessages,
     );
 
-    const exportButton = screen.getByRole('button', { name: 'Cannot export chat with errors' });
+    renderWithProviders(
+      <MessageHeader
+        {...defaultProps}
+        messages={[mockMessage, erroredResponseMessage]}
+      />,
+    );
+
+    const exportButton = screen.getByRole("button", {
+      name: "Cannot export chat with errors",
+    });
     expect(exportButton).toBeDisabled();
-    expect(exportButton).toHaveAttribute('title', 'Cannot export chat with errors');
+    expect(exportButton).toHaveAttribute(
+      "title",
+      "Cannot export chat with errors",
+    );
   });
 
-  test('shows correct tooltip when response is in progress', () => {
+  test("shows correct tooltip when response is in progress", () => {
     const inProgressResponseMessage = {
-      id: 'resp-1',
-      role: 'assistant' as const,
-      content: 'Response in progress...',
-      created_at: '2024-01-01T00:01:00Z',
+      id: "resp-1",
+      role: "assistant" as const,
+      content: "Response in progress...",
+      created_at: "2024-01-01T00:01:00Z",
       components: [],
       in_progress: true,
     } as IChatMessage;
     const mockHooks = createMockHooks({
-      useFetchAllMessages: { data: [mockMessage, inProgressResponseMessage] } as any,
+      useFetchAllMessages: {
+        data: [mockMessage, inProgressResponseMessage],
+      } as any,
     });
-    vi.mocked(useFetchAllMessages).mockReturnValue(mockHooks.useFetchAllMessages);
-
-    renderWithProviders(
-      <MessageHeader {...defaultProps} messages={[mockMessage, inProgressResponseMessage]} />
+    vi.mocked(useFetchAllMessages).mockReturnValue(
+      mockHooks.useFetchAllMessages,
     );
 
-    const exportButton = screen.getByRole('button', {
-      name: 'Wait for agent to finish responding',
+    renderWithProviders(
+      <MessageHeader
+        {...defaultProps}
+        messages={[mockMessage, inProgressResponseMessage]}
+      />,
+    );
+
+    const exportButton = screen.getByRole("button", {
+      name: "Wait for agent to finish responding",
     });
-    expect(exportButton).toHaveAttribute('title', 'Wait for agent to finish responding');
+    expect(exportButton).toHaveAttribute(
+      "title",
+      "Wait for agent to finish responding",
+    );
   });
 
-  test('does not render action buttons for assistant message', () => {
-    const assistantMessage = { ...mockMessage, role: 'assistant' as const };
+  test("renders feedback actions for assistant message without user actions", () => {
+    const assistantMessage = { ...mockMessage, role: "assistant" as const };
     const mockHooksWithAssistantMessage = createMockHooks({
       useFetchAllMessages: { data: [assistantMessage] } as any,
     });
     vi.mocked(useFetchAllMessages).mockReturnValue(
-      mockHooksWithAssistantMessage.useFetchAllMessages
+      mockHooksWithAssistantMessage.useFetchAllMessages,
     );
 
-    renderWithProviders(<MessageHeader {...defaultProps} messages={[assistantMessage]} />);
+    renderWithProviders(
+      <MessageHeader {...defaultProps} messages={[assistantMessage]} />,
+    );
 
-    expect(screen.getByText('DataRobot')).toBeInTheDocument();
+    expect(screen.getByText("DataRobot")).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /delete message and response/i })
+      screen.queryByRole("button", { name: /delete message and response/i }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /export chat/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /export chat/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId("message-feedback-thumbs-up"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("message-feedback-thumbs-down"),
+    ).toBeInTheDocument();
+  });
+
+  test("shows thumbs up as selected when assistant message has positive feedback", () => {
+    const assistantMessage = {
+      ...mockResponseMessage,
+      user_rating: 1,
+    } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />,
+    );
+
+    expect(screen.getByTestId("message-feedback-thumbs-up")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  test("sends positive feedback and clears previous text", async () => {
+    const user = userEvent.setup();
+    const updateFeedback = vi.fn();
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue({
+      mutate: updateFeedback,
+      isPending: false,
+    } as any);
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />,
+    );
+
+    await user.click(screen.getByTestId("message-feedback-thumbs-up"));
+
+    expect(updateFeedback).toHaveBeenCalledWith({
+      messageId: assistantMessage.id,
+      chatId: "chat-1",
+      userRating: 1,
+      userFeedback: "",
+    });
+  });
+
+  test("opens negative feedback dialog and submits feedback text", async () => {
+    const user = userEvent.setup();
+    const updateFeedback = vi.fn();
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue({
+      mutate: updateFeedback,
+      isPending: false,
+    } as any);
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />,
+    );
+
+    await user.click(screen.getByTestId("message-feedback-thumbs-down"));
+    await user.type(
+      screen.getByTestId("message-feedback-textarea"),
+      "Needs more detail",
+    );
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(updateFeedback).toHaveBeenCalledWith({
+      messageId: assistantMessage.id,
+      chatId: "chat-1",
+      userRating: -1,
+      userFeedback: "Needs more detail",
+    });
+  });
+
+  test("closing negative feedback dialog sends rating without text", async () => {
+    const user = userEvent.setup();
+    const updateFeedback = vi.fn();
+    vi.mocked(useUpdateMessageFeedback).mockReturnValue({
+      mutate: updateFeedback,
+      isPending: false,
+    } as any);
+    const assistantMessage = { ...mockResponseMessage } as IChatMessage;
+
+    renderWithProviders(
+      <MessageHeader
+        messageId={assistantMessage.id}
+        chatId="chat-1"
+        messages={[assistantMessage]}
+      />,
+    );
+
+    await user.click(screen.getByTestId("message-feedback-thumbs-down"));
+    await user.keyboard("{Escape}");
+
+    expect(updateFeedback).toHaveBeenCalledWith({
+      messageId: assistantMessage.id,
+      chatId: "chat-1",
+      userRating: -1,
+    });
   });
 });

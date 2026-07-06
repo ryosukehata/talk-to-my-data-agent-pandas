@@ -1168,6 +1168,31 @@ PR #35 (`dev` -> `main`) をmainへ進めるため、Report Builder取り込み�
 - OpenAI reasoning系モデルでは `max_tokens` ではなく `max_completion_tokens` / Responses APIの `max_output_tokens` を使う必要があるため、`infra/settings_generative.py` の `LLMSettings.max_completion_length` は未指定にした。
 - `app_backend/tests/test_infra_llm_settings.py` を追加し、LLM Blueprint設定で `max_completion_length` を再度固定しないことをASTベースで確認する。importによるDataRobot SDK初期化を避けるため、設定ファイルを直接parseしている。
 
+### デプロイ後のReport永続化修正（2026-06-30）
+
+- 現象: Report Builderは表示されるが、新規作成・実行したreportが新しいrunで一覧に残らない。
+- 原因: `ReportStorage` が metadata / index / Word のPersistentStorage保存を `asyncio.create_task(...)` で投げっぱなしにしていた。特にindex更新では一時ファイルを非同期taskへ渡した直後に削除していたため、`report_index_{user_id}` が永続化されず、次のrunで一覧復元できなかった。
+- 修正: `ReportStorage.save()` / `_update_index()` / `save_word_file()` / `delete()` で、ローカルキャッシュ更新後にPersistentStorageの保存・削除完了を `await` する。
+- 追加テスト:
+  - `app_backend/tests/test_report_storage.py::test_save_persists_report_and_index_before_return`
+    - `save()` が戻った時点で report metadata と index がPersistentStorageへ保存済みであることを確認。
+  - `app_backend/tests/test_report_storage.py::test_list_by_user_recovers_reports_from_storage_after_new_run`
+    - 別run相当の空ローカルキャッシュから、PersistentStorageのindexとmetadataを使って一覧復元できることを確認。
+
+### Sidebar導線改善（2026-06-30）
+
+- 現象: Sidebar上のReport Builder導線がDatasets / Chatsと違う見た目で、ファイルアイコンのみのため見つけづらい。
+- 修正: Sidebarを `Datasets` -> `Chats` -> `Reports` の一連の流れにし、Reportsも同じセクション見出しと `+ New Report` ボタンで表示する。
+- Chatsの履歴が長い場合でもReportsを必ず表示するため、Sidebar全体ではなくChatsリスト内部だけを伸縮・スクロールさせ、Reportsセクションは固定枠として残す。
+- `+ New Report` は `/reports?new=1` に遷移し、Reports画面の作成フォームを開いた状態にする。
+- 既存ReportのSidebar項目には `key` を設定し、クリック時の詳細遷移とactive表示に使えるようにする。
+- 日本語UI向けに `New Report` -> `新しいレポート` の翻訳を追加。
+- 追加テスト:
+  - `app_frontend/tests/components/Sidebar.test.tsx`
+    - feature flagがoffのときReportsとNew Reportを非表示にする。
+    - feature flagがonのとき `Datasets` -> `Chats` -> `Reports` の順に表示し、`New Report` ボタンを表示する。
+    - Chatsセクションが伸縮領域、Reportsセクションが固定領域であることを確認する。
+
 ---
 
 ## 冗長箇所メモ

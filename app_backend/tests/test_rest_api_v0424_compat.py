@@ -10,6 +10,7 @@ os.environ.setdefault("DATAROBOT_API_TOKEN", "test-token")
 os.environ.setdefault("DATAROBOT_ENDPOINT", "https://example.com")
 os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 
+from core.routers import database as database_router
 from utils import rest_api
 from utils.analyst_db import InternalDataSourceType
 from utils.schema import AnalystDataset, LoadDatabaseRequest
@@ -170,8 +171,10 @@ async def _assert_get_and_process_tables_uses_schema(
             "datasource_type": datasource_type,
         }
 
-    monkeypatch.setattr(rest_api, "get_external_database", fake_get_external_database)
-    monkeypatch.setattr(rest_api, "process_and_update", fake_process_and_update)
+    monkeypatch.setattr(
+        database_router, "get_external_database", fake_get_external_database
+    )
+    monkeypatch.setattr(database_router, "process_and_update", fake_process_and_update)
 
     await rest_api.get_and_process_tables(["raw_sales"], analyst_db, 25, "PUBLIC")
 

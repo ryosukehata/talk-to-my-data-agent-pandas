@@ -31,7 +31,7 @@ This intuitive experience is designed for **scalability and flexibility**, ensur
 
 ## 🚀 Quick Start
 
-### Quickstart with DataRobot CLI
+### Start with DataRobot CLI
 
 #### 1. Install the DataRobot CLI
 
@@ -115,36 +115,22 @@ If you want to locate the credentials manually:
 
 See the [React Frontend Development Guide](app_frontend/README.md) and [FastAPI Backend Development Guide](app_backend/README.md).
 
-Run the following to deploy or update your application:
-```bash
-source set_env.sh  # On Windows use `set_env.bat`
-pulumi up
-```
-Alternatively, run the following command for a simpler setup:
+Run the following to install dependencies and deploy or update your application:
 
-```sh
-python quickstart.py YOUR_PROJECT_NAME
-# Windows users may need:  py quickstart.py YOUR_PROJECT_NAME
+```bash
+task install
+task infra:select -- YOUR_PROJECT_NAME --create
+task deploy
 ```
-Replace `YOUR_PROJECT_NAME` with any name you prefer, then press **Enter**.
+
+Replace `YOUR_PROJECT_NAME` with any name you prefer. If the Pulumi stack is already selected, rerun only `task deploy` for subsequent updates.
 
 When deployment completes, the terminal will display a link to your running application.\
 👉 **Click the link to open and start using your app!**
 
-**What does `quickstart.py` do?**
+`task deploy` runs Pulumi from the split `infra/` project using its `uv` environment, matching the CD workflow.
 
-The quickstart script automates the entire setup process for you:
-
-- Creates and activates a Python virtual environment
-- Installs all required dependencies (using `uv` for faster installation, falling back to `pip`)
-- Loads your `.env` configuration
-- Sets up the Pulumi stack with your project name
-- Runs `pulumi up` to deploy your application
-- Displays your application URL when complete
-
-This single command replaces all the manual steps described in the [advanced setup section](#setup-for-advanced-users).
-
-Python 3.10 - 3.12 are supported
+Python 3.11 - 3.13 are supported for the infrastructure project.
 
 Advanced users desiring control over virtual environment creation, dependency installation, environment variable setup
 and `pulumi` invocation see [here](#setup-for-advanced-users).
@@ -190,8 +176,7 @@ App templates contain three families of complementary logic:
   ```
 - **App Logic**: Necessary for user consumption; whether via a hosted front-end or integrating into an external consumption layer.
   ```
-  app_frontend/  # React frontend (recommended, default) with the api located in app_backend
-  frontend/  # Streamlit frontend (deprecated, will be removed March 20th, 2026)
+  app_frontend/  # React frontend with the api located in app_backend
   utils/  # App business logic & runtime helpers
   ```
 - **Operational Logic**: Necessary to activate DataRobot assets.
@@ -218,13 +203,12 @@ Your data privacy is important to us. Data handling is governed by the DataRobot
 
 ### Change the LLM
 
-1. Modify the `LLM` setting in `infra/settings_generative.py` by changing `LLM=LLMs.AZURE_OPENAI_GPT_4_O` to any other LLM from the `LLMs` object.
-   - Trial users: Please set `LLM=LLMs.AZURE_OPENAI_GPT_4_O_MINI` since GPT-4o is not supported in the trial. Use the `OPENAI_API_DEPLOYMENT_ID` in `.env` to override which model is used in your Azure organization. You'll still see GPT 4o-mini in the playground, but the deployed app will use the provided Azure deployment.
-2. To use an existing TextGen model or deployment:
-   - In `infra/settings_generative.py`: Set `LLM=LLMs.DEPLOYED_LLM`.
-   - In `.env`: Set either the `TEXTGEN_REGISTERED_MODEL_ID` or the `TEXTGEN_DEPLOYMENT_ID`
-   - In `.env`: Set `CHAT_MODEL_NAME` to the model name expected by the deployment (e.g. "claude-3-7-sonnet-20250219" for an anthropic deployment,"datarobot-deployed-llm" for NIM models )
-   - (Optional) In `utils/api.py`: `ALTERNATIVE_LLM_BIG` and `ALTERNATIVE_LLM_SMALL` can be used for fine-grained control over which LLM is used for different tasks.
+LLM infrastructure is selected through `infra/configurations/llm/*` and the active `infra/infra/llm.py` symlink.
+
+1. By default, `infra/infra/llm.py` points to `deployed_llm.py` so the stack uses an existing TextGen deployment.
+2. To use an existing TextGen deployment, set `TEXTGEN_DEPLOYMENT_ID` and optionally `LLM_DEFAULT_MODEL` in `.env`.
+3. To switch LLM infrastructure, set `INFRA_ENABLE_LLM` to one of the files in `infra/configurations/llm/`, for example `gateway_direct.py`, `registered_model.py`, `blueprint_with_llm_gateway.py`, or `blueprint_with_external_llm.py`.
+4. To use an existing registered TextGen model, set `INFRA_ENABLE_LLM=registered_model.py` and `TEXTGEN_REGISTERED_MODEL_ID` in `.env`.
 
 ### Use [DataRobot LLM Gateway](https://docs.datarobot.com/en/docs/gen-ai/genai-code/dr-llm-gateway.html)
 
@@ -241,28 +225,26 @@ The application follows this priority order for LLM selection:
 
 **Important**: Remove or comment out `OPENAI_*` environment variables to use DataRobot's LLM Gateway
 
-1. In `.env`: Set `USE_DATAROBOT_LLM_GATEWAY=true`
-2. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+1. In `.env`: Set `INFRA_ENABLE_LLM=gateway_direct.py` and `USE_DATAROBOT_LLM_GATEWAY=true`
+2. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
 #### **When LLM Gateway is enabled:**
 
 - No hardcoded LLM credentials (OpenAI keys) are required in your `.env` file
 - The LLM Gateway provides a unified interface to multiple LLM providers through DataRobot in production
-- You can pick from the catalog and change the model `LLM` in `infra/settings_generative.py`
-- It will use a DataRobot Guarded RAG Deployment and LLM Blueprint for that selected model
+- You can pick from the catalog and change the model through `LLM_DEFAULT_MODEL`
+- The `gateway_direct.py` configuration passes Gateway runtime parameters directly to the application
 
 **Note**: LLM Gateway mode requires consumption based pricing is enabled for your DataRobot account as is evidenced by the `ENABLE_LLM_GATEWAY` feature flag.
 Contact your administrator if this feature is not available.
 
 1. In `.env`: If not using an existing TextGen model or deployment, provide the required credentials dependent on your choice.
-2. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+2. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
 > **⚠️ Availability information:**
@@ -274,59 +256,39 @@ Contact your administrator if this feature is not available.
 
 To add Snowflake support:
 
-1. Modify the `DATABASE_CONNECTION_TYPE` setting in `infra/settings_database.py` by changing `DATABASE_CONNECTION_TYPE = "no_database"` to `DATABASE_CONNECTION_TYPE = "snowflake"`.
+1. Set `DATABASE_CONNECTION_TYPE=snowflake` in `.env`.
 2. Provide snowflake credentials in `.env` by either setting `SNOWFLAKE_USER` and `SNOWFLAKE_PASSWORD` or by setting `SNOWFLAKE_KEY_PATH` to a file containing the key. The key file should be a `*.p8` private key file. (see [Snowflake Documentation](https://docs.snowflake.com/en/user-guide/key-pair-auth))
 3. Fill out the remaining snowflake connection settings in `.env` (refer to `.env.template` for more details)
-4. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+4. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
 #### BigQuery
 
 The Talk to my Data Agent supports connecting to BigQuery.
 
-1. Modify the `DATABASE_CONNECTION_TYPE` setting in `infra/settings_database.py` by changing `DATABASE_CONNECTION_TYPE = "no_database"` to `DATABASE_CONNECTION_TYPE = "bigquery"`.
+1. Set `DATABASE_CONNECTION_TYPE=bigquery` in `.env`.
 2. Provide the required google credentials in `.env` dependent on your choice. Ensure that GOOGLE_DB_SCHEMA is also populated in `.env`.
-3. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+3. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
 #### SAP Datasphere
 
 The Talk to my Data Agent supports connecting to SAP Datasphere.
 
-1. Modify the `DATABASE_CONNECTION_TYPE` setting in `infra/settings_database.py` by changing `DATABASE_CONNECTION_TYPE = "no_database"` to `DATABASE_CONNECTION_TYPE = "sap"`.
+1. Set `DATABASE_CONNECTION_TYPE=sap` in `.env`.
 2. Provide the required SAP credentials in `.env`.
-3. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
+3. Run `task deploy` to update your stack.
    ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
+   task deploy
    ```
 
-### Change the Frontend
+### Frontend
 
-> [!WARNING]
-> **The Streamlit frontend is deprecated and will be removed March 20th, 2026.** We strongly recommend using the React frontend.
-
-The Talk to My Data agent supports two frontend options:
-
-- **React** (default, recommended): A modern JavaScript-based frontend with enhanced UI features which uses [FastAPI Backend](app_backend/README.md). See the [React Frontend Development Guide](app_frontend/README.md)
-- **Streamlit** (deprecated): A Python-based frontend with a simple interface. **Will be removed March 20th, 2026.** See the [Streamlit Frontend Development Guide](frontend/README.md)
-
-#### Using the Streamlit Frontend (Not Recommended)
-
-If you need to temporarily use the deprecated Streamlit frontend:
-
-1. In `.env`: Set `FRONTEND_TYPE="streamlit"` to use the Streamlit frontend instead of the default React.
-2. Run `pulumi up` to update your stack (Or run `python quickstart.py` for easier setup)
-   ```bash
-   source set_env.sh  # On Windows use `set_env.bat`
-   pulumi up
-   ```
+The Talk to My Data agent uses the React frontend in `app_frontend/` with the FastAPI backend in `app_backend/`. See the [React Frontend Development Guide](app_frontend/README.md) for local UI development.
 
 ## Tools
 
@@ -341,7 +303,7 @@ You can help the data analyst python agent by providing tools that can assist wi
 ## Delete all provisioned resources
 
 ```bash
-pulumi down
+task infra:down-yes
 ```
 
 ## Setup for advanced users
@@ -349,23 +311,19 @@ pulumi down
 For manual control over the setup process adapt the following steps for MacOS/Linux to your environment:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-source set_env.sh
-pulumi stack init YOUR_PROJECT_NAME
-pulumi up
+dr dotenv setup
+task install
+task infra:select -- YOUR_PROJECT_NAME --create
+task deploy
 ```
 
-e.g. for Windows/conda/cmd.exe this would be:
+For direct Pulumi control, run commands from the split infrastructure project:
 
 ```bash
-conda create --prefix .venv pip
-conda activate .\.venv
-pip install -r requirements.txt
-set_env.bat
-pulumi stack init YOUR_PROJECT_NAME
-pulumi up
+cd infra
+uv sync --all-extras --dev
+uv run pulumi stack select YOUR_PROJECT_NAME --create
+uv run pulumi up
 ```
 
 For projects that will be maintained, DataRobot recommends forking the repo so upstream fixes and improvements can be merged in the future.

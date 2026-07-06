@@ -1,14 +1,18 @@
-import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { CheckIcon, ChevronDown } from 'lucide-react';
-import { useTranslation } from '@/i18n';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
-import { TruncatedText } from '@/components/ui-custom/truncated-text';
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { CheckIcon, ChevronDown } from "lucide-react";
+import { useTranslation } from "@/i18n";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
+import { TruncatedText } from "@/components/ui-custom/truncated-text";
 
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -17,21 +21,21 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from '@/components/ui/command';
+} from "@/components/ui/command";
 
-const singleSelectVariants = cva('m-1', {
+const singleSelectVariants = cva("m-1", {
   variants: {
     variant: {
-      default: 'border-foreground/10 text-foreground bg-card hover:bg-card/80',
+      default: "border-foreground/10 bg-card text-foreground hover:bg-card/80",
       secondary:
-        'border-foreground/10 bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        "border-foreground/10 bg-secondary text-secondary-foreground hover:bg-secondary/80",
       destructive:
-        'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
-      inverted: 'inverted',
+        "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
+      inverted: "inverted",
     },
   },
   defaultVariants: {
-    variant: 'default',
+    variant: "default",
   },
 });
 
@@ -55,14 +59,17 @@ interface SingleSelectProps
   isLoading?: boolean;
 }
 
-export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProps>(
+export const SingleSelect = React.forwardRef<
+  HTMLButtonElement,
+  SingleSelectProps
+>(
   (
     {
       options,
       onValueChange,
       variant,
-      defaultValue = '',
-      placeholder = 'Select options',
+      defaultValue = "",
+      placeholder = "Select options",
       animation = 0,
       modalPopover = false,
       className,
@@ -70,10 +77,11 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
       isLoading = false,
       ...props
     },
-    ref
+    ref,
   ) => {
     const { t } = useTranslation();
-    const [selectedValue, setSelectedValue] = React.useState<string>(defaultValue);
+    const [selectedValue, setSelectedValue] =
+      React.useState<string>(defaultValue);
     const [isPopoverOpen, setIsPopoverOpen] = React.useState(false);
     const [isComposing, setIsComposing] = React.useState(false);
 
@@ -82,36 +90,44 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
       onValueChange(v);
     };
 
-    const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === 'Enter' && !isComposing) {
+    const handleInputKeyDown = (
+      event: React.KeyboardEvent<HTMLInputElement>,
+    ) => {
+      if (event.key === "Enter" && !isComposing) {
         setIsPopoverOpen(true);
-      } else if (event.key === 'Backspace' && !event.currentTarget.value) {
-        applyValue('');
+      } else if (event.key === "Backspace" && !event.currentTarget.value) {
+        applyValue("");
       }
     };
 
     const handleTogglePopover = () => {
-      setIsPopoverOpen(prev => !prev);
+      setIsPopoverOpen((prev) => !prev);
     };
 
     return (
-      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen} modal={modalPopover}>
+      <Popover
+        open={isPopoverOpen}
+        onOpenChange={setIsPopoverOpen}
+        modal={modalPopover}
+      >
         <PopoverTrigger asChild>
           <Button
             ref={ref}
             {...props}
             onClick={handleTogglePopover}
             className={cn(
-              'flex w-full p-1 rounded-md border min-h-10 h-auto items-center justify-between bg-inherit hover:bg-inherit [&_svg]:pointer-events-auto',
-              className
+              "flex h-auto min-h-10 w-full items-center justify-between rounded-md border bg-inherit p-1 hover:bg-inherit [&_svg]:pointer-events-auto",
+              className,
             )}
             testId={testId}
           >
             {selectedValue ? (
-              <div className="flex justify-between items-center w-full">
+              <div className="flex w-full items-center justify-between">
                 <div className="flex flex-wrap items-center">
                   {(() => {
-                    const option = options.find(o => o.value === selectedValue);
+                    const option = options.find(
+                      (o) => o.value === selectedValue,
+                    );
                     return (
                       <>
                         <Badge
@@ -121,20 +137,22 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
                           type="outline"
                         >
                           <TruncatedText>{option?.label}</TruncatedText>
-                          {option?.postfix && <span className="ml-1">{option?.postfix}</span>}
+                          {option?.postfix && (
+                            <span className="ml-1">{option?.postfix}</span>
+                          )}
                         </Badge>
                       </>
                     );
                   })()}
                 </div>
                 <div className="flex items-center justify-between">
-                  <ChevronDown className="h-4 mx-2 cursor-pointer text-muted-foreground" />
+                  <ChevronDown className="mx-2 h-4 cursor-pointer text-muted-foreground" />
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-between w-full mx-auto">
-                <span className="body-secondary mx-3">{placeholder}</span>
-                <ChevronDown className="h-4 cursor-pointer text-muted-foreground mx-2" />
+              <div className="mx-auto flex w-full items-center justify-between">
+                <span className="mx-3 body-secondary">{placeholder}</span>
+                <ChevronDown className="mx-2 h-4 cursor-pointer text-muted-foreground" />
               </div>
             )}
           </Button>
@@ -146,7 +164,7 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
         >
           <Command>
             <CommandInput
-              placeholder={t('Search...')}
+              placeholder={t("Search...")}
               disabled={isLoading || !options.length}
               onKeyDown={handleInputKeyDown}
               onCompositionStart={() => setIsComposing(true)}
@@ -155,13 +173,13 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
             <CommandList className="max-w-[800px]">
               {isLoading ? (
                 <CommandItem className="flex items-center justify-center py-6">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                 </CommandItem>
               ) : (
                 <>
-                  <CommandEmpty>{t('No results found.')}</CommandEmpty>
+                  <CommandEmpty>{t("No results found.")}</CommandEmpty>
                   <CommandGroup>
-                    {options.map(option => {
+                    {options.map((option) => {
                       const isSelected = selectedValue === option.value;
                       return (
                         <CommandItem
@@ -172,17 +190,19 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
                         >
                           <div
                             className={cn(
-                              'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
+                              "mr-2 flex size-4 items-center justify-center rounded-sm border border-primary",
                               {
-                                'opacity-50 [&_svg]:invisible': !isSelected,
-                              }
+                                "opacity-50 [&_svg]:invisible": !isSelected,
+                              },
                             )}
                           >
-                            <CheckIcon className="h-4 w-4 text-primary" />
+                            <CheckIcon className="size-4 text-primary" />
                           </div>
                           <span>{option.label}</span>
                           {option?.postfix && (
-                            <span className="ml-1 grow text-right">{option?.postfix}</span>
+                            <span className="ml-1 grow text-right">
+                              {option?.postfix}
+                            </span>
                           )}
                         </CommandItem>
                       );
@@ -199,9 +219,9 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
                     disabled={isLoading}
                     data-testid="multi-select-close"
                     onSelect={() => setIsPopoverOpen(false)}
-                    className="flex-1 justify-center cursor-pointer max-w-full"
+                    className="max-w-full flex-1 cursor-pointer justify-center"
                   >
-                    {t('Confirm')}
+                    {t("Confirm")}
                   </CommandItem>
                 </div>
               </CommandGroup>
@@ -210,7 +230,7 @@ export const SingleSelect = React.forwardRef<HTMLButtonElement, SingleSelectProp
         </PopoverContent>
       </Popover>
     );
-  }
+  },
 );
 
-SingleSelect.displayName = 'SingleSelect';
+SingleSelect.displayName = "SingleSelect";

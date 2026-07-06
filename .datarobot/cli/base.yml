@@ -5,16 +5,11 @@ root:
     default: ""
     optional: true
     help: "The passphrase used to encrypt and decrypt the private key. This value is required if you're not using pulumi cloud."
-  - env: FRONTEND_TYPE
+  - env: DATAROBOT_DEFAULT_USE_CASE
     type: string
-    help: "Choose which frontend implementation to use (streamlit or react)"
-    multiple: false
-    default: "react"
-    options:
-      - name: "react"
-        value: "react"
-      - name: "streamlit"
-        value: "streamlit"
+    default:
+    optional: true
+    help: "Enter the default use case for this application. If not set, a new use case will be created automatically."
   - env: USE_DATAROBOT_LLM_GATEWAY
     type: "boolean"
     help: "Use LLM Gateway instead of DataRobot-hosted LLM. If you select this, you do not need any credentials for your DataRobot-hosted LLM since it will use your DataRobot credentials instead."
@@ -26,24 +21,25 @@ root:
       - name: "No"
         value: "false"
         requires: "datarobot_hosted_llm"
-  - key: "enable_snowflake"
-    help: "Do you want to configure Snowflake?"
+  - env: DATABASE_CONNECTION_TYPE
+    type: string
+    help: Do you want to enable an external database connection?
+    default: no_database
     options:
-      - name: "No"
-      - name: "Yes"
-        requires: "snowflake_config"
-  - key: "enable_bigquery"
-    help: "Do you want to configure BigQuery?"
-    options:
-      - name: "No"
-      - name: "Yes"
-        requires: "bigquery_config"
-  - key: "enable_sap_datasphere"
-    help: "Do you want to configure SAP DataSphere?"
-    options:
-      - name: "No"
-      - name: "Yes"
-        requires: "sap_datasphere_config"
+      - name: None
+        value: no_database
+      - name: Snowflake
+        value: snowflake
+        requires: snowflake_config
+      - name: BigQuery
+        value: bigquery
+        requires: bigquery_config
+      - name: SAP Datasphere
+        value: sap
+        requires: sap_datasphere_config
+      - name: JDBC (PostgreSQL / MySQL / SQL Server)
+        value: datarobot_jdbc
+        requires: jdbc_config
 
 datarobot_hosted_llm:
   - key: "enable_google_vertexai"
@@ -172,6 +168,15 @@ bigquery_config:
     optional: false
     help: "The Google Cloud BigQuery schema"
 
+jdbc_config:
+  - env: JDBC_URI
+    type: secret_string
+    optional: false
+    help: "The full JDBC connection string, e.g. jdbc:postgresql://host:5432/db. Credentials may be embedded in the URI or passed via JDBC_CONNECTION_PARAMETERS."
+  - env: JDBC_CONNECTION_PARAMETERS
+    type: secret_string
+    optional: true
+    help: 'Optional JSON object of JDBC connection parameters, e.g. {"user": "dbuser", "password": "secret"}.'
 
 sap_datasphere_config:
   - env: SAP_DATASPHERE_HOST

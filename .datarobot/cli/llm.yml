@@ -1,0 +1,153 @@
+---
+root:
+  - env: INFRA_ENABLE_LLM
+    type: string
+    default: "deployed_llm.py"
+    help: >
+      Choose your LLM integration.
+
+      - If you already have a custom model deployed LLM and a deployment ID,
+        select DataRobot Deployed LLM.
+      - For the simplest Gateway-only setup, select DataRobot's LLM Gateway.
+      - If you want to use your LLM provider credentials instead of the LLM
+        Gateway, select External LLM.
+      - If you need full DataRobot governance and monitoring with LLM Blueprint
+        support, select LLM Gateway with External Model.
+      - If you have an existing registered model that you want to use with an
+        LLM Blueprint, select Registered Model with an LLM Blueprint.
+    options:
+      - name: "LLM Gateway"
+        value: "gateway_direct.py"
+      - name: "DataRobot Deployed LLM"
+        value: "deployed_llm.py"
+        requires: deployed_llm
+      - name: "External LLM"
+        value: "blueprint_with_external_llm.py"
+        requires: external_llm
+      - name: "LLM Gateway with External Model"
+        value: "blueprint_with_llm_gateway.py"
+      - name: "Registered Model with an LLM Blueprint"
+        value: "registered_model.py"
+        requires: registered_model
+
+deployed_llm:
+  - env: TEXTGEN_DEPLOYMENT_ID
+    type: string
+    optional: false
+    help: "Enter the deployment ID of the DataRobot custom model deployed LLM."
+  - env: LLM_DEFAULT_MODEL
+    type: string
+    default: "datarobot/datarobot-deployed-llm"
+    optional: true
+    help: "LiteLLM model name accepted by the deployed text generation model."
+
+registered_model:
+  - env: TEXTGEN_REGISTERED_MODEL_ID
+    type: string
+    optional: false
+    help: "Enter the ID of the registered model with an LLM blueprint to use."
+  - env: DATAROBOT_TIMEOUT_MINUTES
+    type: number
+    default: 30
+    optional: true
+    help: "Enter the timeout in minutes for DataRobot operations."
+  - env: LLM_DEFAULT_MODEL
+    type: string
+    default: "datarobot/datarobot-deployed-llm"
+    optional: true
+    help: "LiteLLM model name accepted by the registered model deployment."
+
+external_llm:
+  - env: LLM_DEFAULT_MODEL
+    type: string
+    default: "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0"
+    optional: true
+    help: >
+      LiteLLM model name used at runtime to call your external LLM.
+      Examples: "azure/gpt-4o", "bedrock/anthropic.claude-sonnet-4-20250514-v1:0".
+  - env: LLM_DEFAULT_LLM_ID
+    type: string
+    optional: true
+    help: "DataRobot Playground catalog identifier for the LLM Blueprint."
+  - env: LLM_DEFAULT_LLM_NAME
+    type: string
+    optional: true
+    help: "Friendly display name for the LLM shown in DataRobot UI."
+  - key: external_llm_provider
+    optional: false
+    options:
+      - name: "Azure with OpenAI"
+        requires: azure_openai
+      - name: "Google VertexAI"
+        requires: vertexai
+      - name: "Anthropic"
+        requires: anthropic
+      - name: "Bedrock"
+        requires: bedrock
+      - name: "Cohere"
+        requires: cohere
+      - name: "TogetherAI"
+        requires: togetherai
+    help: >
+      Choose which external LLM provider to use. Supported providers are:
+      Azure OpenAI, AWS Bedrock, GCP VertexAI, Anthropic, Cohere, and TogetherAI.
+
+azure_openai:
+  - env: OPENAI_API_KEY
+    type: secret_string
+    optional: false
+    help: "Enter the OpenAI API key."
+  - env: OPENAI_API_BASE
+    type: string
+    optional: false
+    help: "Enter the OpenAI API base URL."
+  - env: OPENAI_API_DEPLOYMENT_ID
+    type: string
+    optional: false
+    help: "Enter the OpenAI API deployment ID."
+  - env: OPENAI_API_VERSION
+    type: string
+    optional: false
+    help: "Enter the OpenAI API version."
+
+bedrock:
+  - env: AWS_ACCESS_KEY_ID
+    type: string
+    optional: false
+    help: "Enter the AWS access key ID for Bedrock."
+  - env: AWS_SECRET_ACCESS_KEY
+    type: secret_string
+    optional: false
+    help: "Enter the AWS secret access key for Bedrock."
+  - env: AWS_REGION_NAME
+    type: string
+    optional: false
+    help: "Enter the AWS region name for Bedrock."
+
+vertexai:
+  - env: VERTEXAI_APPLICATION_CREDENTIALS
+    type: string
+    optional: false
+    help: "Enter the path to the VertexAI application credentials JSON file."
+  - env: VERTEXAI_SERVICE_ACCOUNT
+    type: string
+    optional: false
+    help: "Enter the Google service account email."
+
+anthropic:
+  - env: ANTHROPIC_API_KEY
+    type: secret_string
+    optional: false
+    help: "Enter the API key for Anthropic."
+
+cohere:
+  - env: COHERE_API_KEY
+    type: secret_string
+    optional: false
+    help: "Enter the API key for Cohere."
+
+togetherai:
+  - env: TOGETHERAI_API_KEY
+    type: secret_string
+    optional: false
+    help: "Enter the API key for TogetherAI."

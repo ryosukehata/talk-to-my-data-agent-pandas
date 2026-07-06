@@ -6,6 +6,12 @@
 - 保存の不安定性（非同期文脈・空データの取り扱い・部分失敗）を解消し、`custom_prompts` と同様の整合的なポリシー（空は保存しない、原子的書き込み、明確なロールバック）に揃える。
 
 ## 実装変更の要点（ReportStorage）
+- Report Builderの永続化完了待ち（2026-06-30）
+  - ファイル参照: utils/customize/infrastructure/storage/report_storage.py
+  - 変更: metadata / index / Word の保存と削除で `asyncio.create_task(...)` を使わず、`PersistentStorage` の処理を `await` する。
+  - 理由: デプロイ環境で request / background task の終了後に投げっぱなし task が完了しないと、新しい run でローカルキャッシュが空になった際に report 一覧を復元できない。
+  - 追加修正: index 追加時に一時ファイルを非同期 task に渡して即削除する処理を廃止し、ローカル index ファイルを原子的に書き込んだ後、そのファイルを永続化する。
+
 - インデックス削除時の空永続化禁止
   - ファイル参照: utils/customize/infrastructure/storage/report_storage.py:271
   - 変更: レポート削除でインデックスが空になった場合、`save_to_storage` による空JSONの永続化を行わず、`delete_file(self._index_key())` を呼び出し、ローカルキャッシュも削除。
@@ -64,3 +70,7 @@
 - 非同期文脈での保存
   - 前提: FastAPIエンドポイントから呼び出し。
   - 検証: `save_word_file` / `save` が await で動作し、保存スキップが発生しない。
+
+- 新しい run での一覧復元
+  - 手順: 1つ目の `ReportStorage` インスタンスで `save(report)` を実行後、別のローカルキャッシュディレクトリを使う2つ目の `ReportStorage` で `list_by_user(user_id)` を実行。
+  - 検証: PersistentStorage から `report_index_{user_id}` と metadata を取得し、保存済み report が一覧に戻る。

@@ -1,14 +1,14 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
-import { PromptInput } from '@/components/ui-custom/prompt-input';
-import { Button } from '@/components/ui/button';
-import { usePostMessage } from '@/api/chat-messages/hooks';
-import { useAppState } from '@/state';
-import { useTranslation } from '@/i18n';
-import { DATA_SOURCES } from '@/constants/dataSources';
-import { TemplateButton } from '@/components/template';
-import { RefinerButton } from '@/components/refiner';
-import type { IChat } from '@/api/chat-messages/types';
-import type { PromptTemplate } from '@/api/templates/types';
+import { useMemo, useState, useRef, useEffect } from "react";
+import { PromptInput } from "@/components/ui-custom/prompt-input";
+import { Button } from "@/components/ui/button";
+import { usePostMessage } from "@/api/chat-messages/hooks";
+import { useAppState } from "@/state";
+import { useTranslation } from "@/i18n";
+import { DATA_SOURCES } from "@/constants/dataSources";
+import { TemplateButton } from "@/components/template";
+import { RefinerButton } from "@/components/refiner";
+import type { IChat } from "@/api/chat-messages/types";
+import type { PromptTemplate } from "@/api/templates/types";
 
 export const UserPrompt = ({
   chatId,
@@ -31,7 +31,7 @@ export const UserPrompt = ({
     dataSource: globalDataSource,
   } = useAppState();
   const { mutate: postMessage } = usePostMessage();
-  const [selectedTemplateText, setSelectedTemplateText] = useState<string>('');
+  const [selectedTemplateText, setSelectedTemplateText] = useState<string>("");
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
 
   const isDataUploadRequired = !allowedDataSources?.[0];
@@ -60,11 +60,11 @@ export const UserPrompt = ({
       dataSource: chatDataSource,
     });
     // Clear template text after sending
-    setSelectedTemplateText('');
+    setSelectedTemplateText("");
   };
 
   const handleClearTemplate = () => {
-    setSelectedTemplateText('');
+    setSelectedTemplateText("");
     promptInputRef.current?.focus();
   };
 
@@ -80,7 +80,7 @@ export const UserPrompt = ({
     handleSend(message);
     // Clear the input field after auto-send
     if (promptInputRef.current) {
-      promptInputRef.current.value = '';
+      promptInputRef.current.value = "";
     }
   };
 
@@ -88,7 +88,7 @@ export const UserPrompt = ({
   useEffect(() => {
     if (selectedTemplateText && promptInputRef.current) {
       // Set the value and trigger change event for proper state sync
-      const event = new Event('input', { bubbles: true });
+      const event = new Event("input", { bubbles: true });
       promptInputRef.current.value = selectedTemplateText;
       promptInputRef.current.dispatchEvent(event);
     }
@@ -97,13 +97,13 @@ export const UserPrompt = ({
   return (
     <div className="w-full max-w-3xl">
       {/* Template selection area */}
-      <div className="w-full flex justify-between items-center mb-4">
+      <div className="mb-4 flex w-full items-center justify-between">
         <div className="flex gap-2">
           <TemplateButton
             onSelectTemplate={handleTemplateSelect}
             onSendDirectly={handleSend}
             mode="send"
-            variant="outline"
+            variant="secondary"
             size="sm"
             disabled={isDataUploadRequired || hasInProgressMessages}
             testId="user-prompt-template-button"
@@ -124,7 +124,7 @@ export const UserPrompt = ({
             onClick={handleClearTemplate}
             className="text-xs text-muted-foreground"
           >
-            {t('Clear Template')}
+            {t("Clear Template")}
           </Button>
         )}
       </div>
@@ -139,8 +139,10 @@ export const UserPrompt = ({
         isProcessing={hasInProgressMessages}
         placeholder={
           isDataUploadRequired
-            ? t('Please upload and process data using the sidebar before starting the chat')
-            : t('Ask another question about your datasets.')
+            ? t(
+                "Please upload and process data using the sidebar before starting the chat",
+              )
+            : t("Ask another question about your datasets.")
         }
         isDisabled={isDataUploadRequired}
         testId={testId}

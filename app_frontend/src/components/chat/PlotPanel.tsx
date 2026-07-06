@@ -1,18 +1,18 @@
-import React, { Suspense, lazy } from 'react';
-import { CollapsiblePanel } from './CollapsiblePanel';
-import { PlotlyData } from './utils';
-import './PlotPanel.css';
-import { useTranslation } from '@/i18n';
+import React, { Suspense, lazy } from "react";
+import { CollapsiblePanel } from "./CollapsiblePanel";
+import { PlotlyData } from "./utils";
+import "./PlotPanel.css";
+import { useTranslation } from "@/i18n";
 
 const Plot = lazy(() => {
-  return import('react-plotly.js');
+  return import("react-plotly.js");
 });
 
 const PlotLoading = () => {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center justify-center p-4 h-[200px]">
-      <div>{t('Loading visualization...')}</div>
+    <div className="flex h-[200px] items-center justify-center p-4">
+      <div>{t("Loading visualization...")}</div>
     </div>
   );
 };
@@ -34,9 +34,9 @@ interface PlotPanelProps {
 
 export const PlotPanel: React.FC<PlotPanelProps> = ({
   plotData,
-  className = '',
-  width = '100%',
-  height = '500px',
+  className = "",
+  width = "100%",
+  height = "500px",
 }) => {
   if (!plotData || !plotData.data || !plotData.layout) {
     return null;
@@ -49,7 +49,7 @@ export const PlotPanel: React.FC<PlotPanelProps> = ({
           data={plotData.data}
           layout={plotData.layout}
           className={className}
-          style={{ position: 'relative', width, height }}
+          style={{ position: "relative", width, height }}
           config={{ responsive: true }}
         />
       </Suspense>

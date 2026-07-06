@@ -1,0 +1,100 @@
+# v11.8.2 integration notes
+
+## Scope
+
+`dev` に `v11.7.2` 同期PRがmergeされた状態を土台に、`v11.8.0..v11.8.2` から必要差分だけを移植する。
+
+取り込む:
+
+- transfer database hang修正
+- `datarobot>=3.13.0` 前提
+- `used_datasets` schema/frontend表示
+- `datarobot_jdbc` database connection
+- OTel endpoint/header/disabled env config
+- frontend i18n `<html lang>` 同期とlocale修正
+
+維持する:
+
+- pandas公開挙動
+- `core/src/core/customize`
+- custom prompts
+- question refiner
+- report builder
+- template selector
+- LLM prompt/completion本文をデフォルト送信しない telemetry 方針
+
+見送る:
+
+- upstream のPolars前提差分
+- broad theme/docs/logo churn
+- sidebar keyboard shortcut削除など、今回のPR3受け入れに必須ではないUI churn
+- app source の `requirements.txt` / `app_backend/requirements.txt` 依存経路。`Pulumi Up` 失敗調査後、upstream `v11.8.2` と同じ `uv.lock` + runtime `uv sync` に寄せるため削除へ変更した。
+
+## Implementation decisions
+
+- `git merge v11.8.2` は legacy upstream churn とPolars前提差分の再衝突が大きいため、必要差分を手動移植する。実装後に `ours` merge で `v11.8.2` を履歴上の祖先にする。
+- `AsyncDataRobotClient` は `httpx.Timeout(60.0, connect=30.0)` を明示し、paginationの `next` URL 取得では初回paramsを再送しない。
+- OTel は `Config` の `otel_exporter_otlp_endpoint`, `otel_exporter_otlp_headers`, `otel_sdk_disabled` を app startup で `otel.configure(config)` に渡す。disabled時は FastAPI/requests/httpx auto-instrumentation を起動しない。
+- `CodeGeneration` / `RunAnalysisResult` に `used_datasets` を追加し、LLMに利用可能dataset keyを明示する。LLMが不正な型を返した場合は空配列へ丸め、既存実行を落とさない。
+- frontendは `IAnalysisComponent.used_datasets` を追加し、Behind the scenesのコードタブに使用datasetのprovenance stripを表示する。
+- `JDBCCredentials` と `JdbcPreviewOperator` を追加し、PostgreSQL/MySQL/SQL Server の `jdbc:` URIだけを受け付ける。DataRobot SDKの同期preview APIはasyncメソッド内でexecutor経由にしてevent loopを塞がない。
+- `.env.template`, `.datarobot/cli/base.yml`, infra runtime parameters に `datarobot_jdbc` / `JDBC_URI` / `JDBC_CONNECTION_PARAMETERS` と OTel env を追加する。
+- `app_frontend/src/i18n/index.ts` で `document.documentElement.lang` をi18n languageに同期し、`pt_BR` などのunderscoreはhyphenへ正規化する。
+
+## TDD notes
+
+REDで追加したテスト:
+
+- `core/tests/test_v1182_core.py`
+  - `AsyncDataRobotClient` timeout / pagination params
+  - telemetry disabled時のauto-instrumentation抑止
+  - `used_datasets` schema
+  - `datarobot_jdbc` connection type / credentials / operator
+- `app_backend/tests/test_v1182_compat.py`
+  - OTel config
+  - DataRobot SDK constraint
+  - `.env.template` / CLI / infra runtime parameter
+- `app_frontend/tests/components/CodeTabContent.test.tsx`
+  - `usedDatasets` が空なら非表示
+  - dataset名をcomma-separatedで表示
+- `app_frontend/tests/i18n/index.test.ts`
+  - `<html lang>` 初期化
+  - `pt_BR` -> `pt-BR` 正規化
+
+RED確認:
+
+- `uv run --project core pytest core/tests/test_v1182_core.py -q`
+  - `JDBCCredentials` 未実装で import error
+- `uv run pytest app_backend/tests/test_v1182_compat.py -q`
+  - OTel config / SDK constraint / env docs / infra runtime parameter未実装で失敗
+- `pnpm --dir app_frontend test ...`
+  - repoはnpm CI構成だが、ローカルpnpmはbuild approval policyでテスト実行前に停止。以降はCIと同じnpmで検証する
+
+GREEN確認:
+
+- `uv run --project core pytest core/tests/test_v1182_core.py core/tests/scripts/test_transfer_database.py -q`: 10 passed
+- `uv run --project core pytest core/tests -q`: 11 passed
+- `uv run pytest app_backend/tests/test_v1182_compat.py app_backend/tests/test_api_analysis_execution_v0424_compat.py app_backend/tests/test_upstream_compat_imports.py -q`: 25 passed
+- `uv run pytest app_backend/tests customize_docs/test_question_refiner.py customize_docs/test_report_questions_generator.py customize_docs/test_word_generation_llm.py -q`: 128 passed, 2 skipped
+- `npm --prefix app_frontend test`: 27 files / 163 tests passed
+- `npm --prefix app_frontend run lint`: 0 errors, existing warnings only
+- `npm --prefix app_frontend run knip`: passed, existing configuration hint only
+- `npm --prefix app_frontend run build`: passed
+- `task --list --sort none`: passed
+- `uv run ruff check core/src/core/database_helpers.py core/src/core/api.py core/src/core/credentials.py core/src/core/persistent_storage.py core/src/core/telemetry/otel.py core/tests/test_v1182_core.py app_backend/app app_backend/tests/test_v1182_compat.py app_backend/tests/test_api_analysis_execution_v0424_compat.py infra/infra/components/dr_credential.py infra/infra/app_backend.py`: passed
+- `uv run --project infra ruff check`: passed
+- `task infra:unit`: skipped because `infra/tests/units/` does not exist
+
+## Local test notes
+
+- `uv run --project infra pytest` はrepository rootの `pytest.ini` を拾い、infra venvで `app_backend/tests` まで収集して `datarobot_asgi_middleware` 不足で失敗する。これはv11.6.3/v11.7.2で記録済みのproject-level collection問題と同じで、infra Taskfileの対応経路は `task infra:unit`。
+- `pnpm --dir app_frontend test` は `ERR_PNPM_IGNORED_BUILDS` で `pnpm install` の段階で止まった。CIは `.github/workflows/app_frontend-vitest.yml` と `app_frontend/Taskfile.yaml` の両方でnpmを使うため、npmコマンドで最終確認した。
+- 一度pnpmを実行した副作用で `node_modules` がpnpmレイアウトになり、`npm run build` が `unenv/node/process` import解決で失敗した。`rm -rf app_frontend/node_modules && npm --prefix app_frontend install` でCI相当のnpmレイアウトへ戻し、build/test/lint/knipを再実行して通過確認した。
+- 2026-06-28 dev merge後の `Pulumi Up` は ApplicationSource build 成功後、CustomApplication の ready 判定で失敗した。初回follow-upでは `/health` を明示したが、upstream `v11.8.2` は pre-bundled 起動中に一時HTTP serverで root path を返して readiness を維持するため、health endpointはroot probeのまま維持する。
+- 2026-06-28 follow-upの `Pulumi Up` でも ready 判定が失敗した。最新ApplicationSourceは `healthEndpointPath=/health` になっていたため、次の原因として `build-app.sh` が pre-bundled marker 検出時に依存installを完全にスキップする点を修正した。既存 `APP_ENVIRONMENT_ID` は v11.8.2 の `datarobot==3.13.0` などを内包している保証がないため、pre-bundled環境でも `requirements.txt` を明示installする。
+- 2026-06-28 upstream差分確認で、fork側 `start-app.sh` から upstream の pre-bundled bootstrap server が消えていることを確認した。`uv sync` と実サーバ起動までの間も port 8080 を開けておくため、upstream と同じく `python3 -m http.server` を一時起動し、sync後にuvicornへ切り替える。
+- 2026-06-28 追加調査で、upstream `v11.8.2` は `app_backend/uv.lock` をApplicationSourceに含める一方、fork側はroot `.gitignore` の `uv.lock` により `app_backend/uv.lock` が未追跡になっていた。pre-bundled runtimeでも `start-app.sh` が `uv sync` を実行するため、lockfileを配布対象に戻して DataRobot 上での依存解決を upstream と同じ deterministic sync に寄せる。
+- 2026-06-28 lockfile追加後も `Pulumi Up` は同じ ready 判定で失敗した。DataRobot のlatest sourceには `uv.lock` が含まれることを確認済み。残る upstream との差分として source root に `build-app.sh` / `requirements.in` / `requirements.txt` が残り、`start-app.sh` も `$PORT` / `DEV_MODE` 分岐を持っていたため、upstream `v11.8.2` と同じ `uv.lock` + runtime `uv sync` 構成へ戻す。
+- 2026-06-28 runtime bundle削除後のCIでも DataRobot latest source に `build-app.sh` / `requirements.*` が残っていた。原因は refresh 前の `.github/scripts/prepare_pulumi_refresh_files.py` が Pulumi state の missing file を任意に空ファイル復元していたため。補完対象を `metadata.yaml` と現行hashへ差し替え可能な static asset に限定し、削除済みsource rootファイルを復活させない。
+- 2026-06-28 stale file復元を止めた後、latest source rootから `build-app.sh` / `requirements.*` は消えたが、CustomApplication更新後32秒で失敗した。次のupstream差分として `app_backend/pyproject.toml` の `[tool.uv] package = false` が欠け、hatchling build対象になっていたため、runtime `uv sync` でapp_backend自体をbuildしない upstream 構成へ戻す。
+- 2026-06-28 `package=false` 後も31秒で失敗した。CIのlatest sourceは正しいが、source metadataの `baseEnvironmentId` は2025-09-29作成の legacy Japanese font環境で、Dockerfileに `uv` が無かった。原因はworkflow secret `APP_ENVIRONMENT_ID` を fork独自fallbackで拾っていたこと。upstream同様 `APPLICATION_EXECUTION_ENVIRONMENT_ID` が明示された場合だけ既存環境を使い、CIは公式 `PYTHON_312_APPLICATION_BASE` へ戻す。

@@ -1,46 +1,46 @@
-import { screen } from '@testing-library/react';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { Sidebar } from '@/components/Sidebar';
-import { renderWithProviders } from '../test-utils';
+import { screen } from "@testing-library/react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+import { Sidebar } from "@/components/Sidebar";
+import { renderWithProviders } from "../test-utils";
 
-vi.mock('@/components/WelcomeModal', () => ({
+vi.mock("@/components/WelcomeModal", () => ({
   WelcomeModal: () => null,
 }));
 
-vi.mock('@/components/AddDataModal', () => ({
+vi.mock("@/components/AddDataModal", () => ({
   AddDataModal: () => null,
 }));
 
-vi.mock('@/components/NewChatModal', () => ({
+vi.mock("@/components/NewChatModal", () => ({
   NewChatModal: () => null,
 }));
 
-vi.mock('@/components/SettingsModal', () => ({
+vi.mock("@/components/SettingsModal", () => ({
   SettingsModal: () => null,
 }));
 
-vi.mock('@/api/dictionaries', () => ({
+vi.mock("@/api/dictionaries", () => ({
   useGeneratedDictionaries: vi.fn(),
-  getDictionariesMenu: vi.fn(data => data),
+  getDictionariesMenu: vi.fn((data) => data),
 }));
 
-vi.mock('@/api/chat-messages', () => ({
+vi.mock("@/api/chat-messages", () => ({
   useFetchAllChats: vi.fn(),
-  getChatsMenu: vi.fn(data => data),
+  getChatsMenu: vi.fn((data) => data),
 }));
 
-vi.mock('@/api/reports', () => ({
+vi.mock("@/api/reports", () => ({
   useReports: vi.fn(),
 }));
 
-vi.mock('@/api/feature-flag', () => ({
+vi.mock("@/api/feature-flag", () => ({
   useFetchFeatureFlags: vi.fn(),
 }));
 
-import { useGeneratedDictionaries } from '@/api/dictionaries';
-import { useFetchAllChats } from '@/api/chat-messages';
-import { useFetchFeatureFlags } from '@/api/feature-flag';
-import { useReports } from '@/api/reports';
+import { useGeneratedDictionaries } from "@/api/dictionaries";
+import { useFetchAllChats } from "@/api/chat-messages";
+import { useFetchFeatureFlags } from "@/api/feature-flag";
+import { useReports } from "@/api/reports";
 
 const mockUseGeneratedDictionaries = vi.mocked(useGeneratedDictionaries);
 const mockUseFetchAllChats = vi.mocked(useFetchAllChats);
@@ -54,7 +54,7 @@ const featureFlags = {
   refinerAutoSend: false,
 };
 
-describe('Sidebar Report Builder feature flag', () => {
+describe("Sidebar Report Builder feature flag", () => {
   beforeEach(() => {
     mockUseGeneratedDictionaries.mockReturnValue({
       data: [],
@@ -70,23 +70,38 @@ describe('Sidebar Report Builder feature flag', () => {
     } as any);
   });
 
-  test('hides Report Builder navigation when the flag is disabled', () => {
+  test("hides Report Builder navigation when the flag is disabled", () => {
     mockUseFetchFeatureFlags.mockReturnValue({
       data: { ...featureFlags, reportBuilderEnabled: false },
     } as any);
 
     renderWithProviders(<Sidebar />);
 
-    expect(screen.queryByText('Reports')).not.toBeInTheDocument();
+    expect(screen.queryByText("Reports")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "New Report" }),
+    ).not.toBeInTheDocument();
   });
 
-  test('shows Report Builder navigation when the flag is enabled', () => {
+  test("shows Report Builder after chats when the flag is enabled", () => {
     mockUseFetchFeatureFlags.mockReturnValue({
       data: { ...featureFlags, reportBuilderEnabled: true },
     } as any);
 
     renderWithProviders(<Sidebar />);
 
-    expect(screen.getByText('Reports')).toBeInTheDocument();
+    expect(screen.getByText("Reports")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "New Report" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-chats-section")).toHaveClass("flex-1");
+    expect(screen.getByTestId("sidebar-reports-section")).toHaveClass(
+      "flex-none",
+    );
+    expect(
+      screen
+        .getAllByText(/Datasets|Chats|Reports/)
+        .map((node) => node.textContent),
+    ).toEqual(["Datasets", "Chats", "Reports"]);
   });
 });

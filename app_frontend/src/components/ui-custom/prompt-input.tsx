@@ -1,17 +1,17 @@
-import React, { useRef, useEffect, useImperativeHandle, useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane } from '@fortawesome/free-solid-svg-icons/faPaperPlane';
-import { faHourglassHalf } from '@fortawesome/free-solid-svg-icons/faHourglassHalf';
-import { useTranslation } from '@/i18n';
+import React, { useRef, useEffect, useImperativeHandle, useState } from "react";
+import { Hourglass, Send } from "lucide-react";
+import { useTranslation } from "@/i18n";
 
-import { cn } from '~/lib/utils';
-import { Button } from '@/components/ui/button';
+import { cn } from "~/lib/utils";
+import { Button } from "@/components/ui/button";
+import { FieldDescription, FieldError } from "@/components/ui/field";
+import { MAX_PROMPT_LENGTH } from "@/constants/chat";
 
-type SendButtonArrangement = 'prepend' | 'append';
+type SendButtonArrangement = "prepend" | "append";
 
 type PromptInputProps = Omit<
   React.TextareaHTMLAttributes<HTMLTextAreaElement>,
-  'onChange' | 'value' | 'onSend'
+  "onChange" | "value" | "onSend"
 > & {
   sendButtonArrangement?: SendButtonArrangement;
   onSend?: (message: string) => void;
@@ -28,22 +28,22 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
   (
     {
       className,
-      sendButtonArrangement = 'append',
+      sendButtonArrangement = "append",
       onSend,
       isProcessing = false,
       isDisabled,
-      testId = 'chat-prompt-input',
-      initialValue = '',
-      chatId = 'initial',
+      testId = "chat-prompt-input",
+      initialValue = "",
+      chatId = "initial",
       ...props
     },
-    ref
+    ref,
   ) => {
     const { t } = useTranslation();
     const chatMessageKey = getChatMessageKey(chatId);
     const internalRef = useRef<HTMLTextAreaElement>(null);
     const [message, setMessage] = useState(
-      initialValue || localStorage.getItem(chatMessageKey) || ''
+      initialValue || localStorage.getItem(chatMessageKey) || "",
     );
 
     useEffect(() => {
@@ -64,11 +64,11 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
       // Auto-resize textarea based on content
       const textarea = internalRef.current;
       if (textarea) {
-        textarea.style.height = 'auto'; // Reset height to find actual value
+        textarea.style.height = "auto"; // Reset height to find actual value
 
         const textHeight = textarea.scrollHeight;
         textarea.style.height = `${textHeight}px`;
-        textarea.style.overflow = textHeight > 300 ? 'auto' : 'hidden';
+        textarea.style.overflow = textHeight > 300 ? "auto" : "hidden";
       }
     }, [message]);
 
@@ -78,19 +78,22 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
     const handleSend = () => {
       if (message.trim()) {
         onSend?.(message);
-        setMessage('');
+        setMessage("");
         localStorage.removeItem(chatMessageKey);
       }
     };
 
-    const isButtonDisabled = isProcessing || isDisabled || !message.trim();
+    const isAtLimit = message.length >= MAX_PROMPT_LENGTH;
+    const showCounter = message.length > MAX_PROMPT_LENGTH * 0.8;
+    const isButtonDisabled =
+      isProcessing || isDisabled || !message.trim() || isAtLimit;
 
     const buttonTooltip =
       isButtonDisabled && !isProcessing
-        ? t('Ask a question')
+        ? t("Ask a question")
         : isButtonDisabled && isProcessing
-          ? t('Processing... Waiting for response.')
-          : t('Send message');
+          ? t("Processing... Waiting for response.")
+          : t("Send message");
 
     return (
       <div
@@ -98,34 +101,35 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
         aria-disabled={isDisabled}
         data-testid={testId}
         className={cn(
-          'flex gap-2 justify-start items-center px-3 py-3 w-full min-w-3xs mr-4',
-          'border-border rounded-md border shadow-xs',
-          'bg-transparent placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground',
-          'text-base transition-[color,box-shadow]',
-          'ring-ring/10 outline-ring/50',
-          !isFocused && 'hover:border-muted-foreground',
+          "relative mr-4 flex w-full min-w-3xs items-center justify-start gap-2 p-3",
+          "rounded-md border border-border shadow-xs",
+          "bg-transparent selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground",
+          "text-base transition-[color,box-shadow]",
+          "ring-ring/10 outline-ring/50",
+          !isFocused && "hover:border-muted-foreground",
           isFocused &&
-            'border-accent outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
-          sendButtonArrangement === 'prepend' ? 'flex-row-reverse' : 'flex-row',
-          className
+            "border-accent outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+          sendButtonArrangement === "prepend" ? "flex-row-reverse" : "flex-row",
+          className,
         )}
       >
         <textarea
           id="prompt-input-textarea"
           className={cn(
-            'flex leading-5 box-content max-h-[300px] justify-center w-full resize-none overflow-hidden bg-transparent placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
-            className
+            "box-content flex max-h-[300px] w-full resize-none justify-center overflow-hidden bg-transparent leading-5 placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+            className,
           )}
           rows={1}
           autoFocus={props.autoFocus}
           onCompositionStart={() => setIsComposing(true)}
           onCompositionEnd={() => setIsComposing(false)}
-          onKeyDown={event => {
+          onKeyDown={(event) => {
             if (
               !isComposing &&
               !isProcessing &&
               !isDisabled &&
-              event.key === 'Enter' &&
+              !isAtLimit &&
+              event.key === "Enter" &&
               !(event.shiftKey || event.altKey)
             ) {
               event.preventDefault();
@@ -134,10 +138,11 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
           }}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          onChange={e => setMessage(e.target.value)}
+          onChange={(e) => setMessage(e.target.value)}
           value={message}
           ref={internalRef}
           disabled={isDisabled}
+          data-testid="prompt-input-textarea"
           {...props}
         />
         <Button
@@ -147,12 +152,34 @@ const PromptInput = React.forwardRef<HTMLTextAreaElement, PromptInputProps>(
           onClick={handleSend}
           title={buttonTooltip}
         >
-          <FontAwesomeIcon icon={isProcessing ? faHourglassHalf : faPaperPlane} size="lg" />
+          {isProcessing ? (
+            <Hourglass data-testid="processing-icon" />
+          ) : (
+            <Send data-testid="send-icon" />
+          )}
         </Button>
+        {showCounter &&
+          (isAtLimit ? (
+            <FieldError
+              data-testid="char-counter"
+              className="absolute right-0 -bottom-6"
+            >
+              {t("Message limit reached ({{max}} characters)", {
+                max: MAX_PROMPT_LENGTH,
+              })}
+            </FieldError>
+          ) : (
+            <FieldDescription
+              data-testid="char-counter"
+              className="absolute right-0 -bottom-6"
+            >
+              {message.length}/{MAX_PROMPT_LENGTH}
+            </FieldDescription>
+          ))}
       </div>
     );
-  }
+  },
 );
-PromptInput.displayName = 'PromptInput';
+PromptInput.displayName = "PromptInput";
 
 export { PromptInput };

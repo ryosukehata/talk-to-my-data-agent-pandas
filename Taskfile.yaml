@@ -9,6 +9,12 @@ includes:
   app_frontend:
     taskfile: ./app_frontend/Taskfile.yaml
     dir: ./app_frontend
+  core:
+    taskfile: ./core/Taskfile.yaml
+    dir: ./core
+  infra:
+    taskfile: ./infra/Taskfile.yaml
+    dir: ./infra
 tasks:
   default:
     desc: "ℹ️ Show all available tasks (run `task --list-all` to see hidden tasks)"
@@ -17,11 +23,13 @@ tasks:
     silent: true
 
   start:
-    desc: "🚀 Quickstart"
+    desc: "💻 Prepare local development environment"
     cmds:
       - dr self update
       - dr dotenv setup --if-needed
-      - python quickstart.py
+      - task install
+      - task infra:start
+      - echo '✅ You are all set. Run `task dev` to start developing, or run `task deploy-dev` to deploy to DataRobot.'
 
   lint:
     desc: "🧹 Run linters"
@@ -33,6 +41,7 @@ tasks:
     cmds:
       - task: app_backend:install
       - task: app_frontend:install
+      - task: infra:install
 
   reinstall:
     desc: "🛠️ Reinstall all dependencies (placeholder task)"
@@ -58,3 +67,13 @@ tasks:
         echo "🔗 Backend: ${prefix}8080"
         echo "🔗 Frontend: ${prefix}5173"
         wait
+
+  deploy:
+    desc: "🚀 Deploy all services"
+    cmds:
+      - task: infra:deploy
+
+  deploy-dev:
+    desc: "🚀 Deploy infrastructure and services to development"
+    cmds:
+      - task: infra:deploy-dev

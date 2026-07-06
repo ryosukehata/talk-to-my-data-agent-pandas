@@ -107,12 +107,15 @@ def prepare_refresh_files(stack_state: dict[str, Any], workspace: Path) -> list[
             continue
 
         seen_paths.add(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
         replacement = _find_asset_replacement(path)
         if replacement is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(replacement, path)
-        else:
+        elif path.name == "metadata.yaml":
+            path.parent.mkdir(parents=True, exist_ok=True)
             _write_placeholder(path)
+        else:
+            continue
         created_files.append(path)
 
     return created_files

@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBookmark } from '@fortawesome/free-solid-svg-icons/faBookmark';
-import { useTranslation } from '@/i18n';
-import { SavePromptModal } from './SavePromptModal';
-import { SavePromptButtonProps, SavePromptData } from './types';
-import { useCustomPromptState } from './hooks';
-import { useFetchFeatureFlags } from '@/api/feature-flag';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Bookmark } from "lucide-react";
+import { useTranslation } from "@/i18n";
+import { SavePromptModal } from "./SavePromptModal";
+import { SavePromptButtonProps, SavePromptData } from "./types";
+import { useCustomPromptState } from "./hooks";
+import { useFetchFeatureFlags } from "@/api/feature-flag";
 
 export const SavePromptButton: React.FC<SavePromptButtonProps> = ({
   promptText,
@@ -36,7 +35,7 @@ export const SavePromptButton: React.FC<SavePromptButtonProps> = ({
         setSaving(false);
       }, 3000); // 3秒後にリセット
     } catch (error) {
-      console.error('Failed to save prompt:', error);
+      console.error("Failed to save prompt:", error);
       setSaving(false);
       // エラーハンドリングは親コンポーネントで行う
     }
@@ -48,10 +47,10 @@ export const SavePromptButton: React.FC<SavePromptButtonProps> = ({
         variant="ghost"
         size="sm"
         onClick={() => setIsModalOpen(true)}
-        title={t('Save as custom prompt')}
+        title={t("Save as custom prompt")}
         disabled={disabled || !promptText.trim()}
       >
-        <FontAwesomeIcon icon={faBookmark} />
+        <Bookmark />
       </Button>
 
       <SavePromptModal
