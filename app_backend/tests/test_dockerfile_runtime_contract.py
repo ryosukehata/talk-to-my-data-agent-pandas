@@ -2,6 +2,7 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DOCKERFILE = REPOSITORY_ROOT / "docker" / "Dockerfile"
+START_SCRIPT = REPOSITORY_ROOT / "app_backend" / "start-app.sh"
 APP_BACKEND_INFRA = REPOSITORY_ROOT / "infra" / "infra" / "app_backend.py"
 PULUMI_UP_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "pulumi-up.yml"
 
@@ -15,24 +16,39 @@ def test_dockerfile_uses_chainguard_fips_python_dev_image() -> None:
     )
 
 
-def test_dockerfile_installs_japanese_fonts_with_wolfi_apk() -> None:
+def test_dockerfile_extends_official_context_with_japanese_fonts() -> None:
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
 
     assert "apk add --no-cache" in dockerfile
     assert "fontconfig" in dockerfile
     assert "font-noto-cjk" in dockerfile
     assert "apt-get" not in dockerfile
+    assert "python -m pip install --no-cache poetry uv" in dockerfile
 
 
-def test_dockerfile_runs_application_as_non_root_user() -> None:
+def test_dockerfile_keeps_official_root_runtime_user_contract() -> None:
     dockerfile_lines = DOCKERFILE.read_text(encoding="utf-8").splitlines()
     user_lines = [
         line.strip() for line in dockerfile_lines if line.strip().startswith("USER ")
     ]
+    hadolint_config = (REPOSITORY_ROOT / ".hadolint.yml").read_text(encoding="utf-8")
 
-    assert user_lines[0] == "USER root"
-    assert user_lines[-1] == "USER 65532:65532"
-    assert "chown -R 65532:65532 /opt/code" in "\n".join(dockerfile_lines)
+    assert user_lines[-1] == "USER root"
+    assert "65532:65532" not in "\n".join(dockerfile_lines)
+    assert "DL3002" in hadolint_config
+    assert "DL3042" in hadolint_config
+
+
+def test_start_script_stays_close_to_upstream_prebundled_uv_bootstrap() -> None:
+    start_script = START_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'export UV_CACHE_DIR="${WORKING_DIR}/.uv"' in start_script
+    assert 'rm -rf ".venv"' in start_script
+    assert 'cp -r "$PREBUNDLED_VENV" ".venv"' in start_script
+    assert "uv sync --frozen" not in start_script
+    assert "uv sync" in start_script
+    assert "exec uv run python -m uvicorn" in start_script
+    assert "UV_PROJECT_ENVIRONMENT" not in start_script
 
 
 def test_pulumi_manages_app_environment_from_dockerfile_by_default() -> None:
