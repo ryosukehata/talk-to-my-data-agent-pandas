@@ -229,7 +229,9 @@ class OTel:
                     "OTEL_EXPORTER_OTLP_ENDPOINT not set. Disabling telemetry to prevent connection errors."
                 )
 
-        is_remote = endpoint and "localhost" not in endpoint and "127.0.0.1" not in endpoint
+        is_remote = (
+            endpoint and "localhost" not in endpoint and "127.0.0.1" not in endpoint
+        )
         if self.telemetry_enabled and is_remote and not headers:
             self.telemetry_enabled = False
             logging.getLogger(__name__).error(

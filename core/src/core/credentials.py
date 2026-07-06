@@ -24,6 +24,7 @@ from pydantic_settings import BaseSettings
 
 class DRCredentials(BaseSettings): ...
 
+
 class AzureOpenAICredentials(DRCredentials):
     """LLM credentials auto-constructed using environment variables."""
 
