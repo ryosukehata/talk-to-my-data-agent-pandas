@@ -89,7 +89,7 @@ def test_start_script_supports_uv_and_prebuilt_python_environments() -> None:
     start_script = (REPO_ROOT / "app_backend" / "start-app.sh").read_text()
 
     assert "uv sync" in start_script
-    assert "exec uv run --frozen python -m uvicorn" in start_script
+    assert "exec uv run python -m uvicorn" in start_script
     assert "exec python3 -m uvicorn" in start_script
     assert "PYTHONPATH" in start_script
 
