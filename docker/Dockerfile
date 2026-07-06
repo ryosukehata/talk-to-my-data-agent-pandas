@@ -18,9 +18,6 @@ WORKDIR /opt/code
 
 # Install 'uv' for fast package resolution and 'poetry' for dependency management.
 # This enables support for pyproject.toml based configurations as part of APP-5254.
-RUN python -m pip install --no-cache-dir poetry uv \
-    && chown -R 65532:65532 /opt/code
-
-USER 65532:65532
+RUN python -m pip install --no-cache poetry uv
 
 EXPOSE 8080

@@ -1,9 +1,13 @@
 import asyncio
+import base64
 import io
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
+import pytest
 from openpyxl import load_workbook
 from utils.analyst_db import DatasetMetadata, DatasetType, InternalDataSourceType
 from utils.schema import (
@@ -61,6 +65,14 @@ def test_chat_excel_export_writes_pandas_analysis_result_sheet() -> None:
     asyncio.run(_assert_chat_excel_export_writes_pandas_analysis_result_sheet())
 
 
+def test_chat_excel_export_writes_problematic_plotly_trace_sheet(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asyncio.run(
+        _assert_chat_excel_export_writes_problematic_plotly_trace_sheet(monkeypatch)
+    )
+
+
 def test_run_charts_result_uses_japanese_plotly_font_fallbacks() -> None:
     fig_json = go.Figure(data=[go.Bar(x=["東京", "大阪"], y=[1, 2])]).to_json()
 
@@ -76,6 +88,47 @@ def test_run_charts_result_uses_japanese_plotly_font_fallbacks() -> None:
     assert result.fig1.layout.font.family == expected_family
     assert result.fig2 is not None
     assert result.fig2.layout.font.family == expected_family
+
+
+def test_plotly_trace_export_handles_ragged_arrays_without_pandas_error() -> None:
+    from core.customize.infrastructure.export.chat_export import (
+        plotly_trace_to_dataframe,
+    )
+
+    chart_df = plotly_trace_to_dataframe(
+        {
+            "type": "bar",
+            "x": ["FY2025", "FY2026"],
+            "y": [100],
+        }
+    )
+
+    assert chart_df["x"].to_list() == ["FY2025", "FY2026"]
+    assert chart_df.loc[0, "y"] == 100
+    assert pd.isna(chart_df.loc[1, "y"])
+
+
+def test_plotly_trace_export_ignores_nested_style_dicts_without_pandas_error() -> None:
+    from core.customize.infrastructure.export.chat_export import (
+        plotly_trace_to_dataframe,
+    )
+
+    chart_df = plotly_trace_to_dataframe(
+        {
+            "type": "scatter",
+            "x": ["A", "B"],
+            "y": [10, 20],
+            "line": {"color": "red"},
+            "marker": {"size": [4, 8]},
+        }
+    )
+
+    assert chart_df.to_dict("records") == [
+        {"x": "A", "y": 10},
+        {"x": "B", "y": 20},
+    ]
+    assert "line" not in chart_df.columns
+    assert "marker" not in chart_df.columns
 
 
 async def _assert_chat_excel_export_writes_pandas_analysis_result_sheet() -> None:
@@ -100,6 +153,47 @@ async def _assert_chat_excel_export_writes_pandas_analysis_result_sheet() -> Non
     assert data_sheet["B1"].value == "label"
     assert data_sheet["A2"].value == 10
     assert data_sheet["B2"].value == "A"
+
+
+async def _assert_chat_excel_export_writes_problematic_plotly_trace_sheet(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core.routers.chats import save_chat_messages
+
+    def write_tiny_png(
+        self: go.Figure,
+        file: str | Path,
+        *_args: object,
+        **_kwargs: object,
+    ) -> None:
+        png_data = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+        )
+        Path(file).write_bytes(png_data)
+
+    monkeypatch.setattr(go.Figure, "write_image", write_tiny_png)
+
+    response = await save_chat_messages(
+        request=None,  # type: ignore[arg-type]
+        chat_id="chat-1",
+        analyst_db=_FakeChartAnalystDB(),  # type: ignore[arg-type]
+    )
+    chunks: list[bytes] = []
+    async for chunk in response.body_iterator:
+        chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode("utf-8"))
+    if response.background:
+        await response.background()
+    body = b"".join(chunks)
+    workbook = load_workbook(io.BytesIO(body), read_only=True)
+
+    assert "Chart 1" in workbook.sheetnames
+    chart_sheet = workbook["Chart 1"]
+    assert chart_sheet["A1"].value == "x"
+    assert chart_sheet["B1"].value == "y"
+    assert chart_sheet["A2"].value == "FY2025"
+    assert chart_sheet["B2"].value == 100
+    assert chart_sheet["A3"].value == "FY2026"
+    assert chart_sheet["A1"].value != "Chart Processing Error"
 
 
 class _FakeDatasetHandler:
@@ -156,6 +250,46 @@ class _FakeAnalystDB:
                             attempts=1,
                             datasets_analyzed=1,
                         ),
+                    )
+                ],
+                in_progress=False,
+            ),
+        ]
+
+
+class _FakeChartAnalystDB:
+    async def get_chat_messages(self, chat_id: str) -> list[AnalystChatMessage]:
+        assert chat_id == "chat-1"
+        fig_json = json.dumps(
+            {
+                "data": [
+                    {
+                        "type": "scatter",
+                        "x": ["FY2025", "FY2026"],
+                        "y": [100],
+                        "line": {"color": "red"},
+                    }
+                ],
+                "layout": {},
+            }
+        )
+        return [
+            AnalystChatMessage(
+                id="user-1",
+                role="user",
+                content="plot revenue",
+                components=[],
+                in_progress=False,
+            ),
+            AnalystChatMessage(
+                id="assistant-1",
+                role="assistant",
+                content="chart",
+                components=[
+                    RunChartsResult(
+                        status="success",
+                        fig1_json=fig_json,
+                        metadata=RunAnalysisResultMetadata(duration=0, attempts=1),
                     )
                 ],
                 in_progress=False,
