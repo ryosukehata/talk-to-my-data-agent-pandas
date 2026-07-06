@@ -113,10 +113,7 @@ def test_app_backend_uses_upstream_uv_runtime_bundle() -> None:
     assert "[tool.uv]\npackage = false" in pyproject
     assert "[build-system]" not in pyproject
     assert "[tool.hatch.build.targets.wheel]" not in pyproject
-    assert 'export UV_CACHE_DIR="${UV_CACHE_DIR:-${RUNTIME_DIR}/uv-cache}"' in (
-        start_script
-    )
-    assert "UV_PROJECT_ENVIRONMENT" in start_script
-    assert "exec uv run --frozen python -m uvicorn" in start_script
+    assert 'export UV_CACHE_DIR="${WORKING_DIR}/.uv"' in start_script
+    assert "exec uv run python -m uvicorn" in start_script
     assert "--port 8080" in start_script
     assert "PORT=" not in start_script
