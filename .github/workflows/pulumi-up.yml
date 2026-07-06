@@ -62,6 +62,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: app_frontend/package-lock.json
 
       - name: Install Taskfile
         uses: arduino/setup-task@v2
@@ -82,7 +84,27 @@ jobs:
       - name: Build frontend assets for Pulumi refresh
         working-directory: app_frontend
         run: |
-          npm install
+          set -euo pipefail
+
+          for attempt in 1 2 3; do
+            if npm ci \
+              --no-audit \
+              --fetch-retries=5 \
+              --fetch-retry-factor=2 \
+              --fetch-retry-mintimeout=20000 \
+              --fetch-retry-maxtimeout=120000; then
+              break
+            fi
+
+            if [ "$attempt" = "3" ]; then
+              exit 1
+            fi
+
+            delay=$((attempt * 20))
+            echo "npm ci failed on attempt ${attempt}; retrying in ${delay}s"
+            sleep "$delay"
+          done
+
           npm run build
 
       - name: Restore ApplicationSource files for Pulumi refresh

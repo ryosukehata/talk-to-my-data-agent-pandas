@@ -58,6 +58,13 @@ def test_pulumi_up_workflow_deploys_from_split_infra_project() -> None:
     assert "TEXTGEN_DEPLOYMENT_ID" not in job["env"]
     assert job["env"]["OPENAI_API_KEY"] == "${{ secrets.OPENAI_API_KEY }}"
 
+    node_step = _step_by_name(steps, "Set up Node.js")
+    assert node_step["with"] == {
+        "node-version": "22",
+        "cache": "npm",
+        "cache-dependency-path": "app_frontend/package-lock.json",
+    }
+
     install_step = _step_by_name(steps, "Install infra dependencies")
     assert install_step == {
         "name": "Install infra dependencies",
@@ -72,7 +79,12 @@ def test_pulumi_up_workflow_deploys_from_split_infra_project() -> None:
 
     build_step = _step_by_name(steps, "Build frontend assets for Pulumi refresh")
     assert build_step["working-directory"] == "app_frontend"
-    assert "npm install" in build_step["run"]
+    assert "npm install" not in build_step["run"]
+    assert "for attempt in 1 2 3" in build_step["run"]
+    assert "npm ci" in build_step["run"]
+    assert "--fetch-retries=5" in build_step["run"]
+    assert "--fetch-retry-mintimeout=20000" in build_step["run"]
+    assert "--fetch-retry-maxtimeout=120000" in build_step["run"]
     assert "npm run build" in build_step["run"]
 
     restore_step = _step_by_name(
