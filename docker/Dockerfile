@@ -2,7 +2,7 @@ FROM datarobot/mirror_chainguard_datarobot.com_python-fips:3.12-dev
 
 USER root
 
-RUN apk add --no-cache fontconfig font-noto-cjk \
+RUN apk add --no-cache bash fontconfig font-noto-cjk \
     && fc-cache -f
 
 # This makes print statements show up in the logs API
