@@ -1,5 +1,7 @@
 FROM datarobot/mirror_chainguard_datarobot.com_python-fips:3.12-dev
 
+USER root
+
 RUN apk add --no-cache fontconfig font-noto-cjk \
     && fc-cache -f
 
@@ -17,7 +19,5 @@ WORKDIR /opt/code
 # Install 'uv' for fast package resolution and 'poetry' for dependency management.
 # This enables support for pyproject.toml based configurations as part of APP-5254.
 RUN python -m pip install --no-cache poetry uv
-
-USER root
 
 EXPOSE 8080

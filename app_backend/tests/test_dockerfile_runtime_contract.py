@@ -26,6 +26,20 @@ def test_dockerfile_extends_official_context_with_japanese_fonts() -> None:
     assert "python -m pip install --no-cache poetry uv" in dockerfile
 
 
+def test_dockerfile_installs_packages_as_root() -> None:
+    dockerfile_lines = DOCKERFILE.read_text(encoding="utf-8").splitlines()
+    root_line = next(
+        index
+        for index, line in enumerate(dockerfile_lines)
+        if line.strip() == "USER root"
+    )
+    apk_line = next(
+        index for index, line in enumerate(dockerfile_lines) if "apk add" in line
+    )
+
+    assert root_line < apk_line
+
+
 def test_dockerfile_keeps_official_root_runtime_user_contract() -> None:
     dockerfile_lines = DOCKERFILE.read_text(encoding="utf-8").splitlines()
     user_lines = [
