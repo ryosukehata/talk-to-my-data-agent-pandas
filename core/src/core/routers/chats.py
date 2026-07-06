@@ -22,7 +22,6 @@ import os
 import tempfile
 from typing import Any, List, Union, cast
 
-import pandas as pd
 from datarobot_genai.core.utils.token_tracking import (
     HeuristicTokenCountingStrategy,
     TokenUsageTracker,
@@ -51,6 +50,7 @@ from core.constants import (
     CONTEXT_WARNING_THRESHOLD,
     MODEL_CONTEXT_WINDOW,
 )
+from core.customize.infrastructure.export.chat_export import plotly_trace_to_dataframe
 from core.deps import get_initialized_db
 from core.logging_helper import get_logger
 from core.schema import (
@@ -761,9 +761,7 @@ async def save_chat_messages(
                         parsed_json = json.loads(js)
                         data_list = parsed_json.get("data", [])
                         if data_list and len(data_list) > 0:
-                            fig_json = data_list[0].copy()
-                            [fig_json.pop(k, None) for k in ["marker", "name", "type"]]
-                            chart_df = pd.DataFrame(fig_json)
+                            chart_df = plotly_trace_to_dataframe(data_list[0])
                             for r in dataframe_to_rows(
                                 chart_df, index=False, header=True
                             ):
