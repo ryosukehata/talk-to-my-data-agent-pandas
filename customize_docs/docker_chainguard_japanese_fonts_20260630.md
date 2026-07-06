@@ -42,6 +42,9 @@ DataRobot の Python FIPS dev ベースイメージへ移行するため、Docke
 - PR #117 CI follow-up: hadolint `DL3002 Last USER should not be root` 対応として、Dockerfile の最終実行ユーザーを `65532:65532` に戻したが、これは DataRobot 公式 context / upstream `start-app.sh` の runtime 契約から外れるため再修正対象になった。
 - PR #117 merge 後の dev Pulumi Up は `ExecutionEnvironment` と `ApplicationSource` の作成には成功したが、`CustomApplication` の ready 判定で `application failed to create` になった。DataRobot API の `CustomApplication.get_logs()` では `buildStatus` は success、runtime log は 0 件だったため、Python import ではなく起動スクリプトまたは `uv` bootstrap の前段で失敗した可能性が高い。
 - ユーザー提供の DataRobot 公式 Docker context (`[DataRobot] Python 3.12 Applications Base`) は `USER root` で、`uv` / `poetry` 導入も `python -m pip install --no-cache poetry uv` だった。upstream 追従を最優先するため、`start-app.sh` は upstream と同じ app source 直下 `.uv` / `.venv` 利用へ戻し、Dockerfile も公式 context の root runtime 契約へ戻した。日本語フォント導入だけを追加差分として残す。
+- PR #122 merge 後の dev Pulumi Up は `ExecutionEnvironment` build まで進み、DataRobot build log で `apk add --no-cache fontconfig font-noto-cjk` が `Unable to lock database: Permission denied` で失敗した。
+  - ベースイメージの既定 user は root ではないため、日本語フォントを導入する `apk add` より前に `USER root` を置く必要がある。
+  - runtime の最終 user も DataRobot 公式 context と同じ `root` のまま維持する。
 - `bash -n app_backend/start-app.sh`: 成功。
 - `uv run pytest app_backend/tests/test_dockerfile_runtime_contract.py app_backend/tests/test_v1182_compat.py customize_docs/test_v11_5_3_infra_config.py -q`: 25 passed。
 - `uv run pytest app_backend/tests -q`: 154 passed。LiteLLM の atexit logging warning は出るが pytest は成功。
