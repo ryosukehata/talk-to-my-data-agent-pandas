@@ -62,8 +62,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: app_frontend/package-lock.json
 
       - name: Install Taskfile
         uses: arduino/setup-task@v2
@@ -87,7 +85,7 @@ jobs:
           set -euo pipefail
 
           for attempt in 1 2 3; do
-            if npm ci \
+            if npm install \
               --no-audit \
               --fetch-retries=5 \
               --fetch-retry-factor=2 \
@@ -101,7 +99,7 @@ jobs:
             fi
 
             delay=$((attempt * 20))
-            echo "npm ci failed on attempt ${attempt}; retrying in ${delay}s"
+            echo "npm install failed on attempt ${attempt}; retrying in ${delay}s"
             sleep "$delay"
           done
 
