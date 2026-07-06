@@ -17,10 +17,10 @@ cleanup 時に `pulumi-resource-command` process が残っていた。
 - 2026-07-06 の `Pulumi Up` workflow では、Pulumi 実行前の
   `Build frontend assets for Pulumi refresh` step で `npm install` が `ECONNRESET`
   により失敗した。
-  - `app_frontend/package-lock.json` を前提に、CI では `npm install` ではなく
-    `npm ci` を使う。
-  - `actions/setup-node` の npm cache を有効化し、registry fetch の一時失敗に備えて
-    `npm ci` を 3 回まで再試行する。
+  - upstream の frontend workflow と同じく `npm install` を使う。
+  - `app_frontend/package-lock.json` は git 管理されていないため、`npm ci` や
+    `actions/setup-node` の `cache-dependency-path` は使わない。
+  - registry fetch の一時失敗に備えて `npm install` を 3 回まで再試行する。
 - workflow の事前 build 成果物を `infra/infra/app_backend.py` の `get_app_backend_app_files()` で直接読む。
 - 既存 Pulumi state に残った `command:local:Command` は update 前に
   stack export JSON から prune し、`pulumi stack import` で反映する。
@@ -52,6 +52,7 @@ cleanup 時に `pulumi-resource-command` process が残っていた。
   - workflow が branch に対応した resource name で App Source / monitoring state を
     事前 prune することを確認する。
   - Pulumi action に `SKIP_PULUMI_FRONTEND_BUILD=true` が渡ることを確認する。
-  - frontend assets build で `npm ci`、npm cache、fetch retry が設定されることを確認する。
+  - frontend assets build で `npm install` と fetch retry が設定されることを確認する。
+  - git 管理されていない `package-lock.json` に依存する npm cache 設定を入れないことを確認する。
 - `customize_docs/test_prune_pulumi_state_resources.py`
   - stack export から対象 type の resources と、その依存参照を削除することを確認する。
