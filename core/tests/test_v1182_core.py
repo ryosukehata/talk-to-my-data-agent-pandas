@@ -30,7 +30,9 @@ def reset_otel_singleton() -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_datarobot_client_uses_timeout_and_does_not_reapply_params() -> None:
+async def test_async_datarobot_client_uses_timeout_and_does_not_reapply_params() -> (
+    None
+):
     with patch("httpx.AsyncClient", autospec=httpx.AsyncClient) as async_client:
         async_client.return_value = async_client
 
@@ -53,9 +55,7 @@ async def test_async_datarobot_client_uses_timeout_and_does_not_reapply_params()
         client = AsyncDataRobotClient(token="token", endpoint="https://example.test")
         values = [
             value
-            async for value in client.unpaginate(
-                "keyValues/", {"entityId": "app-id"}
-            )
+            async for value in client.unpaginate("keyValues/", {"entityId": "app-id"})
         ]
 
     assert values == [{"id": 1}, {"id": 2}]
@@ -63,7 +63,9 @@ async def test_async_datarobot_client_uses_timeout_and_does_not_reapply_params()
     assert isinstance(kwargs["timeout"], httpx.Timeout)
 
 
-def test_otel_does_not_auto_instrument_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_otel_does_not_auto_instrument_when_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("DISABLE_TELEMETRY", "true")
 
     with patch.object(OTel, "_setup_auto_instrumentation") as setup_auto:
@@ -87,16 +89,21 @@ def test_code_generation_and_result_expose_used_datasets() -> None:
 
     assert completion.used_datasets == ["sales"]
     assert result.used_datasets == ["sales"]
-    assert CodeGeneration(
-        code="x = 1", description="analysis", used_datasets="sales"
-    ).used_datasets == []
+    assert (
+        CodeGeneration(
+            code="x = 1", description="analysis", used_datasets="sales"
+        ).used_datasets
+        == []
+    )
 
 
 def test_database_connection_type_includes_datarobot_jdbc() -> None:
     assert "datarobot_jdbc" in DatabaseConnectionType.__args__
 
 
-def test_jdbc_credentials_validate_supported_uri(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_jdbc_credentials_validate_supported_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("JDBC_URI", "jdbc:postgresql://example.test:5432/db")
     monkeypatch.setenv(
         "JDBC_CONNECTION_PARAMETERS", '{"user": "dbuser", "password": "secret"}'
@@ -166,3 +173,15 @@ def test_platform_database_types_use_jdbc_preview_operator(
 
     assert isinstance(operator, JdbcPreviewOperator)
     assert operator.query_friendly_name("sales") == quoted_name
+
+
+@pytest.mark.parametrize("database", ["snowflake", "sap", "bigquery", "datarobot_jdbc"])
+def test_platform_database_types_require_jdbc_uri(
+    monkeypatch: pytest.MonkeyPatch,
+    database: str,
+) -> None:
+    monkeypatch.delenv("JDBC_URI", raising=False)
+    monkeypatch.delenv("JDBC_CONNECTION_PARAMETERS", raising=False)
+
+    with pytest.raises(ValueError, match="JDBC_URI"):
+        get_database_operator(AppInfra(llm="llm", database=database))

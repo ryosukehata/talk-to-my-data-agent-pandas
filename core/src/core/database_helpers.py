@@ -1105,73 +1105,19 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
 def get_database_operator(
     app_infra: AppInfra, schema: str | None = None
 ) -> DatabaseOperator[Any]:
+    del schema
     if app_infra.database in ("snowflake", "sap", "bigquery", "datarobot_jdbc"):
         try:
             return JdbcPreviewOperator(JDBCCredentials())
-        except (ValidationError, ValueError):
-            logger.warning(
-                "JDBC credentials not properly configured for %s",
-                app_infra.database,
-                exc_info=True,
-            )
-            if app_infra.database == "datarobot_jdbc":
-                return NoDatabaseOperator(NoDatabaseCredentials())
+        except (ValidationError, ValueError) as exc:
+            raise ValueError(
+                f"DATABASE_CONNECTION_TYPE is '{app_infra.database}' but JDBC_URI "
+                "is missing or invalid. Set JDBC_URI to a valid JDBC connection "
+                "string such as jdbc:snowflake://..., jdbc:sap://..., or "
+                "jdbc:bigquery://...."
+            ) from exc
 
-    if app_infra.database == "bigquery":
-        credentials: (
-            GoogleCredentialsBQ
-            | SnowflakeCredentials
-            | SAPDatasphereCredentials
-            | JDBCCredentials
-            | NoDatabaseCredentials
-        )
-        try:
-            credentials = GoogleCredentialsBQ()
-            if credentials.service_account_key and credentials.db_schema:
-                # Override schema if provided
-                if schema:
-                    credentials.db_schema = schema
-                return BigQueryOperator(credentials)
-        except (ValidationError, ValueError):
-            logger.warning(
-                "BigQuery credentials not properly configured, falling back to no database"
-            )
-        return NoDatabaseOperator(NoDatabaseCredentials())
-    elif app_infra.database == "snowflake":
-        try:
-            credentials = SnowflakeCredentials()
-            if credentials.is_configured():
-                # Override schema if provided
-                if schema:
-                    credentials = credentials.with_schema(schema)
-                return SnowflakeOperator(credentials)
-        except (ValidationError, ValueError):
-            logger.warning(
-                "Snowflake credentials not properly configured, falling back to no database"
-            )
-        return NoDatabaseOperator(NoDatabaseCredentials())
-    elif app_infra.database == "sap":
-        try:
-            credentials = SAPDatasphereCredentials()
-            if credentials.is_configured():
-                return SAPDatasphereOperator(credentials)
-        except (ValidationError, ValueError):
-            logger.warning(
-                "SAP credentials not properly configured, falling back to no database"
-            )
-        return NoDatabaseOperator(NoDatabaseCredentials())
-    elif app_infra.database == "datarobot_jdbc":
-        try:
-            credentials = JDBCCredentials()
-            return JdbcPreviewOperator(credentials)
-        except (ValidationError, ValueError):
-            logger.warning(
-                "JDBC credentials not properly configured, falling back to no database",
-                exc_info=True,
-            )
-        return NoDatabaseOperator(NoDatabaseCredentials())
-    else:
-        return NoDatabaseOperator(NoDatabaseCredentials())
+    return NoDatabaseOperator(NoDatabaseCredentials())
 
 
 def load_app_infra() -> AppInfra:

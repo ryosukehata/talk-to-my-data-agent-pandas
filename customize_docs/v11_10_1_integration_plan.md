@@ -25,7 +25,7 @@
 ## Implementation decisions
 
 - upstream は database implementation 本体を `core.data_connections.database.database_implementations` に置くが、この fork は既存互換のため `core.database_helpers` を本体として残す。
-- `snowflake` / `sap` / `bigquery` は `JDBC_URI` が設定されている場合に `JdbcPreviewOperator` を優先する。旧 env だけの構成は fallback として残す。
+- `snowflake` / `sap` / `bigquery` / `datarobot_jdbc` は upstream `v11.10.1` に寄せ、`JDBC_URI` 必須の `JdbcPreviewOperator` 経路だけを使う。旧 Snowflake / BigQuery / SAP operator への fallback はこのブランチでは残さない。
 - `app_backend` の古い `fsspec` / `pyarrow` direct pin は core 側の upstream 依存制約と衝突するため削除した。
 - `app_backend/uv.lock` と `infra/uv.lock` は conflict marker を手編集せず、対応する `pyproject.toml` から再生成した。
 
@@ -39,6 +39,7 @@
 - `npm --prefix app_frontend test`: 27 files / 163 tests passed
 - `task --list --sort none`: passed
 - `uv run ruff check core/src/core/database_helpers.py core/src/core/llm_client.py core/src/core/middleware.py core/src/core/telemetry app_backend/app/config.py app_backend/tests/test_llm_configuration.py app_backend/tests/test_v1182_compat.py infra/infra/app_backend.py infra/infra/components/dr_credential.py infra/configurations/llm/nim_deployed_llm.py`: passed
+- `uv run --project core pytest core/tests/test_v1182_core.py -q`: 16 passed
 
 補足:
 

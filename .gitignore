@@ -179,6 +179,7 @@ e2e/downloads/
 
 *.db*
 *.p8
+rsa_key.p8
 .env*
 !.env.template
 node_modules/
