@@ -91,14 +91,17 @@ def test_load_from_database_registers_placeholders_and_defers_processing() -> No
 async def _assert_load_from_database_registers_placeholders() -> None:
     class FakeAnalystDB:
         def __init__(self) -> None:
-            self.registered: list[tuple[AnalystDataset, InternalDataSourceType]] = []
+            self.registered: list[
+                tuple[AnalystDataset, InternalDataSourceType, str | None]
+            ] = []
 
         async def register_dataset(
             self,
             dataset: AnalystDataset,
             data_source: InternalDataSourceType,
+            external_id: str | None = None,
         ) -> dict[str, object]:
-            self.registered.append((dataset, data_source))
+            self.registered.append((dataset, data_source, external_id))
             return {"success": True, "msg": ""}
 
     analyst_db = FakeAnalystDB()
@@ -110,14 +113,19 @@ async def _assert_load_from_database_registers_placeholders() -> None:
         analyst_db,  # type: ignore[arg-type]
     )
 
-    assert result == ["sales", "customers"]
+    assert result == ["PUBLIC-sales", "PUBLIC-customers"]
     assert [
-        (dataset.name, isinstance(dataset.to_df(), pd.DataFrame), dataset.to_df().empty)
-        for dataset, data_source in analyst_db.registered
+        (
+            dataset.name,
+            external_id,
+            isinstance(dataset.to_df(), pd.DataFrame),
+            dataset.to_df().empty,
+        )
+        for dataset, data_source, external_id in analyst_db.registered
         if data_source is InternalDataSourceType.DATABASE
     ] == [
-        ("sales", True, True),
-        ("customers", True, True),
+        ("PUBLIC-sales", "PUBLIC.sales", True, True),
+        ("PUBLIC-customers", "PUBLIC.customers", True, True),
     ]
     assert len(background_tasks.tasks) == 1
     background_task = background_tasks.tasks[0]
@@ -134,6 +142,38 @@ def test_get_and_process_tables_uses_schema_and_processes_loaded_names(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     asyncio.run(_assert_get_and_process_tables_uses_schema(monkeypatch))
+
+
+def test_get_database_tables_returns_mapping_and_uses_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asyncio.run(
+        _assert_get_database_tables_returns_mapping_and_uses_schema(monkeypatch)
+    )
+
+
+async def _assert_get_database_tables_returns_mapping_and_uses_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, object] = {}
+
+    class FakeDatabaseOperator:
+        async def get_tables(self) -> list[str]:
+            return ["ORDERS", "CUSTOMER"]
+
+    def fake_get_external_database(schema: str | None = None) -> FakeDatabaseOperator:
+        calls["schema"] = schema
+        return FakeDatabaseOperator()
+
+    monkeypatch.setattr(
+        database_router, "get_external_database", fake_get_external_database
+    )
+
+    assert await rest_api.get_database_tables(schema="TPCDS_SF100TCL") == {
+        "ORDERS": "ORDERS",
+        "CUSTOMER": "CUSTOMER",
+    }
+    assert calls["schema"] == "TPCDS_SF100TCL"
 
 
 async def _assert_get_and_process_tables_uses_schema(
@@ -154,7 +194,7 @@ async def _assert_get_and_process_tables_uses_schema(
                 "analyst_db": analyst_db,
                 "sample_size": sample_size,
             }
-            return ["sales", "customers"]
+            return ["PUBLIC-sales", "PUBLIC-customers"]
 
     def fake_get_external_database(schema: str | None = None) -> FakeDatabaseOperator:
         calls["schema"] = schema
@@ -185,7 +225,7 @@ async def _assert_get_and_process_tables_uses_schema(
         "sample_size": 25,
     }
     assert calls["process"] == {
-        "dataset_names": ["sales", "customers"],
+        "dataset_names": ["PUBLIC-sales", "PUBLIC-customers"],
         "analyst_db": analyst_db,
         "datasource_type": InternalDataSourceType.DATABASE,
     }

@@ -27,6 +27,8 @@
 - upstream は database implementation 本体を `core.data_connections.database.database_implementations` に置くが、この fork は既存互換のため `core.database_helpers` を本体として残す。
 - `snowflake` / `sap` / `bigquery` / `datarobot_jdbc` は upstream `v11.10.1` に寄せ、`JDBC_URI` 必須の `JdbcPreviewOperator` 経路だけを使う。旧 Snowflake / BigQuery / SAP operator への fallback はこのブランチでは残さない。
 - JDBC Preview 経路では `JDBC_URI` の `schema=` をデフォルト schema として扱い、`/v1/database/schemas` と `schema` 指定付き `/v1/database/tables` を DataRobot JDBC Preview で取得する。選択 schema はテーブル一覧とデータ取得SQLの両方に反映する。
+- database dataset のアプリ内登録名は `SCHEMA-TABLE` 形式に統一する。SQL 生成と JDBC Preview の実データ取得では metadata の `external_id` に保存した `SCHEMA.TABLE` を優先し、表示名と実テーブル名を分離する。
+- core `/v1/database/tables` は customize endpoint と同じく dict 形式で返し、`schema` query を DataRobot JDBC Preview に渡す。list 形式が返った場合でも frontend で table 名を key/value に正規化し、array index (`"0"` など) が `/database/select` に送信されないようにする。
 - OTel exporter の一時的な `ReadTimeout` はアプリ機能の失敗ではないため、既存の OTLP 接続エラーフィルタで詳細スタックを抑制し、1回だけ警告する。
 - `app_backend` の古い `fsspec` / `pyarrow` direct pin は core 側の upstream 依存制約と衝突するため削除した。
 - `app_backend/uv.lock` と `infra/uv.lock` は conflict marker を手編集せず、対応する `pyproject.toml` から再生成した。
@@ -44,6 +46,11 @@
 - `uv run --project core pytest core/tests/test_v1182_core.py -q`: 16 passed
 - `uv run --project core pytest core/tests/test_v1182_core.py core/tests/test_metrics.py -q`: 23 passed
 - Snowflake JDBC Preview 実接続確認: schema 7件、`TPCH_SF1` の table 8件を取得
+- `uv run pytest app_backend/tests/test_rest_api_v0424_compat.py core/tests/test_v1182_core.py app_backend/tests/test_api_analysis_execution_v0424_compat.py -q`: 45 passed
+- `npm --prefix app_frontend test -- src/api/database/api-requests.test.ts`: 2 passed
+- `npm --prefix app_frontend run build`: passed
+- `uv run ruff check core/src/core/database_helpers.py core/src/core/routers/database.py core/src/core/api.py app_backend/tests/test_rest_api_v0424_compat.py core/tests/test_v1182_core.py app_backend/tests/test_api_analysis_execution_v0424_compat.py`: passed
+- `uv run ruff format --check core/src/core/database_helpers.py core/src/core/routers/database.py core/src/core/api.py app_backend/tests/test_rest_api_v0424_compat.py core/tests/test_v1182_core.py app_backend/tests/test_api_analysis_execution_v0424_compat.py`: passed
 
 補足:
 

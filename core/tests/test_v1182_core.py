@@ -149,6 +149,22 @@ def test_get_database_operator_returns_jdbc_preview_operator(
     assert operator.query_friendly_name("sales") == "`sales`"
 
 
+def test_jdbc_preview_query_name_supports_schema_prefixed_dataset_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "JDBC_URI",
+        "jdbc:snowflake://account.snowflakecomputing.com/?db=ANALYTICS&schema=PUBLIC",
+    )
+
+    operator = get_database_operator(
+        AppInfra(llm="llm", database="snowflake"), schema="SALES"
+    )
+
+    assert operator.query_friendly_name("SALES-orders") == '"SALES"."orders"'
+    assert operator.query_friendly_name("SALES.orders") == '"SALES"."orders"'
+
+
 @pytest.mark.parametrize(
     ("database", "jdbc_uri", "quoted_name"),
     [
@@ -240,6 +256,52 @@ async def test_jdbc_preview_selected_schema_filters_table_discovery(
 
     assert tables == ["ORDERS"]
     assert "TABLE_SCHEMA = 'SALES'" in captured_sql[0]
+
+
+@pytest.mark.asyncio
+async def test_jdbc_preview_registers_schema_prefixed_display_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "JDBC_URI",
+        "jdbc:snowflake://account.snowflakecomputing.com/?db=ANALYTICS&schema=PUBLIC",
+    )
+    captured_sql: list[str] = []
+    registered: list[dict[str, Any]] = []
+
+    class FakePreview:
+        @staticmethod
+        def preview(**kwargs: Any) -> Mock:
+            captured_sql.append(kwargs["sql"])
+            return Mock(
+                records=[(1,)],
+                result_schema=[{"name": "ORDER_ID", "data_type": "NUMBER"}],
+            )
+
+    class FakeAnalystDB:
+        async def register_dataset(
+            self, dataset: Any, data_source: Any, **kwargs: Any
+        ) -> dict[str, Any]:
+            registered.append(
+                {"dataset": dataset, "data_source": data_source, **kwargs}
+            )
+            return {"success": True, "msg": ""}
+
+    monkeypatch.setattr(
+        JdbcPreviewOperator, "_preview", staticmethod(lambda: FakePreview)
+    )
+
+    operator = get_database_operator(
+        AppInfra(llm="llm", database="snowflake"), schema="SALES"
+    )
+
+    names = await operator.get_data("ORDERS", analyst_db=FakeAnalystDB())
+
+    assert names == ["SALES-ORDERS"]
+    assert captured_sql[0] == 'SELECT * FROM "SALES"."ORDERS"'
+    assert registered[0]["dataset"].name == "SALES-ORDERS"
+    assert registered[0]["external_id"] == "SALES.ORDERS"
+    assert registered[0]["clobber"] is True
 
 
 def test_otlp_filter_suppresses_metrics_read_timeout() -> None:

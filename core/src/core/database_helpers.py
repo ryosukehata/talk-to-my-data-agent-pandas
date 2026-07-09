@@ -63,6 +63,39 @@ logger = get_logger("DatabaseHelper")
 
 T = TypeVar("T")
 _DEFAULT_DB_QUERY_TIMEOUT = 300
+_DATABASE_DATASET_NAME_SEPARATOR = "-"
+
+
+def database_dataset_display_name(table_name: str, schema_name: str | None) -> str:
+    """Return the dataset name shown in the app for a database table."""
+    schema_name, table_name = database_source_parts(table_name, schema_name)
+    if schema_name:
+        return f"{schema_name}{_DATABASE_DATASET_NAME_SEPARATOR}{table_name}"
+    return table_name
+
+
+def database_source_name(table_name: str, schema_name: str | None) -> str:
+    """Return a stable source identifier for a database table."""
+    schema_name, table_name = database_source_parts(table_name, schema_name)
+    if schema_name:
+        return f"{schema_name}.{table_name}"
+    return table_name
+
+
+def database_source_parts(
+    source_name: str, default_schema: str | None = None
+) -> tuple[str | None, str]:
+    """Split a database source/display name into schema and table parts."""
+    if "." in source_name:
+        schema_name, table_name = source_name.rsplit(".", 1)
+        return schema_name or default_schema, table_name
+
+    if default_schema:
+        display_prefix = f"{default_schema}{_DATABASE_DATASET_NAME_SEPARATOR}"
+        if source_name.startswith(display_prefix):
+            return default_schema, source_name[len(display_prefix) :]
+
+    return default_schema, source_name
 
 
 @dataclass
@@ -1080,10 +1113,11 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
                 raise ValueError(f"Unsupported dialect: {self._dialect_key!r}")
 
     def _qualified_table_name(self, table: str) -> str:
-        quoted_table = self._quote_identifier(table)
-        if not self._selected_schema:
+        schema_name, table_name = database_source_parts(table, self._selected_schema)
+        quoted_table = self._quote_identifier(table_name)
+        if not schema_name:
             return quoted_table
-        return f"{self._quote_identifier(self._selected_schema)}.{quoted_table}"
+        return f"{self._quote_identifier(schema_name)}.{quoted_table}"
 
     @staticmethod
     def _preview() -> Any:
@@ -1239,21 +1273,26 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
                     )
                 )
                 dataframe = pd.DataFrame(records, columns=columns, dtype=str)
-                dataset = AnalystDataset(name=table, data=dataframe)
+                display_name = database_dataset_display_name(
+                    table, self._selected_schema
+                )
+                source_name = database_source_name(table, self._selected_schema)
+                dataset = AnalystDataset(name=display_name, data=dataframe)
                 reg_result = await analyst_db.register_dataset(
                     dataset,
                     InternalDataSourceType.DATABASE,
+                    external_id=source_name,
                     original_column_types=column_types,
                     clobber=True,
                 )
                 if not reg_result["success"]:
                     logger.error(
                         "Failed to register JDBC dataset %s: %s",
-                        table,
+                        display_name,
                         reg_result["msg"],
                     )
                     continue
-                names.append(table)
+                names.append(display_name)
             except Exception:
                 logger.error("JDBC: error loading table %s", table, exc_info=True)
                 continue

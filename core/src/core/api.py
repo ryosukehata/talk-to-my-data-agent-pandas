@@ -110,7 +110,11 @@ from core.data_cleansing_helpers import (
     add_summary_statistics,
     process_column,
 )
-from core.database_helpers import DatabaseOperator, get_external_database
+from core.database_helpers import (
+    DatabaseOperator,
+    database_source_parts,
+    get_external_database,
+)
 from core.dr_helper import async_submit_actuals_to_datarobot
 from core.i18n import gettext
 from core.logging_helper import get_logger, log_api_call
@@ -1811,13 +1815,13 @@ async def _generate_database_analysis_code(
         telemetry_send = None
 
     # Convert dictionary data structure to list of columns for all tables
-    dictionaries = [
-        (
-            await analyst_db.get_data_dictionary(name),
-            await analyst_db.get_dataset_metadata(name),
-        )
-        for name in request.dataset_names
-    ]
+    metadata_by_dataset: dict[str, DatasetMetadata] = {}
+    dictionaries = []
+    for name in request.dataset_names:
+        dictionary = await analyst_db.get_data_dictionary(name)
+        metadata = await analyst_db.get_dataset_metadata(name)
+        metadata_by_dataset[name] = metadata
+        dictionaries.append((dictionary, metadata))
 
     for dictionary, metadata in dictionaries:
         if dictionary:
@@ -1827,7 +1831,12 @@ async def _generate_database_analysis_code(
                         column.column
                     ):
                         column.data_type = original_type
-            dictionary.name = database.query_friendly_name(dictionary.name)
+            source_name = (
+                metadata.external_id
+                if metadata and metadata.external_id
+                else dictionary.name
+            )
+            dictionary.name = database.query_friendly_name(source_name)
     all_tables_info = [
         d.model_dump(mode="json") for d, m in dictionaries if d is not None
     ]
@@ -1837,13 +1846,20 @@ async def _generate_database_analysis_code(
 
     for table in request.dataset_names:
         df = (await analyst_db.get_dataset(table)).to_df()
-        schema_str, table_str = table.split(".")
+        metadata = metadata_by_dataset.get(table)
+        source_name = (
+            metadata.external_id if metadata and metadata.external_id else table
+        )
+        schema_str, table_str = database_source_parts(source_name)
 
         # friendly_name = database.query_friendly_name(table)
 
-        sample_str = (
-            f"Schema: {schema_str}, Table: {table_str}\n{df.head(10).to_string()}"
+        sample_header = (
+            f"Schema: {schema_str}, Table: {table_str}"
+            if schema_str
+            else f"Table: {table_str}"
         )
+        sample_str = f"{sample_header}\n{df.head(10).to_string()}"
         all_samples.append(sample_str)
 
     # Create messages for OpenAI
