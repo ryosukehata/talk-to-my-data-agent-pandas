@@ -46,7 +46,7 @@
 - `uv run --project core pytest core/tests/test_v1182_core.py -q`: 16 passed
 - `uv run --project core pytest core/tests/test_v1182_core.py core/tests/test_metrics.py -q`: 23 passed
 - Snowflake JDBC Preview 実接続確認: schema 7件、`TPCH_SF1` の table 8件を取得
-- `uv run pytest app_backend/tests/test_rest_api_v0424_compat.py core/tests/test_v1182_core.py app_backend/tests/test_api_analysis_execution_v0424_compat.py -q`: 45 passed
+- `uv run pytest app_backend/tests/test_api_validation_errors_v0424_compat.py app_backend/tests/test_rest_api_v0424_compat.py core/tests/test_v1182_core.py app_backend/tests/test_api_analysis_execution_v0424_compat.py -q`: 49 passed
 - `npm --prefix app_frontend test -- src/api/database/api-requests.test.ts`: 2 passed
 - `npm --prefix app_frontend run build`: passed
 - `uv run ruff check core/src/core/database_helpers.py core/src/core/routers/database.py core/src/core/api.py app_backend/tests/test_rest_api_v0424_compat.py core/tests/test_v1182_core.py app_backend/tests/test_api_analysis_execution_v0424_compat.py`: passed

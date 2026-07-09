@@ -1815,7 +1815,7 @@ async def _generate_database_analysis_code(
         telemetry_send = None
 
     # Convert dictionary data structure to list of columns for all tables
-    metadata_by_dataset: dict[str, DatasetMetadata] = {}
+    metadata_by_dataset: dict[str, Any] = {}
     dictionaries = []
     for name in request.dataset_names:
         dictionary = await analyst_db.get_data_dictionary(name)
@@ -1831,11 +1831,7 @@ async def _generate_database_analysis_code(
                         column.column
                     ):
                         column.data_type = original_type
-            source_name = (
-                metadata.external_id
-                if metadata and metadata.external_id
-                else dictionary.name
-            )
+            source_name = getattr(metadata, "external_id", None) or dictionary.name
             dictionary.name = database.query_friendly_name(source_name)
     all_tables_info = [
         d.model_dump(mode="json") for d, m in dictionaries if d is not None
@@ -1847,9 +1843,7 @@ async def _generate_database_analysis_code(
     for table in request.dataset_names:
         df = (await analyst_db.get_dataset(table)).to_df()
         metadata = metadata_by_dataset.get(table)
-        source_name = (
-            metadata.external_id if metadata and metadata.external_id else table
-        )
+        source_name = getattr(metadata, "external_id", None) or table
         schema_str, table_str = database_source_parts(source_name)
 
         # friendly_name = database.query_friendly_name(table)
