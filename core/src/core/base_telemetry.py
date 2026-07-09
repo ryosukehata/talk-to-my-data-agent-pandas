@@ -80,7 +80,9 @@ class OTLPConnectionErrorFilter(logging.Filter):
         # Suppress urllib3 connection errors related to OTLP endpoints
         if record.name.startswith("urllib3.connectionpool"):
             message = record.getMessage()
-            if "HTTPConnectionPool" in message and (
+            if (
+                "HTTPConnectionPool" in message or "HTTPSConnectionPool" in message
+            ) and (
                 ":4318" in message  # Default OTLP port
                 or "/v1/metrics" in message
                 or "/v1/traces" in message
@@ -91,8 +93,36 @@ class OTLPConnectionErrorFilter(logging.Filter):
         # Suppress requests connection errors related to OTLP
         if record.name.startswith("requests."):
             message = record.getMessage()
-            if "ConnectionError" in message and ":4318" in message:
+            if ("ConnectionError" in message or "Timeout" in message) and (
+                ":4318" in message
+                or "/v1/metrics" in message
+                or "/v1/traces" in message
+                or "/v1/logs" in message
+            ):
                 should_suppress = True
+
+        # Suppress opentelemetry SDK export errors caused by connection failures
+        if (
+            not should_suppress
+            and record.name.startswith("opentelemetry.sdk.")
+            and record.levelno == logging.ERROR
+        ):
+            if record.exc_info:
+                exc = record.exc_info[1]
+                while exc is not None:
+                    if type(exc).__name__ in (
+                        "ConnectionError",
+                        "ConnectTimeout",
+                        "NewConnectionError",
+                        "MaxRetryError",
+                        "ReadTimeout",
+                        "ReadTimeoutError",
+                        "Timeout",
+                        "TimeoutError",
+                    ):
+                        should_suppress = True
+                        break
+                    exc = exc.__cause__ or exc.__context__
 
         if should_suppress:
             if self.warning_callback:
@@ -171,6 +201,15 @@ class BaseTelemetry:
         requests_logger = logging.getLogger("requests")
         requests_logger.addFilter(otlp_filter)
 
+        # Apply to opentelemetry SDK export loggers
+        for sdk_logger_name in (
+            "opentelemetry.sdk._logs._internal.export",
+            "opentelemetry.sdk.trace.export",
+            "opentelemetry.sdk.metrics.export",
+            "opentelemetry.sdk.metrics._internal.export",
+        ):
+            logging.getLogger(sdk_logger_name).addFilter(otlp_filter)
+
     def _log_otlp_warning(self) -> None:
         """Log a warning about OTLP connection failure (only once)."""
         if not self._otlp_warning_logged:
@@ -180,7 +219,7 @@ class BaseTelemetry:
             logger.warning(
                 "OTLP collector connection failed. Telemetry data may be lost. "
                 "Suppressing further connection errors to prevent log spam. "
-                "Check OTLP_EXPORTER_OTLP_ENDPOINT configuration."
+                "Check OTEL_EXPORTER_OTLP_ENDPOINT configuration."
             )
 
     def configure_logging(self) -> LoggerProvider:

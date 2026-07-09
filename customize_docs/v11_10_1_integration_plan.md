@@ -26,6 +26,8 @@
 
 - upstream は database implementation 本体を `core.data_connections.database.database_implementations` に置くが、この fork は既存互換のため `core.database_helpers` を本体として残す。
 - `snowflake` / `sap` / `bigquery` / `datarobot_jdbc` は upstream `v11.10.1` に寄せ、`JDBC_URI` 必須の `JdbcPreviewOperator` 経路だけを使う。旧 Snowflake / BigQuery / SAP operator への fallback はこのブランチでは残さない。
+- JDBC Preview 経路では `JDBC_URI` の `schema=` をデフォルト schema として扱い、`/v1/database/schemas` と `schema` 指定付き `/v1/database/tables` を DataRobot JDBC Preview で取得する。選択 schema はテーブル一覧とデータ取得SQLの両方に反映する。
+- OTel exporter の一時的な `ReadTimeout` はアプリ機能の失敗ではないため、既存の OTLP 接続エラーフィルタで詳細スタックを抑制し、1回だけ警告する。
 - `app_backend` の古い `fsspec` / `pyarrow` direct pin は core 側の upstream 依存制約と衝突するため削除した。
 - `app_backend/uv.lock` と `infra/uv.lock` は conflict marker を手編集せず、対応する `pyproject.toml` から再生成した。
 
@@ -40,6 +42,8 @@
 - `task --list --sort none`: passed
 - `uv run ruff check core/src/core/database_helpers.py core/src/core/llm_client.py core/src/core/middleware.py core/src/core/telemetry app_backend/app/config.py app_backend/tests/test_llm_configuration.py app_backend/tests/test_v1182_compat.py infra/infra/app_backend.py infra/infra/components/dr_credential.py infra/configurations/llm/nim_deployed_llm.py`: passed
 - `uv run --project core pytest core/tests/test_v1182_core.py -q`: 16 passed
+- `uv run --project core pytest core/tests/test_v1182_core.py core/tests/test_metrics.py -q`: 23 passed
+- Snowflake JDBC Preview 実接続確認: schema 7件、`TPCH_SF1` の table 8件を取得
 
 補足:
 

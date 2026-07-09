@@ -126,6 +126,7 @@ celerybeat.pid
 
 # Environments
 .env
+pulumi_config.json
 .venv
 env/
 venv/

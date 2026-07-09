@@ -15,7 +15,7 @@ from core.schema import (
     RunAnalysisResult,
     RunAnalysisResultMetadata,
 )
-from core.telemetry.otel import OTel
+from core.telemetry.otel import OTel, OTLPConnectionErrorFilter
 
 
 @pytest.fixture(autouse=True)
@@ -185,3 +185,73 @@ def test_platform_database_types_require_jdbc_uri(
 
     with pytest.raises(ValueError, match="JDBC_URI"):
         get_database_operator(AppInfra(llm="llm", database=database))
+
+
+def test_jdbc_preview_get_schemas_uses_data_preview(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "JDBC_URI",
+        "jdbc:snowflake://account.snowflakecomputing.com/?db=ANALYTICS&schema=PUBLIC",
+    )
+    captured_sql: list[str] = []
+
+    class FakePreview:
+        @staticmethod
+        def preview(**kwargs: Any) -> Mock:
+            captured_sql.append(kwargs["sql"])
+            return Mock(records=[("PUBLIC",), {"SCHEMA_NAME": "SALES"}])
+
+    monkeypatch.setattr(
+        JdbcPreviewOperator, "_preview", staticmethod(lambda: FakePreview)
+    )
+
+    schemas = JdbcPreviewOperator(JDBCCredentials()).get_schemas()
+
+    assert schemas == ["PUBLIC", "SALES"]
+    assert "INFORMATION_SCHEMA.SCHEMATA" in captured_sql[0]
+
+
+@pytest.mark.asyncio
+async def test_jdbc_preview_selected_schema_filters_table_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "JDBC_URI",
+        "jdbc:snowflake://account.snowflakecomputing.com/?db=ANALYTICS&schema=PUBLIC",
+    )
+    captured_sql: list[str] = []
+
+    class FakePreview:
+        @staticmethod
+        def preview(**kwargs: Any) -> Mock:
+            captured_sql.append(kwargs["sql"])
+            return Mock(records=[("ORDERS",)])
+
+    monkeypatch.setattr(
+        JdbcPreviewOperator, "_preview", staticmethod(lambda: FakePreview)
+    )
+
+    operator = get_database_operator(
+        AppInfra(llm="llm", database="snowflake"), schema="SALES"
+    )
+
+    tables = await operator.get_tables()
+
+    assert tables == ["ORDERS"]
+    assert "TABLE_SCHEMA = 'SALES'" in captured_sql[0]
+
+
+def test_otlp_filter_suppresses_metrics_read_timeout() -> None:
+    warnings: list[str] = []
+    filter_ = OTLPConnectionErrorFilter(lambda: warnings.append("warned"))
+    exc = TimeoutError("The read operation timed out")
+    record = Mock(
+        name="opentelemetry.sdk.metrics._internal.export",
+        levelno=40,
+        exc_info=(TimeoutError, exc, None),
+    )
+    record.getMessage.return_value = "Exception while exporting metrics"
+
+    assert filter_.filter(record) is False
+    assert warnings == ["warned"]
