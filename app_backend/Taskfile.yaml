@@ -5,7 +5,6 @@ version: '3'
 # In Notebooks, drop PYTHONPATH to avoid dependency collisions
 env:
   CALCULATED_PYTHONPATH: "{{ if and .PYTHONPATH .NOTEBOOK_ID }}{{ else }}{{ .PYTHONPATH }}{{ end }}"
-  TEST_USER_EMAIL: "dev@example.com"
 
 tasks:
 

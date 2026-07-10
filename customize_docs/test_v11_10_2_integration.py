@@ -3,6 +3,8 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).parents[1]
 
 
@@ -81,3 +83,10 @@ def test_session_secret_runtime_parameter_is_declared_for_cli_and_infra() -> Non
     assert 'key="SESSION_SECRET_KEY"' in infra_source
     assert "datarobot.ApiTokenCredential" in infra_source
     assert "pulumi_datarobot.ApiTokenCredential" not in infra_source
+
+
+def test_test_user_email_is_scoped_to_dev_task_only() -> None:
+    taskfile = yaml.safe_load((REPO_ROOT / "app_backend" / "Taskfile.yaml").read_text())
+
+    assert "TEST_USER_EMAIL" not in taskfile.get("env", {})
+    assert taskfile["tasks"]["dev"]["env"]["TEST_USER_EMAIL"] == "dev@example.com"

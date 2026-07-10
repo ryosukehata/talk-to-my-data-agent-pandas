@@ -32,17 +32,24 @@
 - `app_backend/uv.lock` と `infra/uv.lock` は conflict marker を手編集せず、対応する `pyproject.toml` から再生成する。
 - root の `uv run pytest` は app_backend project ではなく root `requirements.txt` 由来の環境で app import するため、root requirements も同じ security/profiling 依存へ更新する。
 - `PyInstrumentMiddleware` は `PROFILING_ENABLED=true` かつ `profile=1` のリクエスト時だけ `pyinstrument` を要求する。通常起動や root test import では profiling 依存が未同期でも落ちないようにする。
+- `TEST_USER_EMAIL` は dev server 専用のローカル開発用値なので、Taskfile の top-level env には置かず `tasks.dev.env` に限定する。これにより `task test` や deployed instance の import path に `TEST_USER_EMAIL` が漏れない。
+- app factory tests は upstream の session middleware 初期化に必要な `SESSION_SECRET_KEY` を明示する。
+- LLM client の unit test は `Config()` を fake に差し替え、ローカルの `.env` / `pulumi_config.json` にある LLM runtime parameter が upstream default model の検証を上書きしないようにする。実装側は引き続き DataRobot settings fallback を尊重する。
 
 ## Tests
 
 実施済み:
 
-- `uv run pytest customize_docs/test_v11_10_2_integration.py -q`: 4 passed
+- `uv run pytest customize_docs/test_v11_10_2_integration.py -q`: 5 passed
 - `uv run --project core pytest core/tests/test_v1182_core.py -q`: 21 passed, 3 warnings
 - `uv run pytest app_backend/tests/test_v1151_fastapi_integration.py app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_v1182_compat.py app_backend/tests/test_upstream_compat_imports.py -q`: 37 passed
 - `uv run ruff check app_backend/app/__init__.py app_backend/app/config.py app_backend/app/profiling.py app_backend/tests/test_v1151_fastapi_integration.py app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_v1182_compat.py core/src/core/data_cleansing_helpers.py infra/infra/app_backend.py customize_docs/test_v11_10_2_integration.py`: passed
 - `npm --prefix app_frontend test -- src/api/database/api-requests.test.ts`: 1 file / 2 tests passed
 - `npm --prefix app_frontend run build`: passed
+- `uv run pytest app_backend/tests/test_llm_client.py::test_llm_client_config_uses_upstream_config_defaults app_backend/tests/test_llm_client.py::test_async_llm_client_deployed_llm_uses_config_default_model -q`: 2 passed
+- `uv run pytest customize_docs/test_v11_10_2_integration.py app_backend/tests/test_v1151_fastapi_app_factory.py app_backend/tests/test_v1151_fastapi_integration.py app_backend/tests/test_main.py app_backend/tests/test_v1150_compat.py -q`: 24 passed
+- `uv run ruff check app_backend/tests/test_llm_client.py app_backend/tests/test_v1151_fastapi_app_factory.py customize_docs/test_v11_10_2_integration.py`: passed
+- `task --dir app_backend test`: 160 passed, 1 warning
 
 補足:
 
@@ -50,3 +57,4 @@
 - 初回 backend test で root 環境に `pyinstrument` が未同期だったため `app.profiling` import が失敗した。原因は root `uv run pytest` と app_backend project lock の依存境界差分。`requirements.txt` と `customize_docs/test_v11_10_2_integration.py` に回帰確認を追加し、profiling middleware は optional import にした。
 - backend config test はローカル `.env` / DataRobot settings 由来の OTel endpoint/header 補完を受けたため、`otel_sdk_disabled=""` の coercion 確認に必要な OTel fields を明示的に空へ固定した。
 - `npm --prefix app_frontend run build` は既存の Browserslist stale data と大きい chunk warning を出したが、終了コードは 0。
+- CI failure 調査では、`TEST_USER_EMAIL` が `task test` にも漏れて deployed instance guard に引っかかったこと、app factory tests が `SESSION_SECRET_KEY` を設定していなかったことを確認した。ローカル full backend test では追加で `pulumi_config.json` の LLM fallback による unit test 非決定性も検出し、test isolation を追加した。
