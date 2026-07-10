@@ -77,12 +77,19 @@ def test_app_backend_targets_python_312_runtime() -> None:
 def test_session_secret_runtime_parameter_is_declared_for_cli_and_infra() -> None:
     cli_config = (REPO_ROOT / ".datarobot" / "cli" / "app_backend.yaml").read_text()
     infra_source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
+    pulumi_workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "pulumi-up.yml").read_text()
+    )
 
     assert "env: SESSION_SECRET_KEY" in cli_config
     assert "generate: true" in cli_config
     assert 'key="SESSION_SECRET_KEY"' in infra_source
     assert "datarobot.ApiTokenCredential" in infra_source
     assert "pulumi_datarobot.ApiTokenCredential" not in infra_source
+    assert (
+        pulumi_workflow["jobs"]["update"]["env"]["SESSION_SECRET_KEY"]
+        == "${{ secrets.SESSION_SECRET_KEY }}"
+    )
 
 
 def test_test_user_email_is_scoped_to_dev_task_only() -> None:
