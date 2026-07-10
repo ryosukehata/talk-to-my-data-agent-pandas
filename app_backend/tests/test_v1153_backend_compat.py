@@ -39,7 +39,7 @@ def test_default_log_format_is_readable(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.delenv("LOG_FORMAT", raising=False)
     monkeypatch.delenv("MLOPS_RUNTIME_PARAM_LOG_FORMAT", raising=False)
 
-    assert Config().log_format == "readable"
+    assert Config(session_secret_key="test-secret-key").log_format == "readable"
 
 
 def test_readable_log_formatter_keeps_extra_fields() -> None:

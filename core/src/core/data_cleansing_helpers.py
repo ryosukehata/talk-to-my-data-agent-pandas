@@ -61,10 +61,11 @@ def try_simple_numeric_conversion(
 
     # 新しいnull値の数をカウント
     new_nulls = numeric_simple.isna()
-    original_nulls_count = original_nulls.sum()
+    new_null_count = float(new_nulls.sum() or 0)
+    original_null_count = float(original_nulls.sum() or 0)
 
     # 成功率の計算
-    simple_success_rate = 1 - (new_nulls.sum() - original_nulls_count) / len(
+    simple_success_rate = 1 - (new_null_count - original_null_count) / len(
         sample_series
     )
 
@@ -212,7 +213,9 @@ def try_unit_conversion(
 
     # 変換成功率の計算
     new_nulls = sample_result.isna()
-    conversion_success_rate = 1 - (new_nulls.sum() - original_nulls.sum()) / len(
+    new_null_count = float(new_nulls.sum() or 0)
+    original_null_count = float(original_nulls.sum() or 0)
+    conversion_success_rate = 1 - (new_null_count - original_null_count) / len(
         sample_result
     )
 
