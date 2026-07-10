@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.10.1] - 2026-07-02
+
+### Added
+
+- DataRobot user ID on OTel LLM spans.
+
+### Changed
+
+- Improved dr xp error messaging.
+
+## [11.10.0] - 2026-06-30
+
+### Added
+
+- Added OTel chat metrics for improved observability.
+- Added local OTel tracing support.
+- Added edit icon for editable cells in the UI.
+- Show which datasets the LLM used per answer.
+
+### Changed
+
+- External database connections (PostgreSQL, MySQL, SQL Server, Snowflake, SAP Datasphere, BigQuery) now route through the JDBC Preview API (`JdbcPreviewOperator`).
+
+### Fixed
+
+- Fixed persistent storage pagination, timeout, and OTel initialization issues.
+
+### Removed
+
+- Removed native `BigQueryOperator`, `GoogleCredentialsBQ`, and `google-cloud-bigquery`/`google-auth` dependencies.
+- BigQuery-specific env vars (`GOOGLE_SERVICE_ACCOUNT_BQ`, `GOOGLE_REGION_BQ`, `GOOGLE_DB_SCHEMA_BQ`) replaced by `JDBC_URI` and `JDBC_CONNECTION_PARAMETERS`.
+
+## [11.8.2] - 2026-06-04
+
+### Fixed
+
+- Fixed CLI scripts (e.g. `task core:transfer-database`) hanging on custom applications with >100 KeyValues due to three interacting bugs: OTel httpx auto-instrumentation running even with telemetry disabled, missing explicit httpx timeout, and pagination duplicating query parameters on follow-up pages.
+
+## [11.7.2] - 2026-04-27
+
+### Changed
+
+- Updated the README’s “Connecting to Data Stores in the DataRobot Platform” section by adding an explicit Supported remote data connections list.
+- Added explicit Field(description=...) guidance on ConversationSummary.summary and EnhancedQuestionGeneration.enhanced_user_message to discourage smaller LLMs from returning JSON/markdown or other structured formatting.
+- Improved LLM dictionary-generation failures processing.
+
+## [11.7.1] - 2026-04-20
+
+### Changed
+
+- Added GenAI semantic attributes to LLM telemetry calls for improved observability.
+- Excluded specific routes and span names from tracing to reduce telemetry noise.
+
+### Fixed
+
+- Localization corrections across es_419, fr, ja, ko, and pt_BR locales (API key success/error messaging, terminology alignment, trailing whitespace).
+
+## [11.7.0] - 2026-04-08
+
+### Changed
+
+- Add support for using custom pre-built application execution environments.
+
+### Fixed
+
+- Updated post-setup message to recommend `task deploy` instead of `task deploy-dev`.
+
+### Added
+
+- Added feedback to UI (thumbs up, thumbs down and written feedback) for assistant messages.
+- Added a script (`task core:transfer-database`) to copy history from one instance of the application to another.
+
 ## [11.6.2] - 2026-03-26
 
 ### Fixed

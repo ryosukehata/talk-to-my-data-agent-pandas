@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextvars
+
 from .logging import (
     FormatType,
     JsonFormatter,
@@ -20,8 +22,13 @@ from .logging import (
     TextFormatter,
     init_logging,
 )
+from .metrics import track_chat_request
 from .otel import OTel, otel
 from .uvicorn_filter import configure_uvicorn_logging
+
+dr_user_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "dr_user_id", default=None
+)
 
 __all__ = [
     "FormatType",
@@ -31,6 +38,8 @@ __all__ = [
     "ReadableFormatter",
     "TextFormatter",
     "configure_uvicorn_logging",
+    "dr_user_id_var",
     "init_logging",
     "otel",
+    "track_chat_request",
 ]

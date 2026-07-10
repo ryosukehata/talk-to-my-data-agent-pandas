@@ -15,7 +15,7 @@ from core.schema import (
     RunAnalysisResult,
     RunAnalysisResultMetadata,
 )
-from core.telemetry.otel import OTel
+from core.telemetry.otel import OTel, OTLPConnectionErrorFilter
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +30,9 @@ def reset_otel_singleton() -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_datarobot_client_uses_timeout_and_does_not_reapply_params() -> None:
+async def test_async_datarobot_client_uses_timeout_and_does_not_reapply_params() -> (
+    None
+):
     with patch("httpx.AsyncClient", autospec=httpx.AsyncClient) as async_client:
         async_client.return_value = async_client
 
@@ -53,9 +55,7 @@ async def test_async_datarobot_client_uses_timeout_and_does_not_reapply_params()
         client = AsyncDataRobotClient(token="token", endpoint="https://example.test")
         values = [
             value
-            async for value in client.unpaginate(
-                "keyValues/", {"entityId": "app-id"}
-            )
+            async for value in client.unpaginate("keyValues/", {"entityId": "app-id"})
         ]
 
     assert values == [{"id": 1}, {"id": 2}]
@@ -63,7 +63,9 @@ async def test_async_datarobot_client_uses_timeout_and_does_not_reapply_params()
     assert isinstance(kwargs["timeout"], httpx.Timeout)
 
 
-def test_otel_does_not_auto_instrument_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_otel_does_not_auto_instrument_when_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("DISABLE_TELEMETRY", "true")
 
     with patch.object(OTel, "_setup_auto_instrumentation") as setup_auto:
@@ -87,16 +89,21 @@ def test_code_generation_and_result_expose_used_datasets() -> None:
 
     assert completion.used_datasets == ["sales"]
     assert result.used_datasets == ["sales"]
-    assert CodeGeneration(
-        code="x = 1", description="analysis", used_datasets="sales"
-    ).used_datasets == []
+    assert (
+        CodeGeneration(
+            code="x = 1", description="analysis", used_datasets="sales"
+        ).used_datasets
+        == []
+    )
 
 
 def test_database_connection_type_includes_datarobot_jdbc() -> None:
     assert "datarobot_jdbc" in DatabaseConnectionType.__args__
 
 
-def test_jdbc_credentials_validate_supported_uri(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_jdbc_credentials_validate_supported_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("JDBC_URI", "jdbc:postgresql://example.test:5432/db")
     monkeypatch.setenv(
         "JDBC_CONNECTION_PARAMETERS", '{"user": "dbuser", "password": "secret"}'
@@ -115,6 +122,22 @@ def test_jdbc_credentials_validate_supported_uri(monkeypatch: pytest.MonkeyPatch
         JDBCCredentials()
 
 
+@pytest.mark.parametrize(
+    "jdbc_uri",
+    [
+        "jdbc:snowflake://account.snowflakecomputing.com/",
+        "jdbc:sap://host:443",
+        "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443",
+    ],
+)
+def test_jdbc_credentials_validate_platform_jdbc_uris(
+    monkeypatch: pytest.MonkeyPatch, jdbc_uri: str
+) -> None:
+    monkeypatch.setenv("JDBC_URI", jdbc_uri)
+
+    assert JDBCCredentials().jdbc_uri == jdbc_uri
+
+
 def test_get_database_operator_returns_jdbc_preview_operator(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -124,3 +147,173 @@ def test_get_database_operator_returns_jdbc_preview_operator(
 
     assert isinstance(operator, JdbcPreviewOperator)
     assert operator.query_friendly_name("sales") == "`sales`"
+
+
+def test_jdbc_preview_query_name_supports_schema_prefixed_dataset_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "JDBC_URI",
+        "jdbc:snowflake://account.snowflakecomputing.com/?db=ANALYTICS&schema=PUBLIC",
+    )
+
+    operator = get_database_operator(
+        AppInfra(llm="llm", database="snowflake"), schema="SALES"
+    )
+
+    assert operator.query_friendly_name("SALES-orders") == '"SALES"."orders"'
+    assert operator.query_friendly_name("SALES.orders") == '"SALES"."orders"'
+
+
+@pytest.mark.parametrize(
+    ("database", "jdbc_uri", "quoted_name"),
+    [
+        ("snowflake", "jdbc:snowflake://account.snowflakecomputing.com/", '"sales"'),
+        ("sap", "jdbc:sap://host:443", '"sales"'),
+        (
+            "bigquery",
+            "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443",
+            "`sales`",
+        ),
+    ],
+)
+def test_platform_database_types_use_jdbc_preview_operator(
+    monkeypatch: pytest.MonkeyPatch,
+    database: str,
+    jdbc_uri: str,
+    quoted_name: str,
+) -> None:
+    monkeypatch.setenv("JDBC_URI", jdbc_uri)
+
+    operator = get_database_operator(AppInfra(llm="llm", database=database))
+
+    assert isinstance(operator, JdbcPreviewOperator)
+    assert operator.query_friendly_name("sales") == quoted_name
+
+
+@pytest.mark.parametrize("database", ["snowflake", "sap", "bigquery", "datarobot_jdbc"])
+def test_platform_database_types_require_jdbc_uri(
+    monkeypatch: pytest.MonkeyPatch,
+    database: str,
+) -> None:
+    monkeypatch.delenv("JDBC_URI", raising=False)
+    monkeypatch.delenv("JDBC_CONNECTION_PARAMETERS", raising=False)
+
+    with pytest.raises(ValueError, match="JDBC_URI"):
+        get_database_operator(AppInfra(llm="llm", database=database))
+
+
+def test_jdbc_preview_get_schemas_uses_data_preview(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "JDBC_URI",
+        "jdbc:snowflake://account.snowflakecomputing.com/?db=ANALYTICS&schema=PUBLIC",
+    )
+    captured_sql: list[str] = []
+
+    class FakePreview:
+        @staticmethod
+        def preview(**kwargs: Any) -> Mock:
+            captured_sql.append(kwargs["sql"])
+            return Mock(records=[("PUBLIC",), {"SCHEMA_NAME": "SALES"}])
+
+    monkeypatch.setattr(
+        JdbcPreviewOperator, "_preview", staticmethod(lambda: FakePreview)
+    )
+
+    schemas = JdbcPreviewOperator(JDBCCredentials()).get_schemas()
+
+    assert schemas == ["PUBLIC", "SALES"]
+    assert "INFORMATION_SCHEMA.SCHEMATA" in captured_sql[0]
+
+
+@pytest.mark.asyncio
+async def test_jdbc_preview_selected_schema_filters_table_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "JDBC_URI",
+        "jdbc:snowflake://account.snowflakecomputing.com/?db=ANALYTICS&schema=PUBLIC",
+    )
+    captured_sql: list[str] = []
+
+    class FakePreview:
+        @staticmethod
+        def preview(**kwargs: Any) -> Mock:
+            captured_sql.append(kwargs["sql"])
+            return Mock(records=[("ORDERS",)])
+
+    monkeypatch.setattr(
+        JdbcPreviewOperator, "_preview", staticmethod(lambda: FakePreview)
+    )
+
+    operator = get_database_operator(
+        AppInfra(llm="llm", database="snowflake"), schema="SALES"
+    )
+
+    tables = await operator.get_tables()
+
+    assert tables == ["ORDERS"]
+    assert "TABLE_SCHEMA = 'SALES'" in captured_sql[0]
+
+
+@pytest.mark.asyncio
+async def test_jdbc_preview_registers_schema_prefixed_display_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "JDBC_URI",
+        "jdbc:snowflake://account.snowflakecomputing.com/?db=ANALYTICS&schema=PUBLIC",
+    )
+    captured_sql: list[str] = []
+    registered: list[dict[str, Any]] = []
+
+    class FakePreview:
+        @staticmethod
+        def preview(**kwargs: Any) -> Mock:
+            captured_sql.append(kwargs["sql"])
+            return Mock(
+                records=[(1,)],
+                result_schema=[{"name": "ORDER_ID", "data_type": "NUMBER"}],
+            )
+
+    class FakeAnalystDB:
+        async def register_dataset(
+            self, dataset: Any, data_source: Any, **kwargs: Any
+        ) -> dict[str, Any]:
+            registered.append(
+                {"dataset": dataset, "data_source": data_source, **kwargs}
+            )
+            return {"success": True, "msg": ""}
+
+    monkeypatch.setattr(
+        JdbcPreviewOperator, "_preview", staticmethod(lambda: FakePreview)
+    )
+
+    operator = get_database_operator(
+        AppInfra(llm="llm", database="snowflake"), schema="SALES"
+    )
+
+    names = await operator.get_data("ORDERS", analyst_db=FakeAnalystDB())
+
+    assert names == ["SALES-ORDERS"]
+    assert captured_sql[0] == 'SELECT * FROM "SALES"."ORDERS"'
+    assert registered[0]["dataset"].name == "SALES-ORDERS"
+    assert registered[0]["external_id"] == "SALES.ORDERS"
+    assert registered[0]["clobber"] is True
+
+
+def test_otlp_filter_suppresses_metrics_read_timeout() -> None:
+    warnings: list[str] = []
+    filter_ = OTLPConnectionErrorFilter(lambda: warnings.append("warned"))
+    exc = TimeoutError("The read operation timed out")
+    record = Mock(
+        name="opentelemetry.sdk.metrics._internal.export",
+        levelno=40,
+        exc_info=(TimeoutError, exc, None),
+    )
+    record.getMessage.return_value = "Exception while exporting metrics"
+
+    assert filter_.filter(record) is False
+    assert warnings == ["warned"]

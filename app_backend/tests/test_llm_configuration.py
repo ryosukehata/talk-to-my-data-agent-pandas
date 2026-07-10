@@ -43,8 +43,25 @@ def test_llm_configuration_modules_match_upstream_runtime_contracts() -> None:
                 "LLM_DEFAULT_MODEL",
                 "LLM_DEFAULT_MODEL_FRIENDLY_NAME",
                 "USE_BUILDER_API_TOKEN",
+                "USE_DATAROBOT_LLM_GATEWAY",
             },
-            "custom": {"LLM_DEPLOYMENT_ID", "LLM_DEFAULT_MODEL"},
+            "custom": {
+                "LLM_DEPLOYMENT_ID",
+                "LLM_DEFAULT_MODEL",
+                "USE_DATAROBOT_LLM_GATEWAY",
+            },
+        },
+        "nim_deployed_llm": {
+            "app": {
+                "LLM_NIM_DEPLOYMENT_ID",
+                "LLM_DEFAULT_MODEL",
+                "USE_DATAROBOT_LLM_GATEWAY",
+            },
+            "custom": {
+                "LLM_NIM_DEPLOYMENT_ID",
+                "LLM_DEFAULT_MODEL",
+                "USE_DATAROBOT_LLM_GATEWAY",
+            },
         },
         "registered_model": {
             "app": {
@@ -68,7 +85,7 @@ def test_llm_configuration_modules_match_upstream_runtime_contracts() -> None:
             "app": {
                 "LLM_DEPLOYMENT_ID",
                 "LLM_DEFAULT_MODEL",
-                "LLM_default_llm_friendly_name",
+                "LLM_DEFAULT_MODEL_FRIENDLY_NAME",
                 "USE_BUILDER_API_TOKEN",
             },
             "custom": {"LLM_DEPLOYMENT_ID", "LLM_DEFAULT_MODEL"},
@@ -112,6 +129,7 @@ def test_datarobot_cli_llm_yaml_exposes_upstream_configuration_choices() -> None
     assert {
         "gateway_direct.py",
         "deployed_llm.py",
+        "nim_deployed_llm.py",
         "registered_model.py",
         "blueprint_with_llm_gateway.py",
         "blueprint_with_external_llm.py",

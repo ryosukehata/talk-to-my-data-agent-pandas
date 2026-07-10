@@ -24,6 +24,7 @@ from core.analyst_db import AnalystDB, InternalDataSourceType
 from core.data_connections.database.database_implementations import (
     get_external_database,
 )
+from core.database_helpers import database_dataset_display_name, database_source_name
 from core.deps import get_initialized_db
 from core.schema import AnalystDataset, LoadDatabaseRequest
 
@@ -58,9 +59,10 @@ async def get_and_process_tables(
 
 
 @router.get("/tables")
-async def get_database_tables() -> list[str]:
+async def get_database_tables(schema: str | None = None) -> dict[str, str]:
     """Get list of all available database tables."""
-    return await get_external_database().get_tables()
+    tables = await get_external_database(schema=schema).get_tables()
+    return {table: table for table in tables}
 
 
 @router.post("/select")
@@ -71,10 +73,18 @@ async def load_from_database(
     sample_size: int = 1_000,
 ) -> list[str]:
     """Load data from selected database tables."""
+    registered_names = [
+        database_dataset_display_name(table, data.schema_name)
+        for table in data.table_names
+    ]
     await asyncio.gather(
         *[
             analyst_db.register_dataset(
-                AnalystDataset(name=table), InternalDataSourceType.DATABASE
+                AnalystDataset(
+                    name=database_dataset_display_name(table, data.schema_name)
+                ),
+                InternalDataSourceType.DATABASE,
+                external_id=database_source_name(table, data.schema_name),
             )
             for table in data.table_names
         ]
@@ -89,4 +99,4 @@ async def load_from_database(
             data.schema_name,
         )
 
-    return data.table_names
+    return registered_names

@@ -293,7 +293,14 @@ class NoDatabaseCredentials(DRCredentials):
     pass
 
 
-_VALID_JDBC_PREFIXES = ("jdbc:postgresql://", "jdbc:mysql://", "jdbc:sqlserver://")
+_VALID_JDBC_PREFIXES = (
+    "jdbc:postgresql://",
+    "jdbc:mysql://",
+    "jdbc:sqlserver://",
+    "jdbc:snowflake://",
+    "jdbc:sap://",
+    "jdbc:bigquery://",
+)
 
 
 class JDBCCredentials(DRCredentials):
@@ -320,3 +327,6 @@ class JDBCCredentials(DRCredentials):
             supported = ", ".join(_VALID_JDBC_PREFIXES)
             raise ValueError(f"Unsupported JDBC URI. Supported prefixes: {supported}")
         return value
+
+    def __repr__(self) -> str:
+        return "JDBCCredentials(jdbc_uri='***', jdbc_connection_parameters=***)"

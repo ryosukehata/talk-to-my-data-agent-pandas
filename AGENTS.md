@@ -1,7 +1,11 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `app_backend/` houses the FastAPI service, domain logic under `utils/customize/`, and infrastructure adapters.
+- `app_backend/` houses the thin FastAPI service; shared runtime and domain
+  logic live under `core/src/core/`, with customization use cases under
+  `core/src/core/customize/`.
+- `utils/` is a legacy compatibility package that aliases `core.*`; do not add
+  new implementation there.
 - `app_frontend/` contains the React UI; legacy Streamlit lives in `frontend/`.
 - Specs and customization docs reside in `customize_docs/`; data samples and notebooks live in `datasets_*/` and `notebooks/`.
 - Tests mirror modules: backend tests in `app_backend/tests/`; add new suites alongside the code they verify.
@@ -33,7 +37,8 @@
 - When touching storage or networking code, review `infra/` Pulumi stacks and update IAM policies or routes in tandem.
 
 ## エージェント向け追加指示
-- 可能な限り `utils/customize/` ディレクトリ配下のみを操作してください。
+- 可能な限り `core/src/core/customize/` ディレクトリ配下のみを操作してください。
+  `utils/customize/` は旧 import 互換 shim として扱い、実装本体を追加しないでください。
 - 変更内容や仕様、進行状況は、customize_docs以下のmdに機能ごとに書いて欲しい。
 - 日本語で返答してほしい。
-- `utils/customize/`以下にクリーンアーキテクチャーに則って実装しているので、それを参考にして欲しい。
+- `core/src/core/customize/` 以下にクリーンアーキテクチャーに則って実装しているので、それを参考にして欲しい。

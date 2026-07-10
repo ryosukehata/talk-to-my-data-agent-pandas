@@ -25,7 +25,6 @@ from typing import Sequence, cast
 import pulumi
 import pulumi_datarobot as datarobot
 from configurations.jobs.custom_jobs import create_optional_job_resources
-from core.credentials import SnowflakeCredentials
 from core.customize.csv_validator import (
     validate_prompt_template_csv,
     validate_schema_table_description_csv,
@@ -205,15 +204,6 @@ def get_app_backend_app_files(
     source_files.append(
         ((app_backend_application_path / "metadata.yaml").as_posix(), "metadata.yaml")
     )
-
-    if DATABASE_CONNECTION_TYPE == "snowflake":
-        credentials = SnowflakeCredentials()
-        if credentials.snowflake_key_path:
-            snowflake_file = project_root / credentials.snowflake_key_path
-            if snowflake_file.is_file():
-                source_files.append(
-                    (str(snowflake_file), credentials.snowflake_key_path)
-                )
 
     source_files = [
         (file_path, file_name)
