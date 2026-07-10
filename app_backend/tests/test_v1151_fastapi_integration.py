@@ -10,6 +10,7 @@ def _set_required_import_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATAROBOT_API_TOKEN", "test-token")
     monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://example.com")
     monkeypatch.setenv("OTEL_SDK_DISABLED", "true")
+    monkeypatch.setenv("SESSION_SECRET_KEY", "test-secret-key")
 
 
 def test_backend_app_exposes_health_endpoint(
@@ -35,7 +36,7 @@ def test_backend_app_lifespan_initializes_deps(
     from app.config import Config
     from app.deps import Deps
 
-    deps = Deps(config=Config(log_format="text"))
+    deps = Deps(config=Config(log_format="text", session_secret_key="test-secret-key"))
 
     with TestClient(create_app(deps=deps)) as client:
         assert client.app.state.deps is deps
