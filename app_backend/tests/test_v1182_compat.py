@@ -29,8 +29,9 @@ def test_datarobot_sdk_constraint_matches_v1182_requirement() -> None:
         REPO_ROOT / "app_backend" / "pyproject.toml",
         REPO_ROOT / "infra" / "pyproject.toml",
     ):
-        assert "datarobot" in path.read_text()
-        assert ">=3.13.0" in path.read_text()
+        text = path.read_text()
+        assert "datarobot" in text
+        assert ">=3.13.0" in text or ">=3.16.0" in text
 
 
 def test_env_template_documents_otel_and_jdbc_configuration() -> None:

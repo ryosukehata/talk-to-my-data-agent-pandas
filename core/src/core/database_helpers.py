@@ -23,6 +23,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Generator, Generic, TypeVar, cast
+from urllib.parse import parse_qsl, urlsplit
 
 import pandas as pd
 import snowflake.connector
@@ -62,6 +63,39 @@ logger = get_logger("DatabaseHelper")
 
 T = TypeVar("T")
 _DEFAULT_DB_QUERY_TIMEOUT = 300
+_DATABASE_DATASET_NAME_SEPARATOR = "-"
+
+
+def database_dataset_display_name(table_name: str, schema_name: str | None) -> str:
+    """Return the dataset name shown in the app for a database table."""
+    schema_name, table_name = database_source_parts(table_name, schema_name)
+    if schema_name:
+        return f"{schema_name}{_DATABASE_DATASET_NAME_SEPARATOR}{table_name}"
+    return table_name
+
+
+def database_source_name(table_name: str, schema_name: str | None) -> str:
+    """Return a stable source identifier for a database table."""
+    schema_name, table_name = database_source_parts(table_name, schema_name)
+    if schema_name:
+        return f"{schema_name}.{table_name}"
+    return table_name
+
+
+def database_source_parts(
+    source_name: str, default_schema: str | None = None
+) -> tuple[str | None, str]:
+    """Split a database source/display name into schema and table parts."""
+    if "." in source_name:
+        schema_name, table_name = source_name.rsplit(".", 1)
+        return schema_name or default_schema, table_name
+
+    if default_schema:
+        display_prefix = f"{default_schema}{_DATABASE_DATASET_NAME_SEPARATOR}"
+        if source_name.startswith(display_prefix):
+            return default_schema, source_name[len(display_prefix) :]
+
+    return default_schema, source_name
 
 
 @dataclass
@@ -855,12 +889,34 @@ _JDBC_TABLE_DISCOVERY_SQL: dict[str, str] = {
         FROM INFORMATION_SCHEMA.TABLES
         WHERE TABLE_TYPE = 'BASE TABLE'
     """,
+    "snowflake": """
+        SELECT TABLE_NAME
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = CURRENT_SCHEMA()
+          AND TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+        ORDER BY TABLE_TYPE, TABLE_NAME
+    """,
+    "sap": """
+        SELECT TABLE_NAME FROM SYS.TABLES WHERE SCHEMA_NAME = CURRENT_SCHEMA
+        UNION ALL
+        SELECT VIEW_NAME FROM SYS.VIEWS WHERE SCHEMA_NAME = CURRENT_SCHEMA
+        ORDER BY TABLE_NAME
+    """,
+    "bigquery": """
+        SELECT table_name
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE table_type IN ('BASE TABLE', 'VIEW')
+        ORDER BY table_name
+    """,
 }
 
 _JDBC_DIALECT_NAMES = {
     "postgresql": "PostgreSQL",
     "mysql": "MySQL",
     "sqlserver": "SQL Server",
+    "snowflake": "Snowflake",
+    "sap": "SAP Datasphere",
+    "bigquery": "BigQuery",
 }
 
 
@@ -869,9 +925,12 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
         self,
         credentials: JDBCCredentials,
         default_timeout: int = _DEFAULT_DB_QUERY_TIMEOUT,
+        schema: str | None = None,
     ):
         self._credentials = credentials
         self.default_timeout = default_timeout
+        self.default_schema = self._default_schema_from_uri()
+        self._selected_schema = schema or self.default_schema
 
     @property
     def _dialect_key(self) -> str:
@@ -882,6 +941,12 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
             return "mysql"
         if uri.startswith("jdbc:sqlserver://"):
             return "sqlserver"
+        if uri.startswith("jdbc:snowflake://"):
+            return "snowflake"
+        if uri.startswith("jdbc:sap://"):
+            return "sap"
+        if uri.startswith("jdbc:bigquery://"):
+            return "bigquery"
         raise ValueError(f"Unsupported JDBC URI scheme: {uri.split(':')[1]!r}")
 
     def _dialect_name(self) -> str:
@@ -895,8 +960,164 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
                 return f"`{name}`"
             case "sqlserver":
                 return f"[{name}]"
+            case "snowflake" | "sap":
+                return f'"{name}"'
+            case "bigquery":
+                return f"`{name}`"
             case _:
                 raise ValueError(f"Unsupported dialect: {self._dialect_key!r}")
+
+    @staticmethod
+    def _sql_literal(value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
+
+    @staticmethod
+    def _first_record_value(row: Any) -> Any:
+        if isinstance(row, dict):
+            return next(iter(row.values()))
+        if isinstance(row, (tuple, list)):
+            return row[0]
+        return row
+
+    def _jdbc_uri_query_params(self) -> dict[str, str]:
+        parsed = urlsplit(self._credentials.jdbc_uri.removeprefix("jdbc:"))
+        return {
+            key.lower(): value
+            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        }
+
+    def _default_schema_from_uri(self) -> str | None:
+        query_params = self._jdbc_uri_query_params()
+        for key in ("schema", "dbschema", "currentschema", "defaultschema"):
+            if schema := query_params.get(key):
+                return schema
+        return None
+
+    def _schema_discovery_sql(self) -> str:
+        match self._dialect_key:
+            case "postgresql":
+                return """
+                    SELECT schema_name
+                    FROM information_schema.schemata
+                    WHERE schema_name NOT IN ('pg_catalog', 'information_schema')
+                    ORDER BY schema_name
+                """
+            case "mysql":
+                return """
+                    SELECT SCHEMA_NAME
+                    FROM INFORMATION_SCHEMA.SCHEMATA
+                    ORDER BY SCHEMA_NAME
+                """
+            case "sqlserver":
+                return """
+                    SELECT name
+                    FROM sys.schemas
+                    ORDER BY name
+                """
+            case "snowflake":
+                return """
+                    SELECT SCHEMA_NAME
+                    FROM INFORMATION_SCHEMA.SCHEMATA
+                    ORDER BY SCHEMA_NAME
+                """
+            case "sap":
+                return """
+                    SELECT SCHEMA_NAME
+                    FROM SYS.SCHEMAS
+                    ORDER BY SCHEMA_NAME
+                """
+            case "bigquery":
+                return """
+                    SELECT schema_name
+                    FROM INFORMATION_SCHEMA.SCHEMATA
+                    ORDER BY schema_name
+                """
+            case _:
+                raise ValueError(f"Unsupported dialect: {self._dialect_key!r}")
+
+    def _table_discovery_sql(self) -> str:
+        selected_schema = self._selected_schema
+        match self._dialect_key:
+            case "postgresql":
+                schema = selected_schema or "public"
+                return f"""
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE table_schema = {self._sql_literal(schema)}
+                      AND table_type = 'BASE TABLE'
+                    ORDER BY table_name
+                """
+            case "mysql":
+                schema_filter = (
+                    f"table_schema = {self._sql_literal(selected_schema)}"
+                    if selected_schema
+                    else "table_schema = DATABASE()"
+                )
+                return f"""
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE {schema_filter}
+                      AND table_type = 'BASE TABLE'
+                    ORDER BY table_name
+                """
+            case "sqlserver":
+                schema_filter = (
+                    f"TABLE_SCHEMA = {self._sql_literal(selected_schema)} AND"
+                    if selected_schema
+                    else ""
+                )
+                return f"""
+                    SELECT TABLE_NAME
+                    FROM INFORMATION_SCHEMA.TABLES
+                    WHERE {schema_filter} TABLE_TYPE = 'BASE TABLE'
+                    ORDER BY TABLE_NAME
+                """
+            case "snowflake":
+                schema_filter = (
+                    f"TABLE_SCHEMA = {self._sql_literal(selected_schema)}"
+                    if selected_schema
+                    else "TABLE_SCHEMA = CURRENT_SCHEMA()"
+                )
+                return f"""
+                    SELECT TABLE_NAME
+                    FROM INFORMATION_SCHEMA.TABLES
+                    WHERE {schema_filter}
+                      AND TABLE_TYPE IN ('BASE TABLE', 'VIEW')
+                    ORDER BY TABLE_TYPE, TABLE_NAME
+                """
+            case "sap":
+                schema_filter = (
+                    f"{self._sql_literal(selected_schema)}"
+                    if selected_schema
+                    else "CURRENT_SCHEMA"
+                )
+                return f"""
+                    SELECT TABLE_NAME FROM SYS.TABLES WHERE SCHEMA_NAME = {schema_filter}
+                    UNION ALL
+                    SELECT VIEW_NAME FROM SYS.VIEWS WHERE SCHEMA_NAME = {schema_filter}
+                    ORDER BY TABLE_NAME
+                """
+            case "bigquery":
+                information_schema = (
+                    f"{self._quote_identifier(selected_schema)}.INFORMATION_SCHEMA.TABLES"
+                    if selected_schema
+                    else "INFORMATION_SCHEMA.TABLES"
+                )
+                return f"""
+                    SELECT table_name
+                    FROM {information_schema}
+                    WHERE table_type IN ('BASE TABLE', 'VIEW')
+                    ORDER BY table_name
+                """
+            case _:
+                raise ValueError(f"Unsupported dialect: {self._dialect_key!r}")
+
+    def _qualified_table_name(self, table: str) -> str:
+        schema_name, table_name = database_source_parts(table, self._selected_schema)
+        quoted_table = self._quote_identifier(table_name)
+        if not schema_name:
+            return quoted_table
+        return f"{self._quote_identifier(schema_name)}.{quoted_table}"
 
     @staticmethod
     def _preview() -> Any:
@@ -981,15 +1202,12 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
                 None,
                 lambda: self._preview().preview(
                     jdbc_url=self._credentials.jdbc_uri,
-                    sql=_JDBC_TABLE_DISCOVERY_SQL[self._dialect_key],
+                    sql=self._table_discovery_sql(),
                     max_rows=10_000,
                     parameters=self._parameters(),
                 ),
             )
-            tables = [
-                row[0] if not isinstance(row, dict) else next(iter(row.values()))
-                for row in result.records
-            ]
+            tables = [self._first_record_value(row) for row in result.records]
             logger.info("JDBC (%s): found %d tables", self._dialect_name(), len(tables))
             return [str(table) for table in tables]
         except Exception:
@@ -998,7 +1216,27 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
 
     def get_schemas(self, timeout: int | None = None) -> list[str]:
         del timeout
-        return []
+        try:
+            result = self._preview().preview(
+                jdbc_url=self._credentials.jdbc_uri,
+                sql=self._schema_discovery_sql(),
+                max_rows=10_000,
+                parameters=self._parameters(),
+            )
+            schemas = [
+                str(schema)
+                for row in result.records
+                if (schema := self._first_record_value(row))
+            ]
+            logger.info(
+                "JDBC (%s): found %d schemas",
+                self._dialect_name(),
+                len(schemas),
+            )
+            return schemas
+        except Exception:
+            logger.error("JDBC: failed to fetch schemas", exc_info=True)
+            return [self.default_schema] if self.default_schema else []
 
     @functools.lru_cache(maxsize=8)
     async def get_data(
@@ -1017,7 +1255,7 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
                     None,
                     lambda table=table: self._preview().preview(
                         jdbc_url=self._credentials.jdbc_uri,
-                        sql=f"SELECT * FROM {self._quote_identifier(table)}",
+                        sql=f"SELECT * FROM {self._qualified_table_name(table)}",
                         max_rows=min(sample_size, 10_000),
                         parameters=self._parameters(),
                     ),
@@ -1035,34 +1273,42 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
                     )
                 )
                 dataframe = pd.DataFrame(records, columns=columns, dtype=str)
-                dataset = AnalystDataset(name=table, data=dataframe)
+                display_name = database_dataset_display_name(
+                    table, self._selected_schema
+                )
+                source_name = database_source_name(table, self._selected_schema)
+                dataset = AnalystDataset(name=display_name, data=dataframe)
                 reg_result = await analyst_db.register_dataset(
                     dataset,
                     InternalDataSourceType.DATABASE,
+                    external_id=source_name,
                     original_column_types=column_types,
                     clobber=True,
                 )
                 if not reg_result["success"]:
                     logger.error(
                         "Failed to register JDBC dataset %s: %s",
-                        table,
+                        display_name,
                         reg_result["msg"],
                     )
                     continue
-                names.append(table)
+                names.append(display_name)
             except Exception:
                 logger.error("JDBC: error loading table %s", table, exc_info=True)
                 continue
         return names
 
     def query_friendly_name(self, dataset_name: str) -> str:
-        return self._quote_identifier(dataset_name)
+        return self._qualified_table_name(dataset_name)
 
     def get_system_prompt(self) -> ChatCompletionSystemMessageParam:
         prompt = {
             "postgresql": SYSTEM_PROMPT_POSTGRES,
             "mysql": SYSTEM_PROMPT_MYSQL,
             "sqlserver": SYSTEM_PROMPT_SQLSERVER,
+            "snowflake": SYSTEM_PROMPT_SNOWFLAKE,
+            "sap": SYSTEM_PROMPT_SAP_DATASPHERE,
+            "bigquery": SYSTEM_PROMPT_BIGQUERY,
         }[self._dialect_key]
         return ChatCompletionSystemMessageParam(role="system", content=prompt)
 
@@ -1070,61 +1316,18 @@ class JdbcPreviewOperator(DatabaseOperator[JDBCCredentialArgs]):
 def get_database_operator(
     app_infra: AppInfra, schema: str | None = None
 ) -> DatabaseOperator[Any]:
-    if app_infra.database == "bigquery":
-        credentials: (
-            GoogleCredentialsBQ
-            | SnowflakeCredentials
-            | SAPDatasphereCredentials
-            | JDBCCredentials
-            | NoDatabaseCredentials
-        )
+    if app_infra.database in ("snowflake", "sap", "bigquery", "datarobot_jdbc"):
         try:
-            credentials = GoogleCredentialsBQ()
-            if credentials.service_account_key and credentials.db_schema:
-                # Override schema if provided
-                if schema:
-                    credentials.db_schema = schema
-                return BigQueryOperator(credentials)
-        except (ValidationError, ValueError):
-            logger.warning(
-                "BigQuery credentials not properly configured, falling back to no database"
-            )
-        return NoDatabaseOperator(NoDatabaseCredentials())
-    elif app_infra.database == "snowflake":
-        try:
-            credentials = SnowflakeCredentials()
-            if credentials.is_configured():
-                # Override schema if provided
-                if schema:
-                    credentials = credentials.with_schema(schema)
-                return SnowflakeOperator(credentials)
-        except (ValidationError, ValueError):
-            logger.warning(
-                "Snowflake credentials not properly configured, falling back to no database"
-            )
-        return NoDatabaseOperator(NoDatabaseCredentials())
-    elif app_infra.database == "sap":
-        try:
-            credentials = SAPDatasphereCredentials()
-            if credentials.is_configured():
-                return SAPDatasphereOperator(credentials)
-        except (ValidationError, ValueError):
-            logger.warning(
-                "SAP credentials not properly configured, falling back to no database"
-            )
-        return NoDatabaseOperator(NoDatabaseCredentials())
-    elif app_infra.database == "datarobot_jdbc":
-        try:
-            credentials = JDBCCredentials()
-            return JdbcPreviewOperator(credentials)
-        except (ValidationError, ValueError):
-            logger.warning(
-                "JDBC credentials not properly configured, falling back to no database",
-                exc_info=True,
-            )
-        return NoDatabaseOperator(NoDatabaseCredentials())
-    else:
-        return NoDatabaseOperator(NoDatabaseCredentials())
+            return JdbcPreviewOperator(JDBCCredentials(), schema=schema)
+        except (ValidationError, ValueError) as exc:
+            raise ValueError(
+                f"DATABASE_CONNECTION_TYPE is '{app_infra.database}' but JDBC_URI "
+                "is missing or invalid. Set JDBC_URI to a valid JDBC connection "
+                "string such as jdbc:snowflake://..., jdbc:sap://..., or "
+                "jdbc:bigquery://...."
+            ) from exc
+
+    return NoDatabaseOperator(NoDatabaseCredentials())
 
 
 def load_app_infra() -> AppInfra:

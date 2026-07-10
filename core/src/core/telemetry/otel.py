@@ -56,6 +56,7 @@ from opentelemetry.sdk.metrics.view import ExponentialBucketHistogramAggregation
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import Span
 from typing_extensions import ParamSpec, Self, TypeVar
 
 if TYPE_CHECKING:
@@ -80,6 +81,8 @@ except ImportError:
 P = ParamSpec("P")
 T = TypeVar("T")
 
+DEFAULT_EXCLUDED_TRACE_SPAN_NAMES = frozenset({"core.middleware._initialize_session"})
+
 
 class OTLPConnectionErrorFilter(logging.Filter):
     """
@@ -100,7 +103,9 @@ class OTLPConnectionErrorFilter(logging.Filter):
         # Suppress urllib3 connection errors related to OTLP endpoints
         if record.name.startswith("urllib3.connectionpool"):
             message = record.getMessage()
-            if "HTTPConnectionPool" in message and (
+            if (
+                "HTTPConnectionPool" in message or "HTTPSConnectionPool" in message
+            ) and (
                 ":4318" in message  # Default OTLP port
                 or "/v1/metrics" in message
                 or "/v1/traces" in message
@@ -111,8 +116,36 @@ class OTLPConnectionErrorFilter(logging.Filter):
         # Suppress requests connection errors related to OTLP
         if record.name.startswith("requests."):
             message = record.getMessage()
-            if "ConnectionError" in message and ":4318" in message:
+            if ("ConnectionError" in message or "Timeout" in message) and (
+                ":4318" in message
+                or "/v1/metrics" in message
+                or "/v1/traces" in message
+                or "/v1/logs" in message
+            ):
                 should_suppress = True
+
+        # Suppress opentelemetry SDK export errors caused by connection failures
+        if (
+            not should_suppress
+            and record.name.startswith("opentelemetry.sdk.")
+            and record.levelno == logging.ERROR
+        ):
+            if record.exc_info:
+                exc = record.exc_info[1]
+                while exc is not None:
+                    if type(exc).__name__ in (
+                        "ConnectionError",
+                        "ConnectTimeout",
+                        "NewConnectionError",
+                        "MaxRetryError",
+                        "ReadTimeout",
+                        "ReadTimeoutError",
+                        "Timeout",
+                        "TimeoutError",
+                    ):
+                        should_suppress = True
+                        break
+                    exc = exc.__cause__ or exc.__context__
 
         if should_suppress:
             if self.warning_callback:
@@ -129,6 +162,9 @@ class OTel:
     Provides OpenTelemetry configuration following datavolt patterns.
     Implements singleton pattern to ensure only one instance exists per process.
     """
+
+    _SERVICE_PRIORITY = "p1"
+    _METRIC_EXPORT_INTERVAL_MILLIS = 5_000
 
     _instance: Optional[OTel] = None
     _initialized: bool = False
@@ -166,6 +202,7 @@ class OTel:
         self._logger_provider: Optional[LoggerProvider] = None
         self._meter_provider: Optional[MeterProvider] = None
         self._tracer_provider: Optional[TracerProvider] = None
+        self._resource: Optional[Resource] = None
         self._configured: bool = False
         self._startup_logged: bool = False  # Track if startup has been logged
         self._otlp_warning_logged: bool = (
@@ -204,9 +241,40 @@ class OTel:
                     "OTEL_EXPORTER_OTLP_ENDPOINT not set. Disabling telemetry to prevent connection errors."
                 )
 
+        is_remote = (
+            endpoint and "localhost" not in endpoint and "127.0.0.1" not in endpoint
+        )
+        if self.telemetry_enabled and is_remote and not headers:
+            self.telemetry_enabled = False
+            logging.getLogger(__name__).error(
+                "OTEL_EXPORTER_OTLP_ENDPOINT is set to a remote URL but "
+                "OTEL_EXPORTER_OTLP_HEADERS is missing. Disabling telemetry."
+            )
+
         if self.telemetry_enabled and not self._auto_instrumentation_setup:
             self._setup_auto_instrumentation()
             self._auto_instrumentation_setup = True
+
+    def _get_resource(self) -> Resource:
+        if self._resource is None:
+            attrs: dict[str, str] = {
+                "datarobot.service.priority": self._SERVICE_PRIORITY,
+            }
+            # Only set service.name if the platform hasn't already provided OTEL_SERVICE_NAME.
+            # Resource.create() merges env vars at lower precedence than explicit attrs, so
+            # setting it here would shadow the platform value if they ever diverge.
+            if not os.environ.get("OTEL_SERVICE_NAME"):
+                attrs["service.name"] = f"{self.entity_type}-{self.entity_id}"
+            if self.entity_id:
+                attrs["datarobot.application.id"] = self.entity_id
+            pod_name = os.environ.get("HOSTNAME")
+            if pod_name:
+                attrs["k8s.pod.name"] = pod_name
+            version = os.environ.get("APP_VERSION") or os.environ.get("SERVICE_VERSION")
+            if version:
+                attrs["service.version"] = version
+            self._resource = Resource.create(attrs)
+        return self._resource
 
     def _install_otlp_error_filter(self) -> None:
         """Install logging filter to suppress OTLP connection errors."""
@@ -220,6 +288,15 @@ class OTel:
         requests_logger = logging.getLogger("requests")
         requests_logger.addFilter(otlp_filter)
 
+        # Apply to opentelemetry SDK export loggers
+        for sdk_logger_name in (
+            "opentelemetry.sdk._logs._internal.export",
+            "opentelemetry.sdk.trace.export",
+            "opentelemetry.sdk.metrics.export",
+            "opentelemetry.sdk.metrics._internal.export",
+        ):
+            logging.getLogger(sdk_logger_name).addFilter(otlp_filter)
+
     def _log_otlp_warning(self) -> None:
         """Log a warning about OTLP connection failure (only once)."""
         if not self._otlp_warning_logged:
@@ -229,8 +306,21 @@ class OTel:
             logger.warning(
                 "OTLP collector connection failed. Telemetry data may be lost. "
                 "Suppressing further connection errors to prevent log spam. "
-                "Check OTLP_EXPORTER_OTLP_ENDPOINT configuration."
+                "Check OTEL_EXPORTER_OTLP_ENDPOINT configuration."
             )
+
+    def _get_excluded_trace_span_names(self) -> frozenset[str]:
+        configured_span_names = {
+            span_name.strip()
+            for span_name in os.environ.get("OTEL_EXCLUDED_TRACE_SPAN_NAMES", "").split(
+                ","
+            )
+            if span_name.strip()
+        }
+        return DEFAULT_EXCLUDED_TRACE_SPAN_NAMES | configured_span_names
+
+    def _is_trace_span_excluded(self, span_name: str) -> bool:
+        return span_name in self._get_excluded_trace_span_names()
 
     def _setup_auto_instrumentation(self) -> None:
         """
@@ -306,16 +396,8 @@ class OTel:
         if self._logger_provider:
             return self._logger_provider
 
-        # Create resource with application context
-        resource = Resource.create(
-            {
-                "service.name": f"{self.entity_type}-{self.entity_id}",
-                "datarobot.service.priority": "p1",
-            }
-        )
-
         # Create logger provider
-        logger_provider = LoggerProvider(resource=resource)
+        logger_provider = LoggerProvider(resource=self._get_resource())
         set_logger_provider(logger_provider)
 
         # Create OTLP exporter
@@ -341,14 +423,6 @@ class OTel:
         if self._meter_provider:
             return self._meter_provider
 
-        # Create resource
-        resource = Resource.create(
-            {
-                "service.name": f"{self.entity_type}-{self.entity_id}",
-                "datarobot.service.priority": "p1",
-            }
-        )
-
         # Create OTLP exporter
         try:
             otlp_exporter = OTLPMetricExporter(
@@ -360,12 +434,12 @@ class OTel:
             # Create metric reader
             reader = PeriodicExportingMetricReader(
                 exporter=otlp_exporter,
-                export_interval_millis=1000,
+                export_interval_millis=self._METRIC_EXPORT_INTERVAL_MILLIS,
             )
 
             # Create meter provider
             meter_provider = MeterProvider(
-                resource=resource,
+                resource=self._get_resource(),
                 metric_readers=[
                     reader,
                 ],
@@ -377,7 +451,7 @@ class OTel:
             logging.getLogger(__name__).warning(
                 f"Failed to initialize OTLP metrics exporter: {e}"
             )
-            meter_provider = MeterProvider(resource=resource)
+            meter_provider = MeterProvider(resource=self._get_resource())
             metrics.set_meter_provider(meter_provider)
             self._meter_provider = meter_provider
             return meter_provider
@@ -389,16 +463,8 @@ class OTel:
         if self._tracer_provider:
             return self._tracer_provider
 
-        # Create resource
-        resource = Resource.create(
-            {
-                "service.name": f"{self.entity_type}-{self.entity_id}",
-                "datarobot.service.priority": "p1",
-            }
-        )
-
         # Create tracer provider
-        tracer_provider = TracerProvider(resource=resource)
+        tracer_provider = TracerProvider(resource=self._get_resource())
         trace.set_tracer_provider(tracer_provider)
 
         # Create OTLP exporter
@@ -560,22 +626,43 @@ class OTel:
     @overload
     def trace(self: Self, func: Callable[P, T]) -> Callable[P, T]: ...
 
+    @overload
+    def trace(self: Self, name: str) -> Callable[[Any], Any]: ...
+
     @no_type_check
     def trace(self: Self, func: Any) -> Any:
         """
-        Wrap the execution of the decorated function in an OTEL span sharing the same name as the function.
+        Wrap the execution of the decorated function in an OTEL span.
+
+        Accepts an optional custom span name::
+
+            @otel.trace
+            async def my_handler(): ...
+
+            @otel.trace("custom-operation-name")
+            async def my_handler(): ...
+
         WARNING: There are sharp edges with this decorator if applied to functions that are reflected on.
         (I've seen this with methods in utils.rest_api.)
         """
-        tracer = self.get_tracer("application-tracer")
+        if isinstance(func, str):
+            return functools.partial(self._trace_with_name, span_name=func)
+        return self._trace_with_name(func)
 
-        span_name = f"{func.__module__}.{func.__qualname__}"
+    @no_type_check
+    def _trace_with_name(self: Self, func: Any, span_name: Optional[str] = None) -> Any:
+        name = span_name or f"{func.__module__}.{func.__qualname__}"
+
+        if self._is_trace_span_excluded(name):
+            return func
+
+        tracer = self.get_tracer("application-tracer")
 
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_inner(*args, **kwargs):
-                with tracer.start_as_current_span(span_name):
+                with tracer.start_as_current_span(name):
                     return await func(*args, **kwargs)
 
             return async_inner
@@ -583,7 +670,7 @@ class OTel:
 
             @functools.wraps(func)
             async def inner_asyncgen(*args, **kwargs):
-                span = tracer.start_span(span_name)
+                span = tracer.start_span(name)
                 async_generator = func(*args, **kwargs)
                 try:
                     while True:
@@ -604,7 +691,7 @@ class OTel:
 
             @functools.wraps(func)
             def inner_gen(*args, **kwargs):
-                with tracer.start_as_current_span(span_name):
+                with tracer.start_as_current_span(name):
                     for x in func(*args, **kwargs):
                         yield x
 
@@ -613,13 +700,13 @@ class OTel:
 
             @functools.wraps(func)
             def inner(*args, **kwargs):
-                with tracer.start_as_current_span(span_name):
+                with tracer.start_as_current_span(name):
                     return func(*args, **kwargs)
 
             return inner
         else:
             raise ValueError(
-                f"instrument can only decorate a function type, while {span_name} is a {type(func)}."
+                f"instrument can only decorate a function type, while {name} is a {type(func)}."
             )
 
     @functools.cache
@@ -628,6 +715,24 @@ class OTel:
         return meter.create_histogram(
             f"function.{name}", "s", "A histogram recording function timings."
         )
+
+    @contextmanager
+    def span(self, name: str, **attributes: Any) -> Generator[Span, None, None]:
+        """Create a named span as a context manager, with optional initial attributes.
+
+        Use this for ad-hoc spans within a function body where a decorator
+        would be too coarse-grained::
+
+            with otel.span("retrieve-documents", query=query_text) as span:
+                docs = retrieve(query_text)
+                span.set_attribute("doc_count", len(docs))
+        """
+        with self.get_tracer("application-tracer").start_as_current_span(
+            name
+        ) as active_span:
+            for key, value in attributes.items():
+                active_span.set_attribute(key, value)
+            yield active_span
 
     @contextmanager
     def time(self, name: str) -> Generator[None, None, None]:

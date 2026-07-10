@@ -18,27 +18,26 @@ if os.environ.get("RUN_CUSTOMIZE_DOCS_E2E") != "1":
     )
 
 import pandas as pd
-from fastapi.testclient import TestClient
-
-from utils.analyst_db import AnalystDB, InternalDataSourceType
-from utils.api import get_dictionary
-from utils.customize import prompts
-from utils.customize.domain.question_refiner.domain import (
+from core.analyst_db import AnalystDB, InternalDataSourceType
+from core.api import get_dictionary
+from core.customize import prompts
+from core.customize.domain.question_refiner.domain import (
     QuestionRefinementRequest,
 )
-from utils.customize.infrastructure.analyst_db.data_retriever import (
+from core.customize.infrastructure.analyst_db.data_retriever import (
     RefinerDataInfoMessageFactory,
 )
-from utils.customize.infrastructure.llm.llm import (
+from core.customize.infrastructure.llm.llm import (
     LLMQuestionGenerationService,
 )
-from utils.customize.usecase.question_refiner.refiner import (
+from core.customize.usecase.question_refiner.refiner import (
     MessageFactory,
     RefineQuestionUseCase,
     RefineUserPromptBuilder,
 )
-from utils.rest_api import app
-from utils.schema import AnalystDataset
+from core.rest_api import app
+from core.schema import AnalystDataset
+from fastapi.testclient import TestClient
 
 
 async def create_test_dataset() -> AnalystDataset:

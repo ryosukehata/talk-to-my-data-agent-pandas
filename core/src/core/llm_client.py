@@ -36,10 +36,12 @@ from openai import (
     NotFoundError,
     RateLimitError,
 )
-from opentelemetry import trace
+from opentelemetry import propagate, trace
 
 from core.config import Config
 from core.constants import get_llm_model
+from core.telemetry import dr_user_id_var
+from core.telemetry.metrics import track_chat_request
 
 try:
     import litellm
@@ -395,19 +397,33 @@ class CompletionsProxy:
         )
 
         try:
-            with _tracer.start_as_current_span(f"gen_ai.chat {model}") as span:
+            model_name = str(model)
+            with (
+                track_chat_request(model=model_name),
+                _tracer.start_as_current_span(f"gen_ai.chat {model_name}") as span,
+            ):
+                otel_headers: dict[str, str] = {}
+                propagate.inject(otel_headers)
+                if otel_headers:
+                    kwargs["extra_headers"] = {
+                        **(kwargs.get("extra_headers") or {}),
+                        **otel_headers,
+                    }
                 _set_llm_span_attributes(
                     span=span,
-                    model=str(model),
+                    model=model_name,
                     messages=messages,
                     llm_config=self._llm_config,
                     api_base=self._api_base,
                 )
+                dr_user_id = dr_user_id_var.get()
+                if dr_user_id:
+                    span.set_attribute("datarobot.user_id", dr_user_id)
                 # Call underlying implementation
                 result = await self._completions.create(*args, **kwargs)
                 _set_llm_span_attributes(
                     span=span,
-                    model=str(model),
+                    model=model_name,
                     messages=messages,
                     llm_config=self._llm_config,
                     api_base=self._api_base,
@@ -437,21 +453,35 @@ class CompletionsProxy:
         )
 
         try:
-            with _tracer.start_as_current_span(f"gen_ai.chat {model}") as span:
+            model_name = str(model)
+            with (
+                track_chat_request(model=model_name),
+                _tracer.start_as_current_span(f"gen_ai.chat {model_name}") as span,
+            ):
+                otel_headers: dict[str, str] = {}
+                propagate.inject(otel_headers)
+                if otel_headers:
+                    kwargs["extra_headers"] = {
+                        **(kwargs.get("extra_headers") or {}),
+                        **otel_headers,
+                    }
                 _set_llm_span_attributes(
                     span=span,
-                    model=str(model),
+                    model=model_name,
                     messages=messages,
                     llm_config=self._llm_config,
                     api_base=self._api_base,
                 )
+                dr_user_id = dr_user_id_var.get()
+                if dr_user_id:
+                    span.set_attribute("datarobot.user_id", dr_user_id)
                 # Call underlying implementation
                 result, org = await self._completions.create_with_completion(
                     *args, **kwargs
                 )
                 _set_llm_span_attributes(
                     span=span,
-                    model=str(model),
+                    model=model_name,
                     messages=messages,
                     llm_config=self._llm_config,
                     api_base=self._api_base,

@@ -26,33 +26,32 @@ if os.environ.get("RUN_CUSTOMIZE_DOCS_E2E") != "1":
         allow_module_level=True,
     )
 
-import pandas as pd
-from fastapi.testclient import TestClient
-
 # rest_apiのインポート - appは後で取得
-import utils.rest_api as rest_api_module
-from utils.analyst_db import AnalystDB, InternalDataSourceType
-from utils.api import get_dictionary
-from utils.customize.domain.question_refiner.domain import (
+import core.rest_api as rest_api_module
+import pandas as pd
+from core.analyst_db import AnalystDB, InternalDataSourceType
+from core.api import get_dictionary
+from core.customize.domain.question_refiner.domain import (
     QuestionRefinementRequest,
 )
-from utils.customize.domain.report.domain import (
+from core.customize.domain.report.domain import (
     ReportQuestionsGenerationRequest,
 )
-from utils.customize.infrastructure.analyst_db.data_retriever import (
+from core.customize.infrastructure.analyst_db.data_retriever import (
     RefinerDataInfoMessageFactory,
 )
-from utils.customize.infrastructure.llm.llm import LLMQuestionGenerationService
-from utils.customize.infrastructure.llm.report_questions_generator import (
+from core.customize.infrastructure.llm.llm import LLMQuestionGenerationService
+from core.customize.infrastructure.llm.report_questions_generator import (
     LLMReportQuestionsGenerationService,
 )
-from utils.customize.usecase.prompt.builder import (
+from core.customize.usecase.prompt.builder import (
     MessageFactory,
     RefineUserPromptBuilder,
 )
-from utils.customize.usecase.question_refiner.refiner import RefineQuestionUseCase
-from utils.customize.usecase.report.generate_questions import GenerateQuestionsUseCase
-from utils.schema import AnalystDataset
+from core.customize.usecase.question_refiner.refiner import RefineQuestionUseCase
+from core.customize.usecase.report.generate_questions import GenerateQuestionsUseCase
+from core.schema import AnalystDataset
+from fastapi.testclient import TestClient
 
 app = rest_api_module.app
 
@@ -264,8 +263,8 @@ async def test_api_e2e():
 
     # カスタマイズルーターを手動でマウント（循環インポート回避）
     # try:
-    #    from utils.customize.api_endpoints.question_refiner import refiner_router
-    #    from utils.customize.api_endpoints.report import report_router
+    #    from core.customize.api_endpoints.question_refiner import refiner_router
+    #    from core.customize.api_endpoints.report import report_router
 
     #    # ルーターが既に追加されているか確認
     #    has_report_routes = any(

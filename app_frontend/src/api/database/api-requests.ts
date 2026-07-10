@@ -2,6 +2,16 @@ import apiClient from "../apiClient";
 
 export type DatabaseTables = Record<string, string>;
 export type DatabaseSchemas = Record<string, string>;
+type DatabaseTablesResponse = DatabaseTables | string[];
+
+export const normalizeDatabaseTables = (
+  tables: DatabaseTablesResponse,
+): DatabaseTables => {
+  if (Array.isArray(tables)) {
+    return Object.fromEntries(tables.map((table) => [table, table]));
+  }
+  return tables;
+};
 
 export const getDatabaseSchemas = async ({
   signal,
@@ -36,11 +46,14 @@ export const getDatabaseTables = async ({
   signal?: AbortSignal;
 }): Promise<DatabaseTables> => {
   const params = schema ? { schema } : {};
-  const { data } = await apiClient.get<DatabaseTables>(`/v1/database/tables`, {
-    params,
-    signal,
-  });
-  return data;
+  const { data } = await apiClient.get<DatabaseTablesResponse>(
+    `/v1/database/tables`,
+    {
+      params,
+      signal,
+    },
+  );
+  return normalizeDatabaseTables(data);
 };
 
 export const loadFromDatabase = async ({

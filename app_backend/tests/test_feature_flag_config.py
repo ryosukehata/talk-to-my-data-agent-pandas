@@ -1,5 +1,5 @@
 import pytest
-from utils.customize.feature_flag_config import (
+from core.customize.feature_flag_config import (
     FEATURE_FLAG_ENV_VARS,
     get_feature_flags,
 )

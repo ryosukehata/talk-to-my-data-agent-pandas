@@ -32,6 +32,7 @@ from utils.schema import (
     AnalystDataset,
     ChatRequest,
     CodeGeneration,
+    DataDictionary,
     GetBusinessAnalysisResult,
     RunAnalysisRequest,
     RunAnalysisResult,
@@ -927,6 +928,95 @@ async def _assert_run_database_analysis_passes_generator_context_without_argumen
         "token_tracker": token_tracker,
         "telemetry_json": telemetry_json,
     }
+
+
+def test_generate_database_analysis_code_uses_database_external_id(
+    monkeypatch,
+) -> None:
+    asyncio.run(
+        _assert_generate_database_analysis_code_uses_database_external_id(monkeypatch)
+    )
+
+
+async def _assert_generate_database_analysis_code_uses_database_external_id(
+    monkeypatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class FakeAnalystDB:
+        async def get_data_dictionary(self, name: str) -> DataDictionary:
+            assert name == "PUBLIC-sales"
+            return DataDictionary.from_analyst_df(
+                pd.DataFrame({"amount": [100, 200]}),
+                name=name,
+            )
+
+        async def get_dataset_metadata(self, name: str) -> DatasetMetadata:
+            assert name == "PUBLIC-sales"
+            return _dataset_metadata_for_source(
+                name,
+                InternalDataSourceType.DATABASE,
+                external_id="PUBLIC.sales",
+            )
+
+        async def get_dataset(self, name: str) -> AnalystDataset:
+            assert name == "PUBLIC-sales"
+            return AnalystDataset(
+                name=name,
+                data=pd.DataFrame({"amount": [100, 200]}),
+            )
+
+    class FakeDatabase:
+        def query_friendly_name(self, dataset_name: str) -> str:
+            captured["query_friendly_name"] = dataset_name
+            return f"queryable:{dataset_name}"
+
+        def get_system_prompt(self) -> dict[str, str]:
+            return {"role": "system", "content": "Generate SQL"}
+
+    class FakeCompletions:
+        async def create_with_completion(self, **kwargs: Any) -> tuple[Any, Any]:
+            captured["messages"] = kwargs["messages"]
+            return (
+                SimpleNamespace(code="select sum(amount) from sales"),
+                SimpleNamespace(datarobot_association_id="association-id"),
+            )
+
+    class FakeLLMClient:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+        async def __aenter__(self) -> "FakeLLMClient":
+            return self
+
+        async def __aexit__(self, *args: Any) -> None:
+            return None
+
+    monkeypatch.setattr(api, "AsyncLLMClient", FakeLLMClient)
+
+    code = await api._generate_database_analysis_code(
+        FakeDatabase(),  # type: ignore[arg-type]
+        api.RunDatabaseAnalysisRequest(
+            dataset_names=["PUBLIC-sales"],
+            question="sum amount",
+        ),
+        FakeAnalystDB(),  # type: ignore[arg-type]
+    )
+
+    messages = captured["messages"]
+    dictionary_message = next(
+        message
+        for message in messages
+        if message["content"].startswith("Data Dictionary:")
+    )
+    sample_message = next(
+        message for message in messages if message["content"].startswith("Sample Data:")
+    )
+
+    assert code == "select sum(amount) from sales"
+    assert captured["query_friendly_name"] == "PUBLIC.sales"
+    assert "queryable:PUBLIC.sales" in dictionary_message["content"]
+    assert "Schema: PUBLIC, Table: sales" in sample_message["content"]
 
 
 def test_run_database_analysis_updates_steps_with_analysis_context(

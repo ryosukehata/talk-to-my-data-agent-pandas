@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pulumi
 import pulumi_datarobot as datarobot
+from datarobot_pulumi_utils.pulumi import export
 from datarobot_pulumi_utils.pulumi.stack import PROJECT_NAME
 
 __all__ = ["use_case", "project_dir"]
@@ -40,3 +41,14 @@ else:
 
 This intuitive experience is designed for **scalability and flexibility**, ensuring that whether you're working with a few thousand rows or billions, your data analysis remains **fast, efficient, and insightful**. """,
     )
+
+export("DATAROBOT_USE_CASE_ID", use_case.id)
+
+datarobot_base_url = (
+    os.environ.get("DATAROBOT_ENDPOINT", "").rstrip("/").removesuffix("/api/v2")
+)
+export("OTEL_EXPORTER_OTLP_ENDPOINT", f"{datarobot_base_url}/otel")
+export(
+    "OTEL_ENTITY_ID",
+    pulumi.Output.format("experiment_container-{0}", use_case.id),
+)

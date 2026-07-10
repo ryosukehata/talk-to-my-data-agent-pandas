@@ -16,26 +16,25 @@ sys.path.insert(0, str(Path(__file__).parent.parent.absolute()))
 os.environ["OTEL_SDK_DISABLED"] = "true"
 
 import pytest
-
-from utils.customize.domain.report.domain import (
+from core.customize.domain.report.domain import (
     QuestionStatus,
     Report,
     ReportQuestion,
     ReportStatus,
 )
-from utils.customize.domain.report.repository_interface import IReportRepository
-from utils.customize.domain.report.service_interface import (
+from core.customize.domain.report.repository_interface import IReportRepository
+from core.customize.domain.report.service_interface import (
     IReportSectionDataRetriever,
     IReportSummaryService,
     ReportGeneratedSummary,
     ReportSectionData,
 )
-from utils.customize.infrastructure.word.word_generator import (
+from core.customize.infrastructure.word.word_generator import (
     ReportSectionContent,
     WordGenerator,
 )
-from utils.customize.usecase.prompt.builder import SummaryPromptBuilder
-from utils.customize.usecase.report.generate_word import GenerateWordUseCase
+from core.customize.usecase.prompt.builder import SummaryPromptBuilder
+from core.customize.usecase.report.generate_word import GenerateWordUseCase
 
 pytestmark = pytest.mark.asyncio
 
