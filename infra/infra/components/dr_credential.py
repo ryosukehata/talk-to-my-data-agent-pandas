@@ -26,6 +26,9 @@ from core.credentials import (  # type: ignore[import-not-found]
     JDBCCredentials,
     NoDatabaseCredentials,
 )
+from core.customize.snowflake_jdbc_compat import (  # type: ignore[import-not-found]
+    snowflake_jdbc_credentials_from_legacy_env,
+)
 from core.schema import (  # type: ignore[import-not-found]
     DatabaseConnectionType,
 )
@@ -129,8 +132,14 @@ def get_database_credentials(
         if database == "no_database":
             return NoDatabaseCredentials()
 
-        if database in ("snowflake", "bigquery", "sap", "datarobot_jdbc"):
+        if database == "snowflake":
+            credentials = snowflake_jdbc_credentials_from_legacy_env()
+            if credentials is None:
+                credentials = JDBCCredentials()  # type: ignore[call-arg]
+        elif database in ("bigquery", "sap", "datarobot_jdbc"):
             credentials = JDBCCredentials()  # type: ignore[call-arg]
+
+        if database in ("snowflake", "bigquery", "sap", "datarobot_jdbc"):
             if test_credentials:
                 from core.data_connections.database.database_implementations import (  # type: ignore[import-not-found]
                     JdbcPreviewOperator,

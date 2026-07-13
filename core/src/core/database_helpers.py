@@ -46,6 +46,9 @@ from core.credentials import (
 from core.customize.prompts import (
     SYSTEM_PROMPT_SNOWFLAKE,
 )
+from core.customize.snowflake_jdbc_compat import (
+    snowflake_jdbc_credentials_from_legacy_env,
+)
 from core.logging_helper import get_logger
 from core.prompts import (
     SYSTEM_PROMPT_BIGQUERY,
@@ -1320,6 +1323,10 @@ def get_database_operator(
         try:
             return JdbcPreviewOperator(JDBCCredentials(), schema=schema)
         except (ValidationError, ValueError) as exc:
+            if app_infra.database == "snowflake":
+                credentials = snowflake_jdbc_credentials_from_legacy_env()
+                if credentials is not None:
+                    return JdbcPreviewOperator(credentials, schema=schema)
             raise ValueError(
                 f"DATABASE_CONNECTION_TYPE is '{app_infra.database}' but JDBC_URI "
                 "is missing or invalid. Set JDBC_URI to a valid JDBC connection "

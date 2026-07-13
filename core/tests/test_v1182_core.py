@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -16,6 +17,22 @@ from core.schema import (
     RunAnalysisResultMetadata,
 )
 from core.telemetry.otel import OTel, OTLPConnectionErrorFilter
+
+_SNOWFLAKE_ENV_VARS = (
+    "SNOWFLAKE_USER",
+    "SNOWFLAKE_PASSWORD",
+    "SNOWFLAKE_ACCOUNT",
+    "SNOWFLAKE_WAREHOUSE",
+    "SNOWFLAKE_DATABASE",
+    "SNOWFLAKE_SCHEMA",
+    "SNOWFLAKE_ROLE",
+    "SNOWFLAKE_KEY_PATH",
+)
+
+
+def _clear_snowflake_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for env_var in _SNOWFLAKE_ENV_VARS:
+        monkeypatch.delenv(env_var, raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -198,9 +215,80 @@ def test_platform_database_types_require_jdbc_uri(
 ) -> None:
     monkeypatch.delenv("JDBC_URI", raising=False)
     monkeypatch.delenv("JDBC_CONNECTION_PARAMETERS", raising=False)
+    _clear_snowflake_env(monkeypatch)
 
     with pytest.raises(ValueError, match="JDBC_URI"):
         get_database_operator(AppInfra(llm="llm", database=database))
+
+
+def test_snowflake_legacy_env_values_build_jdbc_preview_operator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("JDBC_URI", raising=False)
+    monkeypatch.delenv("JDBC_CONNECTION_PARAMETERS", raising=False)
+    _clear_snowflake_env(monkeypatch)
+    monkeypatch.setenv("SNOWFLAKE_USER", "snowflake_user")
+    monkeypatch.setenv("SNOWFLAKE_PASSWORD", "snowflake_password")
+    monkeypatch.setenv("SNOWFLAKE_ACCOUNT", "account")
+    monkeypatch.setenv("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH")
+    monkeypatch.setenv("SNOWFLAKE_DATABASE", "ANALYTICS")
+    monkeypatch.setenv("SNOWFLAKE_SCHEMA", "PUBLIC")
+    monkeypatch.setenv("SNOWFLAKE_ROLE", "ANALYST")
+
+    operator = get_database_operator(AppInfra(llm="llm", database="snowflake"))
+
+    assert isinstance(operator, JdbcPreviewOperator)
+    assert (
+        operator._credentials.jdbc_uri
+        == "jdbc:snowflake://account.snowflakecomputing.com/"
+        "?warehouse=COMPUTE_WH&db=ANALYTICS&schema=PUBLIC&role=ANALYST"
+    )
+    assert operator._parameters() == {
+        "user": "snowflake_user",
+        "password": "snowflake_password",
+    }
+
+
+def test_snowflake_legacy_key_file_uses_base64_private_key_parameter(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("JDBC_URI", raising=False)
+    monkeypatch.delenv("JDBC_CONNECTION_PARAMETERS", raising=False)
+    _clear_snowflake_env(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    tmp_path.joinpath("rsa_key.p8").write_bytes(b"private-key-pem")
+    monkeypatch.setenv("SNOWFLAKE_USER", "snowflake_user")
+    monkeypatch.setenv("SNOWFLAKE_KEY_PATH", "rsa_key.p8")
+    monkeypatch.setenv("SNOWFLAKE_ACCOUNT", "account")
+    monkeypatch.setenv("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH")
+    monkeypatch.setenv("SNOWFLAKE_DATABASE", "ANALYTICS")
+    monkeypatch.setenv("SNOWFLAKE_SCHEMA", "PUBLIC")
+    monkeypatch.setenv("SNOWFLAKE_ROLE", "ANALYST")
+
+    operator = get_database_operator(AppInfra(llm="llm", database="snowflake"))
+
+    assert operator._parameters() == {
+        "user": "snowflake_user",
+        "private_key_base64": "cHJpdmF0ZS1rZXktcGVt",
+    }
+
+
+def test_snowflake_legacy_env_does_not_hide_invalid_explicit_jdbc_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("JDBC_URI", "jdbc:oracle://example.test/db")
+    monkeypatch.delenv("JDBC_CONNECTION_PARAMETERS", raising=False)
+    _clear_snowflake_env(monkeypatch)
+    monkeypatch.setenv("SNOWFLAKE_USER", "snowflake_user")
+    monkeypatch.setenv("SNOWFLAKE_PASSWORD", "snowflake_password")
+    monkeypatch.setenv("SNOWFLAKE_ACCOUNT", "account")
+    monkeypatch.setenv("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH")
+    monkeypatch.setenv("SNOWFLAKE_DATABASE", "ANALYTICS")
+    monkeypatch.setenv("SNOWFLAKE_SCHEMA", "PUBLIC")
+    monkeypatch.setenv("SNOWFLAKE_ROLE", "ANALYST")
+
+    with pytest.raises(ValueError, match="JDBC_URI"):
+        get_database_operator(AppInfra(llm="llm", database="snowflake"))
 
 
 def test_jdbc_preview_get_schemas_uses_data_preview(
