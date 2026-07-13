@@ -36,12 +36,14 @@
 - app factory tests は upstream の session middleware 初期化に必要な `SESSION_SECRET_KEY` を明示する。
 - LLM client の unit test は `Config()` を fake に差し替え、ローカルの `.env` / `pulumi_config.json` にある LLM runtime parameter が upstream default model の検証を上書きしないようにする。実装側は引き続き DataRobot settings fallback を尊重する。
 - `pulumi-up.yml` は `SESSION_SECRET_KEY` を GitHub Actions secret から Pulumi env に渡す。secret値はリポジトリに置かず、GitHub Secret `SESSION_SECRET_KEY` として管理する。
+- `.env.template` は手動セットアップ向けに `SESSION_SECRET_KEY=<long_random_string>` をコメント付きで案内する。空値を active にすると空の session secret として扱われる恐れがあるため、placeholder はコメントアウトしておく。
+- `.env.template` は Snowflake 用に `jdbc:snowflake://...` の具体例と `SNOWFLAKE_*` placeholder を併記する。実値は環境固有のためテンプレートには入れない。
 
 ## Tests
 
 実施済み:
 
-- `uv run pytest customize_docs/test_v11_10_2_integration.py -q`: 5 passed
+- `uv run pytest customize_docs/test_v11_10_2_integration.py -q`: 6 passed
 - `uv run --project core pytest core/tests/test_v1182_core.py -q`: 21 passed, 3 warnings
 - `uv run pytest app_backend/tests/test_v1151_fastapi_integration.py app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_v1182_compat.py app_backend/tests/test_upstream_compat_imports.py -q`: 37 passed
 - `uv run ruff check app_backend/app/__init__.py app_backend/app/config.py app_backend/app/profiling.py app_backend/tests/test_v1151_fastapi_integration.py app_backend/tests/test_v1153_backend_compat.py app_backend/tests/test_v1182_compat.py core/src/core/data_cleansing_helpers.py infra/infra/app_backend.py customize_docs/test_v11_10_2_integration.py`: passed

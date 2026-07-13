@@ -76,11 +76,13 @@ def test_app_backend_targets_python_312_runtime() -> None:
 
 def test_session_secret_runtime_parameter_is_declared_for_cli_and_infra() -> None:
     cli_config = (REPO_ROOT / ".datarobot" / "cli" / "app_backend.yaml").read_text()
+    env_template = (REPO_ROOT / ".env.template").read_text()
     infra_source = (REPO_ROOT / "infra" / "infra" / "app_backend.py").read_text()
     pulumi_workflow = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "pulumi-up.yml").read_text()
     )
 
+    assert "SESSION_SECRET_KEY=<long_random_string>" in env_template
     assert "env: SESSION_SECRET_KEY" in cli_config
     assert "generate: true" in cli_config
     assert 'key="SESSION_SECRET_KEY"' in infra_source
@@ -97,3 +99,25 @@ def test_test_user_email_is_scoped_to_dev_task_only() -> None:
 
     assert "TEST_USER_EMAIL" not in taskfile.get("env", {})
     assert taskfile["tasks"]["dev"]["env"]["TEST_USER_EMAIL"] == "dev@example.com"
+
+
+def test_env_template_documents_snowflake_values() -> None:
+    env_template = (REPO_ROOT / ".env.template").read_text()
+
+    assert "jdbc:snowflake://<account_identifier>.snowflakecomputing.com/" in (
+        env_template
+    )
+    assert "SNOWFLAKE_SAMPLE_DATA" in env_template
+    assert "TPCH_SF1" in env_template
+    for expected in (
+        'snowflake_authentication="key file authentication"',
+        'SNOWFLAKE_USER="<snowflake_user>"',
+        'SNOWFLAKE_PASSWORD="<snowflake_password>"',
+        'SNOWFLAKE_KEY_PATH="rsa_key.p8"',
+        'SNOWFLAKE_ACCOUNT="<account_identifier>"',
+        'SNOWFLAKE_WAREHOUSE="COMPUTE_WH"',
+        'SNOWFLAKE_DATABASE="SNOWFLAKE_SAMPLE_DATA"',
+        'SNOWFLAKE_SCHEMA="TPCH_SF1"',
+        'SNOWFLAKE_ROLE="PUBLIC"',
+    ):
+        assert expected in env_template
