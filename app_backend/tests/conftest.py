@@ -39,7 +39,7 @@ from app.deps import Deps  # noqa: E402
 
 @pytest.fixture()
 def config() -> Config:
-    return Config()
+    return Config(session_secret_key="test-secret-key")
 
 
 @pytest.fixture

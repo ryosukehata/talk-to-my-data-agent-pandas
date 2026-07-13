@@ -348,6 +348,24 @@ db_credential = get_database_credentials(DATABASE_CONNECTION_TYPE)
 db_runtime_parameter_values = get_credential_runtime_parameter_values(db_credential)
 app_backend_app_runtime_parameters += db_runtime_parameter_values  # type: ignore[arg-type]
 
+session_secret_key = os.environ.get("SESSION_SECRET_KEY")
+if not session_secret_key:
+    raise ValueError(
+        "SESSION_SECRET_KEY environment variable is required to deploy app_backend. "
+        "Run `task start` (or `dr dotenv setup`) to generate one."
+    )
+session_secret_key_credential = datarobot.ApiTokenCredential(
+    resource_name=f"Talk to My Data SESSION_SECRET_KEY Credential [{PROJECT_NAME}]",
+    api_token=session_secret_key,
+)
+app_backend_app_runtime_parameters.append(
+    datarobot.ApplicationSourceRuntimeParameterValueArgs(
+        key="SESSION_SECRET_KEY",
+        type="credential",
+        value=session_secret_key_credential.id,
+    )
+)
+
 if app_frontend is None:
     app_source_files = get_app_backend_app_files(app_backend_app_runtime_parameters)
 else:

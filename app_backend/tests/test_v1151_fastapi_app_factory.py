@@ -10,6 +10,7 @@ def _set_required_import_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATAROBOT_API_TOKEN", "test-token")
     monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://example.com")
     monkeypatch.setenv("OTEL_SDK_DISABLED", "true")
+    monkeypatch.setenv("SESSION_SECRET_KEY", "test-secret-key")
 
 
 def test_core_rest_api_exposes_app_factory(

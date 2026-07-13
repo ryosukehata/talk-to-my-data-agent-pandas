@@ -9,6 +9,11 @@ def test_app_config_accepts_empty_otel_sdk_disabled() -> None:
     config = Config(
         log_level="INFO",
         log_format="readable",
+        session_secret_key="test-secret-key",
+        datarobot_api_token="",
+        otel_entity_id="",
+        otel_exporter_otlp_endpoint="",
+        otel_exporter_otlp_headers="",
         otel_sdk_disabled="",
     )
 

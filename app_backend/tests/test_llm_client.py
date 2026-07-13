@@ -215,6 +215,11 @@ def test_llm_client_config_uses_upstream_config_defaults(
     _clear_llm_env(monkeypatch)
     monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.example/api/v2")
     monkeypatch.setenv("DATAROBOT_API_TOKEN", "token-123")
+    monkeypatch.setattr(
+        llm_client,
+        "Config",
+        lambda: SimpleNamespace(llm_default_model="custom-model"),
+    )
 
     config = llm_client.LLMClientConfig.from_env()
 
@@ -432,6 +437,11 @@ def test_async_llm_client_deployed_llm_uses_config_default_model(
     monkeypatch.setenv("DATAROBOT_ENDPOINT", "https://app.datarobot.example/api/v2")
     monkeypatch.setenv("DATAROBOT_API_TOKEN", "token-123")
     monkeypatch.setenv("TEXTGEN_DEPLOYMENT_ID", "deployment-123")
+    monkeypatch.setattr(
+        llm_client,
+        "Config",
+        lambda: SimpleNamespace(llm_default_model="custom-model"),
+    )
     completions = _RecordingCompletions()
 
     async def fake_acompletion(**_kwargs: Any) -> Any:

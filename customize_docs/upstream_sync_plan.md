@@ -8,11 +8,11 @@
 ## 現在地
 
 - 取り込み元: `upstream/main`
-- fetch確認日: 2026-06-27
-- upstream次候補: `v11.8.2`
+- fetch確認日: 2026-07-10
+- upstream次候補: `v11.10.2`
 - upstream 0系最新: `v0.5.3`
-- upstream最新タグ: `v11.8.2`
-- `origin/dev` 最新: `aee3e4d` (`v11.7.2` 取り込みPR #107 merge済み)
+- upstream最新タグ: `v11.10.2`
+- `origin/dev` 最新: `74dbcf3` (`v11.10.1` 取り込みPR #118 merge済み)
 - `origin/dev` は内容上 `v0.5.1` 済みだが、履歴上は `v0.5.1` タグを祖先に持たない。
 - 退避ブランチ: `backup/dev-before-upstream-sync-20260604`, `backup/dev-before-v0.4.24-sync-20260604`
 
@@ -68,6 +68,7 @@
 | `v11.7.2` | `codex/upstream-sync-v11.7.2` | 一部取り込む | assistant feedback API/UI、`message_feedback`、dictionary failure persistence、`core:transfer-database`、pre-built execution environment、LLM GenAI semantic attributes、feedback i18n | pandas公開挙動、`core/src/core/customize`、custom prompts、question refiner、report builder、template selectorを維持。FastAPI request body validationはPydantic modelに寄せ、LLM telemetry本文は `LLM_CAPTURE_CONTENT=true` のときだけ扱う。PR3対象のv11.8 transfer hang修正、Polars前提差分、不要なtheme/docs churnは見送り。 | 詳細は `customize_docs/v11_7_2_integration_plan.md` |
 | `v11.8.2` | `codex/upstream-sync-v11.8.2` | 一部取り込む | transfer database hang修正、`datarobot>=3.13.0`、`used_datasets` schema/frontend表示、`datarobot_jdbc`、OTel env config、locale修正 | `git merge v11.8.2` は legacy upstream churn とPolars前提差分の再衝突が大きいため、必要差分を手動移植した。pandas公開挙動、`core/src/core/customize`、custom prompts、question refiner、report builder、template selectorを維持。LLM prompt/completion本文は引き続き `LLM_CAPTURE_CONTENT=true` のときだけ扱う。 | 詳細は `customize_docs/v11_8_2_integration_plan.md` |
 | `v11.10.1` | `codex/upstream-sync-v11.10.1` | 一部取り込む | OTel chat metrics、LLM span user id、JDBC PreviewのSnowflake/SAP/BigQuery対応、NIM deployed LLM、Dictionary edit icon、persistent_fs修正 | `core.data_connections.database.database_implementations` は互換ファサードを維持し、JDBC dialect拡張は `core.database_helpers` に移植した。root docsと `core/uv.lock` は採用しない。 | 詳細は `customize_docs/v11_10_1_integration_plan.md` |
+| `v11.10.2` | `codex/upstream-sync-v11.10.2` | 取り込む | `SESSION_SECRET_KEY` runtime parameter、profiling middleware、OTel dependency緩和、CVE対応、CLI install commands | `cryptography>=48` と旧 `snowflake-connector-python<4` が `cffi` 制約で衝突したため、forkのSnowflake互換を残す前提で connector 4.x / SQLAlchemy 1.11へ更新。`core/uv.lock` と `docs/.bin/uv.lock` は採用しない。 | 詳細は `customize_docs/v11_10_2_integration_plan.md` |
 
 ## `v0.4.24` の次アクション
 

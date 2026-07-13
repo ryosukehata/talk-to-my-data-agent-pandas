@@ -37,6 +37,7 @@ jobs:
       OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
       OPENAI_API_VERSION: ${{ secrets.OPENAI_API_VERSION }}
       OPENAI_API_DEPLOYMENT_ID: ${{ secrets.OPENAI_API_DEPLOYMENT_ID }}
+      SESSION_SECRET_KEY: ${{ secrets.SESSION_SECRET_KEY }}
       FRONTEND_TYPE: ${{ vars.FRONTEND_TYPE || 'react' }}
       APPLICATION_EXECUTION_ENVIRONMENT_ID: ${{ github.ref == 'refs/heads/main' && secrets.APPLICATION_EXECUTION_ENVIRONMENT_ID
         || '' }}
