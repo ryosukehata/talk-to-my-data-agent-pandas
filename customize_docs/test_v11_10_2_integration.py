@@ -109,6 +109,8 @@ def test_env_template_documents_snowflake_values() -> None:
     )
     assert "SNOWFLAKE_SAMPLE_DATA" in env_template
     assert "TPCH_SF1" in env_template
+    assert "private_key_base64" in env_template
+    assert "Local private_key_file paths are not readable" in env_template
     for expected in (
         'snowflake_authentication="key file authentication"',
         'SNOWFLAKE_USER="<snowflake_user>"',

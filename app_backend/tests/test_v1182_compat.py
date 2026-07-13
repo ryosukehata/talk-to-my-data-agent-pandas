@@ -58,6 +58,9 @@ def test_infra_maps_jdbc_credentials_and_otel_runtime_parameters() -> None:
     credential_source = (
         REPO_ROOT / "infra" / "infra" / "components" / "dr_credential.py"
     ).read_text()
+    database_source = (
+        REPO_ROOT / "core" / "src" / "core" / "database_helpers.py"
+    ).read_text()
 
     assert "OTEL_EXPORTER_OTLP_ENDPOINT" in app_backend_source
     assert "OTEL_EXPORTER_OTLP_HEADERS" in app_backend_source
@@ -65,6 +68,8 @@ def test_infra_maps_jdbc_credentials_and_otel_runtime_parameters() -> None:
     assert "JDBCCredentials" in credential_source
     assert "JDBC_URI" in credential_source
     assert "JDBC_CONNECTION_PARAMETERS" in credential_source
+    assert "core.customize.snowflake_jdbc_compat" in credential_source
+    assert "core.customize.snowflake_jdbc_compat" in database_source
 
 
 def test_infra_uses_upstream_execution_environment_selector() -> None:
