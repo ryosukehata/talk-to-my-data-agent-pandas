@@ -380,7 +380,6 @@ app_backend_app_source = datarobot.ApplicationSource(
         resource_label=CustomAppResourceBundles.CPU_7XL.value.id,
         replicas=1,
         service_web_requests_on_root_path=True,
-        session_affinity=True,
     ),
     required_key_scope_level=required_key_scope_level,
     opts=pulumi.ResourceOptions(retain_on_delete=True),
