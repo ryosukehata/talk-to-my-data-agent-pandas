@@ -182,6 +182,34 @@ def test_jdbc_preview_query_name_supports_schema_prefixed_dataset_name(
     assert operator.query_friendly_name("SALES.orders") == '"SALES"."orders"'
 
 
+def test_snowflake_jdbc_system_prompt_requires_derived_table_safe_sql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "JDBC_URI",
+        "jdbc:snowflake://account.snowflakecomputing.com/?db=ANALYTICS&schema=PUBLIC",
+    )
+
+    prompt = JdbcPreviewOperator(JDBCCredentials()).get_system_prompt()["content"]
+
+    assert "exactly one SELECT statement or one WITH/CTE statement" in prompt
+    assert "MUST NOT have a trailing semicolon" in prompt
+    assert "Return valid JSON only" in prompt
+    assert "Do not wrap the JSON or SQL in Markdown code fences" in prompt
+    assert "Do not use SHOW, DESCRIBE, EXPLAIN, CALL" in prompt
+    assert "Never use placeholders, template variables" in prompt
+    assert "Use only the exact table references" in prompt
+    assert (
+        "ARRAY_AGG(DISTINCT expression) WITHIN GROUP (ORDER BY expression)" in prompt
+    )
+    assert "ORDER BY expression must be the same expression" in prompt
+    assert "Do not repeat an invalid placeholder, table reference" in prompt
+    assert "Warehouse: {warehouse}" not in prompt
+    assert "Database: {database}" not in prompt
+    assert "{database}" not in prompt
+    assert "{schema}" not in prompt
+
+
 @pytest.mark.parametrize(
     ("database", "jdbc_uri", "quoted_name"),
     [
