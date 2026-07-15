@@ -29,7 +29,11 @@ Your query should return not just the facts directly related to the question, bu
 Your query will be executed from Python using the Snowflake Python Connector.
 
 RESPONSE:
-Your response shall be a single, executable Snowflake SQL query that retrieves, analyzes, aggregates and returns the information required to answer the user's question.
+Your response shall be a JSON object with the following fields:
+1) code: one executable Snowflake SQL query that retrieves, analyzes, aggregates and returns the information required to answer the user's question.
+2) description: a brief explanation of how the code works and how to interpret its results.
+Return valid JSON only. Do not wrap the JSON or SQL in Markdown code fences.
+The code value must contain SQL only. Do not include prose, labels, or non-SQL text in it.
 In addition, your response should return any relevant, supporting or contextual information to help the user better understand the results.
 Try to ensure that your query does not return an empty result set.
 Your code may not include any operations that could alter or corrupt the data in Snowflake.
@@ -40,13 +44,6 @@ The result of this query will be analyzed by humans and plotted in charts, so co
 Do not provide multiple queries that must be executed in different steps - the query must execute in a single step.
 Do not include any USE statements.
 Include comments to explain your code.
-Your response shall be formatted as JSON with the following fields:
-1) code: Snowflake SQL code that will execute and return the data
-2) description: A brief description of how the code works, and how the results can be interpreted to answer the question.
-
-SNOWFLAKE ENVIRONMENT:
-Warehouse: {warehouse}
-Database: {database}
 
 NECESSARY CONSIDERATIONS:
 Carefully consider the metadata and the sample data when constructing your query to avoid errors or an empty result.
@@ -54,13 +51,23 @@ For example, seemingly numeric columns might contain non-numeric formatting such
 When performing date operations on a date column, consider casting that column as a DATE for error redundancy.
 To ensure case sensitivity of column names, use quotes around column names.
 This query will be executed using the Snowflake Python Connector. Make sure the query will be compatible with the Snowflake Python Connector.
-Always reference tables fully quoted and qualified, as in '{database}."SCHEMA_NAME"."TABLE_NAME"' and quote any column names in the query.
+Always quote table and column identifiers in the query.
+
+JDBC EXECUTION CONSTRAINTS:
+The code value is embedded inside a derived table by the JDBC execution service. It MUST contain exactly one SELECT statement or one WITH/CTE statement that ends in a SELECT statement, and it MUST NOT have a trailing semicolon.
+Do not use SHOW, DESCRIBE, EXPLAIN, CALL, EXECUTE IMMEDIATE, SET, BEGIN/END, temporary objects, or session-dependent statements.
+Never use placeholders, template variables, or inferred database/schema names. Do not emit any database or schema token enclosed in single or double curly braces.
+Use only the exact table references provided in the sample data and data dictionary. Do not invent, substitute, or prepend a database or schema name.
+For ordered Snowflake ARRAY_AGG expressions, use exactly this form:
+ARRAY_AGG(DISTINCT expression) WITHIN GROUP (ORDER BY expression)
+When ARRAY_AGG uses DISTINCT and WITHIN GROUP, the ORDER BY expression must be the same expression passed to ARRAY_AGG.
 
 
 REATTEMPT:
 It's possible that your query will fail due to a SQL error or return an empty result set.
 If this happens, you will be provided the failed query and the error message.
 Take this failed SQL code and error message into consideration when building your query so that the problem doesn't happen again.
+Correct the reported syntax or identifier issue. Do not repeat an invalid placeholder, table reference, or aggregate ordering pattern from the failed query.
 
 Remember that snowflake is case sensitive, and assumes ANY unquoted identifier are UPPER_CASE. Quote everything!
 """
