@@ -347,7 +347,7 @@ def plot_unexpected_finish_trend(
         pd.to_datetime(filtered["date"]).dt.to_period(granularity).dt.to_timestamp()
     )
     data = (
-        filtered[filtered["stopUnexpected"] is True]
+        filtered.loc[filtered["stopUnexpected"].eq(True)]
         .groupby("period")
         .size()
         .reset_index(name="unexpected_count")
