@@ -26,15 +26,16 @@ cleanup 時に `pulumi-resource-command` process が残っていた。
   stack export JSON から prune し、`pulumi stack import` で反映する。
   - 失敗した replacement が複数残ると同一 URN が曖昧になり、`pulumi state delete`
     では削除できないため。
-- CI では `SKIP_PULUMI_CUSTOM_JOBS=true` も設定し、`pulumi-datarobot` provider の
-  CustomJob 更新を避ける。
-  - command resource を外した後も `datarobot:index:CustomJob Usage Export Job`
-    の更新完了直後に update が終了しないため。
-  - 既存 DataRobot CustomJob は削除せず、Pulumi state からのみ prune する。
-- CI では `DISALLOW_MONITORING_RESOURCES=true` も設定し、usage dashboard と
-  monitoring datasets も Pulumi state からのみ prune する。
-  - CustomJob を外した後も `Data Analyst Dashboard [dev]` の更新が完了せず、
-    update が終了しないため。
+- 2026-07-24、CI の `SKIP_PULUMI_CUSTOM_JOBS=true` と
+  `DISALLOW_MONITORING_RESOURCES=true` を削除し、Usage Export Job、usage dashboard、
+  Trace Dataset、Access Log Dataset をPulumi管理へ戻した。
+  - 監視リソースをstateから除外したまま物理Custom Jobだけを残すと、Datasetが削除・
+    置換された後もJobのruntime parameterが古いDataset IDを参照し、実行時に
+    DataRobot APIの `410 GONE` となるため。
+  - CIのstate prune対象からCustom Job、usage dashboard、monitoring datasetsを外し、
+    `pulumi refresh` と `pulumi up` で実リソースとstateを継続的に同期する。
+  - 過去のschedule管理用ComponentResourceは物理リソースを持たないため、従来どおり
+    prune対象に残す。
 - CI では main app の `Data Analyst App Source` も Pulumi state から prune する。
   - `ApplicationSource` / `CustomApplication` 更新後に旧 source を delete original
     しようとして、DataRobot API が 422 `This entity is in use by a custom application`
@@ -49,10 +50,11 @@ cleanup 時に `pulumi-resource-command` process が残っていた。
   - Pulumi stack が事前 build 済み frontend assets を直接使えることを確認する。
 - `customize_docs/test_pulumi_workflow_refresh.py`
   - workflow が `command:local:Command` state を事前 prune することを確認する。
-  - workflow が branch に対応した resource name で App Source / monitoring state を
-    事前 prune することを確認する。
+  - workflow が branch に対応したApp Sourceだけを事前pruneすることを確認する。
   - Pulumi action に `SKIP_PULUMI_FRONTEND_BUILD=true` が渡ることを確認する。
   - frontend assets build で `npm install` と fetch retry が設定されることを確認する。
   - git 管理されていない `package-lock.json` に依存する npm cache 設定を入れないことを確認する。
+  - Usage Export Job、usage dashboard、monitoring datasetsをCIがskipまたはstate prune
+    しないことを確認する。
 - `customize_docs/test_prune_pulumi_state_resources.py`
   - stack export から対象 type の resources と、その依存参照を削除することを確認する。
