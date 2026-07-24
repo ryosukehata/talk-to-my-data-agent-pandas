@@ -44,8 +44,6 @@ jobs:
       APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID: ${{ github.ref == 'refs/heads/main' && secrets.APPLICATION_EXECUTION_ENVIRONMENT_VERSION_ID
         || '' }}
       SKIP_PULUMI_FRONTEND_BUILD: "true"
-      SKIP_PULUMI_CUSTOM_JOBS: "true"
-      DISALLOW_MONITORING_RESOURCES: "true"
       VITE_ENABLE_TEMPLATE_EDIT: ${{ secrets.VITE_ENABLE_TEMPLATE_EDIT }}
       VITE_ENABLE_CUSTOM_PROMPTS: ${{ secrets.VITE_ENABLE_CUSTOM_PROMPTS }}
       PROMPTS_TEMPLATE_PATH: ${{ secrets.PROMPTS_TEMPLATE_PATH }}
@@ -130,13 +128,7 @@ jobs:
             custom:resource:CustomJobPostActions \
             custom:resource:CustomJobScheduleCleanup \
             command:local:Command \
-            datarobot:index/customJob:CustomJob \
-            datarobot:index:CustomJob \
             --resource-name "Data Analyst App Source [$project_name]" \
-            --resource-name "Data Analyst Dashboard Source [$project_name]" \
-            --resource-name "Data Analyst Dashboard [$project_name]" \
-            --resource-name "Dataset Trace [$project_name]" \
-            --resource-name "Dataset Access Log [$project_name]" \
             > /tmp/pruned-urns.txt
 
           stale_urns="$(cat /tmp/pruned-urns.txt)"
