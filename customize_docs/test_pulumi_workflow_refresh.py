@@ -113,6 +113,21 @@ def test_pulumi_up_workflow_deploys_from_split_infra_project() -> None:
     }
 
 
+def test_pulumi_up_workflow_keeps_monitoring_resources_managed() -> None:
+    workflow = _load_workflow("pulumi-up.yml")
+    job = workflow["jobs"]["update"]
+    prune_step = _step_by_name(job["steps"], "Remove stale Pulumi state resources")
+
+    assert "SKIP_PULUMI_CUSTOM_JOBS" not in job["env"]
+    assert "DISALLOW_MONITORING_RESOURCES" not in job["env"]
+    assert "datarobot:index/customJob:CustomJob" not in prune_step["run"]
+    assert "datarobot:index:CustomJob" not in prune_step["run"]
+    assert 'Data Analyst Dashboard Source [$project_name]' not in prune_step["run"]
+    assert 'Data Analyst Dashboard [$project_name]' not in prune_step["run"]
+    assert 'Dataset Trace [$project_name]' not in prune_step["run"]
+    assert 'Dataset Access Log [$project_name]' not in prune_step["run"]
+
+
 def test_infra_python_workflow_runs_split_infra_checks() -> None:
     workflow = _load_workflow("infra-python.yml")
     job = workflow["jobs"]["python-checks"]
