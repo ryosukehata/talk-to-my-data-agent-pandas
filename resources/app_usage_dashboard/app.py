@@ -338,7 +338,7 @@ st.subheader(_("section_titles.active_user_trend"))
 fig = visualizations.plot_active_user_trend(
     filtered_df, (start, end), granularity[0].upper()
 )
-st.plotly_chart(fig, use_container_width=True, key="active_user_trend_chart")
+st.plotly_chart(fig, width="stretch", key="active_user_trend_chart")
 
 # Add download button below the chart
 trend_data = visualizations.get_active_user_trend_data(
@@ -360,7 +360,7 @@ st.subheader(_("section_titles.number_of_chats_trend"))
 fig2 = visualizations.plot_number_of_chats_trend(
     filtered_df, (start, end), granularity[0].upper()
 )
-st.plotly_chart(fig2, use_container_width=True, key="number_of_chats_trend_chart")
+st.plotly_chart(fig2, width="stretch", key="number_of_chats_trend_chart")
 
 # Add download button below the chart
 chats_trend_data = visualizations.get_number_of_chats_trend_data(
@@ -382,7 +382,7 @@ st.subheader(_("section_titles.user_activity_heatmap"))
 fig3 = visualizations.plot_user_activity_heatmap(
     filtered_df, (start, end), granularity[0].upper()
 )
-st.plotly_chart(fig3, use_container_width=True, key="user_activity_heatmap_chart")
+st.plotly_chart(fig3, width="stretch", key="user_activity_heatmap_chart")
 
 # Add download button below the chart
 heatmap_data = visualizations.get_user_activity_heatmap_data(
@@ -404,35 +404,35 @@ st.subheader(_("section_titles.llm_call_count_trend"))
 fig4 = visualizations.plot_llm_call_count_trend(
     filtered_df, (start, end), granularity[0].upper()
 )
-st.plotly_chart(fig4, use_container_width=True, key="llm_call_count_trend_chart")
+st.plotly_chart(fig4, width="stretch", key="llm_call_count_trend_chart")
 
 # Display LLM Error Count Trend chart
 st.subheader(_("section_titles.llm_error_avg_trend"))
 fig5 = visualizations.plot_llm_error_avg_trend(
     filtered_df, (start, end), granularity[0].upper()
 )
-st.plotly_chart(fig5, use_container_width=True, key="llm_error_avg_trend_chart")
+st.plotly_chart(fig5, width="stretch", key="llm_error_avg_trend_chart")
 
 # Display Average LLM Call Process Time Trend chart
 st.subheader(_("section_titles.llm_avg_process_time_trend"))
 fig6 = visualizations.plot_llm_avg_process_time_trend(
     filtered_df, (start, end), granularity[0].upper()
 )
-st.plotly_chart(fig6, use_container_width=True, key="llm_avg_process_time_trend_chart")
+st.plotly_chart(fig6, width="stretch", key="llm_avg_process_time_trend_chart")
 
 # Display Data Source Usage Trend chart
 st.subheader(_("section_titles.data_source_usage_trend"))
 fig7 = visualizations.plot_data_source_usage_trend(
     filtered_df, (start, end), granularity[0].upper()
 )
-st.plotly_chart(fig7, use_container_width=True, key="data_source_usage_trend_chart")
+st.plotly_chart(fig7, width="stretch", key="data_source_usage_trend_chart")
 
 # Display Unexpected Finish Trend chart
 st.subheader(_("section_titles.unexpected_finish_trend"))
 fig8 = visualizations.plot_unexpected_finish_trend(
     filtered_df, (start, end), granularity[0].upper()
 )
-st.plotly_chart(fig8, use_container_width=True, key="unexpected_finish_trend_chart")
+st.plotly_chart(fig8, width="stretch", key="unexpected_finish_trend_chart")
 
 # Display User Message Word Cloud
 st.subheader(_("section_titles.user_message_wordcloud"))
@@ -486,4 +486,4 @@ else:
     col_headers = [_(f"dataframe_headers.{col}") for col in display_cols]
     table_df = filtered_df[display_cols].copy()
     table_df.columns = col_headers
-    st.dataframe(table_df, use_container_width=True)
+    st.dataframe(table_df, width="stretch")
