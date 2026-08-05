@@ -12,7 +12,7 @@ dependencies = [
     "babel>=2.16,<3",
     "boto3>=1.36.2,<2.0",
     "core",
-    "cryptography>=48.0.1,<49.0",
+    "cryptography>=50.0.0,<51.0",
     "datarobot[auth-authlib,core]>=3.13.0",
     "datarobot-asgi-middleware>=0.2.0",
     "datarobot-genai>=0.3.4,<0.4",
